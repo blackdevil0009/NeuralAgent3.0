@@ -1,0 +1,582 @@
+/* ============================================================
+   registration_style.css
+   NeuralAgent 3.0 – Ayurvedic Registration Page Styles
+   Maintainer: NeuralAgent Dev Team
+   Last Updated: 2026-02-25
+   ============================================================ */
+
+/* ---------- Google Font Import ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@300;400;500;600&family=Lora:ital,wght@1,400&display=swap');
+
+/* ---------- CSS Variables / Design Tokens ---------- */
+:root {
+  --primary-green    : #2d6a4f;
+  --primary-light    : #52b788;
+  --accent-gold      : #c9a84c;
+  --accent-amber     : #e9c46a;
+  --bg-dark          : rgba(20, 40, 25, 0.78);
+  --card-bg          : rgba(255, 255, 255, 0.93);
+  --card-shadow      : 0 24px 60px rgba(20, 60, 30, 0.30);
+  --input-border     : #b7d9c2;
+  --input-focus      : #2d6a4f;
+  --error-red        : #c0392b;
+  --text-dark        : #1a2e1a;
+  --text-muted       : #5a755a;
+  --text-light       : #ffffff;
+  --radius-card      : 22px;
+  --radius-input     : 10px;
+  --transition       : 0.28s ease;
+}
+
+/* ---------- Reset & Base ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  font-family: 'Poppins', sans-serif;
+  color: var(--text-dark);
+}
+
+/* ---------- Full-Page Background ---------- */
+.reg-page {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 40px 16px;
+  background:
+    /* Radial glow top-left */
+    radial-gradient(ellipse at 8% 10%, rgba(82, 183, 136, 0.40) 0%, transparent 55%),
+    /* Radial glow bottom-right */
+    radial-gradient(ellipse at 92% 90%, rgba(201, 168, 76, 0.28) 0%, transparent 55%),
+    /* Main deep forest gradient */
+    linear-gradient(160deg, #0d2b14 0%, #1a4428 35%, #2d6a4f 70%, #1b3a25 100%);
+}
+
+/* --- Decorative SVG leaf layer (pseudo-element) --- */
+.reg-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cellipse cx='80' cy='60' rx='60' ry='30' fill='none' stroke='rgba(82,183,136,0.18)' stroke-width='2'/%3E%3Cellipse cx='330' cy='120' rx='70' ry='35' fill='rgba(45,106,79,0.12)' transform='rotate(-30 330 120)'/%3E%3Cellipse cx='50' cy='300' rx='80' ry='28' fill='rgba(82,183,136,0.10)' transform='rotate(20 50 300)'/%3E%3Cellipse cx='360' cy='340' rx='65' ry='30' fill='none' stroke='rgba(201,168,76,0.14)' stroke-width='1.5'/%3E%3Cellipse cx='200' cy='380' rx='90' ry='32' fill='rgba(45,106,79,0.09)' transform='rotate(-15 200 380)'/%3E%3Ccircle cx='200' cy='200' r='3' fill='rgba(201,168,76,0.30)'/%3E%3Ccircle cx='100' cy='150' r='2' fill='rgba(82,183,136,0.25)'/%3E%3Ccircle cx='310' cy='260' r='2.5' fill='rgba(201,168,76,0.20)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 420px 420px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+}
+
+/* Vaidya silhouette / mandala decorative circle */
+.reg-page::after {
+  content: '';
+  position: fixed;
+  right: -120px;
+  bottom: -120px;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 168, 76, 0.12) 0%, transparent 65%);
+  border: 2px solid rgba(201, 168, 76, 0.12);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---------- Card Container ---------- */
+.reg-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 720px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  animation: slideUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Card Header Banner ---------- */
+.reg-header {
+  background: linear-gradient(135deg, var(--primary-green) 0%, #1b4332 100%);
+  padding: 30px 40px 24px;
+  text-align: center;
+  position: relative;
+}
+
+.reg-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0; right: 0;
+  height: 22px;
+  background: var(--card-bg);
+  border-radius: 22px 22px 0 0;
+}
+
+.reg-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  letter-spacing: 2px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.40);
+}
+
+.reg-tagline {
+  font-family: 'Lora', serif;
+  font-style: italic;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+  letter-spacing: 0.6px;
+}
+
+/* ---------- Tab Toggle (Patient / Doctor) ---------- */
+.reg-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px 40px 0;
+}
+
+.reg-tab-btn {
+  flex: 1;
+  max-width: 200px;
+  padding: 11px 0;
+  border: 2px solid var(--primary-light);
+  border-radius: 50px;
+  background: transparent;
+  color: var(--primary-green);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.reg-tab-btn.active,
+.reg-tab-btn:hover {
+  background: var(--primary-green);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(45, 106, 79, 0.32);
+  transform: translateY(-2px);
+}
+
+/* ---------- Form Body ---------- */
+.reg-form-body {
+  padding: 28px 40px 12px;
+}
+
+.reg-section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  color: var(--primary-green);
+  margin-bottom: 18px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(45, 106, 79, 0.14);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reg-section-title span {
+  font-size: 1.3rem;
+}
+
+/* ---------- Form Grid ---------- */
+.reg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 22px;
+}
+
+.reg-grid.full {
+  grid-template-columns: 1fr;
+}
+
+/* ---------- Form Group ---------- */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-group.full-col {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.8px solid var(--input-border);
+  border-radius: var(--radius-input);
+  background: #f8fdf9;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.88rem;
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--input-focus);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.12);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #aec8b4;
+  font-size: 0.84rem;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Password strength indicator */
+.pw-strength-bar {
+  height: 4px;
+  border-radius: 4px;
+  background: #e0e0e0;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.pw-strength-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.35s ease, background 0.35s ease;
+}
+
+.pw-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ---------- File Upload ---------- */
+.file-upload-wrapper {
+  position: relative;
+}
+
+.file-upload-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1.8px dashed var(--primary-light);
+  border-radius: var(--radius-input);
+  background: #f0faf4;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  font-size: 0.86rem;
+  color: var(--primary-green);
+}
+
+.file-upload-label:hover {
+  background: #e1f5ea;
+  border-color: var(--primary-green);
+}
+
+.file-upload-label .upload-icon {
+  font-size: 1.2rem;
+}
+
+.file-upload-label span {
+  font-weight: 500;
+}
+
+.file-upload-input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  top: 0; left: 0;
+  cursor: pointer;
+}
+
+.file-name-display {
+  font-size: 0.75rem;
+  color: var(--primary-green);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* ---------- Section Divider ---------- */
+.reg-divider {
+  border: none;
+  border-top: 1.5px dashed rgba(45, 106, 79, 0.18);
+  margin: 22px 0 18px;
+}
+
+/* ---------- Terms & Conditions ---------- */
+.terms-box {
+  background: #f4faf6;
+  border: 1.5px solid rgba(45, 106, 79, 0.18);
+  border-radius: 12px;
+  padding: 14px 16px;
+  max-height: 130px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+.terms-box::-webkit-scrollbar { width: 5px; }
+.terms-box::-webkit-scrollbar-track { background: #e8f5ee; }
+.terms-box::-webkit-scrollbar-thumb { background: var(--primary-light); border-radius: 4px; }
+
+.terms-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.terms-check input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--primary-green);
+  flex-shrink: 0;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.terms-check a {
+  color: var(--primary-green);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* ---------- Error / Success Messages ---------- */
+.field-error {
+  font-size: 0.72rem;
+  color: var(--error-red);
+  margin-top: 2px;
+}
+
+.form-error-banner {
+  background: #fdecea;
+  border: 1px solid #f5c6cb;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--error-red);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- Submit Button ---------- */
+.reg-footer {
+  padding: 20px 40px 30px;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 50px;
+  background: linear-gradient(135deg, var(--primary-green) 0%, #1b4332 100%);
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 6px 22px rgba(45, 106, 79, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-submit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.1);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.btn-submit:hover::after { opacity: 1; }
+
+.btn-submit:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(45, 106, 79, 0.45);
+}
+
+.btn-submit:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 14px rgba(45, 106, 79, 0.30);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Loading spinner inside button */
+.btn-submit .spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Login Redirect Link ---------- */
+.reg-redirect {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 10px;
+  padding-bottom: 6px;
+}
+
+.reg-redirect a {
+  color: var(--primary-green);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.reg-redirect a:hover {
+  color: var(--accent-gold);
+}
+
+/* ---------- Floating Leaf Decorations ---------- */
+.leaf {
+  position: fixed;
+  border-radius: 0 90% 0 90%;
+  opacity: 0.07;
+  pointer-events: none;
+  z-index: 0;
+  animation: sway 8s ease-in-out infinite;
+}
+
+.leaf-1 {
+  width: 180px; height: 90px;
+  background: #52b788;
+  top: 8%; left: -60px;
+  transform: rotate(30deg);
+  animation-delay: 0s;
+}
+
+.leaf-2 {
+  width: 260px; height: 120px;
+  background: #40916c;
+  top: 30%; left: -80px;
+  transform: rotate(-20deg);
+  animation-delay: 1.5s;
+}
+
+.leaf-3 {
+  width: 200px; height: 95px;
+  background: #52b788;
+  bottom: 20%; right: -70px;
+  transform: rotate(150deg);
+  animation-delay: 0.8s;
+}
+
+.leaf-4 {
+  width: 300px; height: 130px;
+  background: #2d6a4f;
+  bottom: 5%; right: -100px;
+  transform: rotate(130deg);
+  animation-delay: 2s;
+}
+
+.leaf-5 {
+  width: 140px; height: 70px;
+  background: #c9a84c;
+  top: 5%; right: 60px;
+  transform: rotate(-45deg);
+  animation-delay: 3s;
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(var(--rot, 30deg)) translateY(0); }
+  50%       { transform: rotate(var(--rot, 30deg)) translateY(-12px); }
+}
+
+/* ---------- Responsive Adjustments ---------- */
+@media (max-width: 680px) {
+  .reg-container {
+    border-radius: 16px;
+    margin: 0 8px;
+  }
+
+  .reg-header {
+    padding: 24px 24px 20px;
+  }
+
+  .reg-form-body {
+    padding: 22px 20px 8px;
+  }
+
+  .reg-footer {
+    padding: 16px 20px 24px;
+  }
+
+  .reg-tabs {
+    padding: 18px 20px 0;
+  }
+
+  .reg-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reg-logo {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .reg-tab-btn {
+    font-size: 0.78rem;
+    padding: 9px 0;
+  }
+}

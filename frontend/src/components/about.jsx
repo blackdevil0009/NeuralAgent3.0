@@ -1,0 +1,81 @@
+import React from 'react';
+
+const VALUES = [
+    { icon: '🌿', title: 'Holistic Care', desc: 'Blending ancient Ayurvedic wisdom with modern AI for truly comprehensive health guidance.' },
+    { icon: '🔬', title: 'Science-Backed', desc: 'Every recommendation is grounded in validated clinical research and Ayurvedic texts.' },
+    { icon: '🔒', title: 'Privacy First', desc: 'Bank-grade encryption protects your sensitive health data at every step.' },
+    { icon: '🤝', title: 'Accessible to All', desc: 'Breaking barriers to quality healthcare for patients and practitioners alike.' },
+];
+
+const TEAM = [
+    { emoji: '👨‍⚕️', name: 'Dr. Arjun Menon', role: 'Chief Medical Officer', bg: '#e8f5ee' },
+    { emoji: '👩‍💻', name: 'Priya Sharma', role: 'AI Research Lead', bg: '#fff8e7' },
+    { emoji: '🧑‍🌾', name: 'Vaidya R. Tripathi', role: 'Ayurveda Specialist', bg: '#f0eaff' },
+    { emoji: '👨‍💼', name: 'Kiran Patel', role: 'Product & Strategy', bg: '#fde8e8' },
+];
+
+export default function About() {
+    return (
+        <section className="na-about" id="about">
+            <div className="na-section-container">
+
+                {/* Section header */}
+                <div className="na-section-header">
+                    <span className="na-badge">Our Story</span>
+                    <h2 className="na-section-title">
+                        Bridging <span className="na-gradient-text">Ancient Wisdom</span> &amp; Modern Medicine
+                    </h2>
+                    <p className="na-section-sub">
+                        NeuralAgent was born from a belief — that everyone deserves intelligent, compassionate healthcare.
+                        We combine the timeless principles of Ayurveda with cutting-edge AI to redefine what health support looks like.
+                    </p>
+                </div>
+
+                {/* Values grid */}
+                <div className="na-values-grid">
+                    {VALUES.map(v => (
+                        <div className="na-value-card" key={v.title}>
+                            <div className="na-value-icon">{v.icon}</div>
+                            <h3 className="na-value-title">{v.title}</h3>
+                            <p className="na-value-desc">{v.desc}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Mission strip */}
+                <div className="na-mission-strip">
+                    <div className="na-mission-left">
+                        <h3>Our Mission</h3>
+                        <p>
+                            To democratize access to holistic health intelligence — serving patients with empathy
+                            and empowering doctors with precision AI tools, anchored in the values of Ayurveda.
+                        </p>
+                    </div>
+                    <div className="na-mission-stats">
+                        {[['50K+', 'Consultations'], ['200+', 'Expert Doctors'], ['98%', 'Satisfaction'], ['15+', 'Specializations']].map(([n, l]) => (
+                            <div className="na-mission-stat" key={l}>
+                                <span className="na-mission-num">{n}</span>
+                                <span className="na-mission-lbl">{l}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Team */}
+                <div className="na-section-header" style={{ marginTop: '60px' }}>
+                    <span className="na-badge">Meet the Team</span>
+                    <h2 className="na-section-title">The Minds Behind <span className="na-gradient-text">NeuralAgent</span></h2>
+                </div>
+                <div className="na-team-grid">
+                    {TEAM.map(m => (
+                        <div className="na-team-card" key={m.name} style={{ '--card-bg': m.bg }}>
+                            <div className="na-team-avatar">{m.emoji}</div>
+                            <h4 className="na-team-name">{m.name}</h4>
+                            <p className="na-team-role">{m.role}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
