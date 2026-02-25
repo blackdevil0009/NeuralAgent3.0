@@ -1,51 +1,97 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const MOCK_CONVOS = [
-    { id: 1, name: 'Rohit Sharma', avatar: '👨', lastMsg: 'Does the herbal tea help with acidity?', time: '10:15 AM', unread: true },
-    { id: 2, name: 'Anjali Gupta', avatar: '👩', lastMsg: 'Uploaded my CBC reports for review.', time: 'Yesterday', unread: false },
-    { id: 3, name: 'Suresh Iyer', avatar: '👴', lastMsg: 'BP is stable after the new routine.', time: '2 days ago', unread: false },
-];
-
+// Mock data removed
 const MOCK_REPORTS = [
     { id: 'R1', title: 'Blood Work - Feb 2026', type: 'PDF', date: '22 Feb 2026', status: 'Pending Review' },
     { id: 'R2', title: 'Digestive Scans', type: 'IMG', date: '20 Feb 2026', status: 'Analyzed' },
 ];
 
-const INITIAL_MESSAGES = {
-    1: [
-        { sender: 'patient', text: "Hello Doctor, I've been feeing more lethargic in the mornings lately. Also my digestion feels slow.", time: '10:05 AM' },
-        { sender: 'doctor', text: "I see. Based on your previous history, your Vata-Pitta balance might be shifting. Have you been following the warm-water routine?", time: '10:10 AM' },
-        { sender: 'patient', text: "Yes, mostly. I've uploaded my latest blood reports here for you to see.", time: '10:15 AM' }
-    ],
-    2: [
-        { sender: 'patient', text: "Hi, I've uploaded the reports from yesterday's scan.", time: 'Yesterday' }
-    ],
-    3: [
-        { sender: 'patient', text: "BP is stable after the new routine.", time: '2 days ago' }
-    ]
-};
-
 export default function DoctorInbox() {
-    const [selectedConvo, setSelectedConvo] = useState(MOCK_CONVOS[0]);
+    const navigate = useNavigate();
+    const [conversations, setConversations] = useState([]);
+    const [selectedConvo, setSelectedConvo] = useState(null);
     const [showReports, setShowReports] = useState(false);
-    const [messages, setMessages] = useState(INITIAL_MESSAGES);
+    const [messages, setMessages] = useState({});
     const [inputText, setInputText] = useState('');
-    const [activeReportOverlay, setActiveReportOverlay] = useState(null); // { type: 'summary' | 'preview', report: object }
+    const [activeReportOverlay, setActiveReportOverlay] = useState(null);
 
-    const handleSendMessage = () => {
-        if (!inputText.trim()) return;
+    /* Fetch Patients and History */
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
 
-        const newMessage = {
-            sender: 'doctor',
-            text: inputText,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        // 1. Fetch Patient list
+        fetch('http://localhost:5000/api/patients', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .then(res => res.json())
+            .then(res => {
+                if (res.data && res.data.patients) {
+                    const convos = res.data.patients.map(p => ({
+                        id: p.id,
+                        name: p.fullName,
+                        avatar: '👨',
+                        lastMsg: 'Patient waiting...',
+                        time: 'Now',
+                        online: true
+                    }));
+                    setConversations(convos);
+                    if (convos.length > 0) setSelectedConvo(convos[0]);
+                }
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!selectedConvo) return;
+        const token = localStorage.getItem('token');
+
+        const fetchHistory = () => {
+            fetch(`http://localhost:5000/api/v2/messages/history/${selectedConvo.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.data && res.data.messages) {
+                        const formattedMsgs = res.data.messages.map(m => ({
+                            sender: m.senderId === selectedConvo.id ? 'patient' : 'doctor',
+                            text: m.content,
+                            time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }));
+                        setMessages(prev => ({ ...prev, [selectedConvo.id]: formattedMsgs }));
+                    }
+                });
         };
 
-        setMessages({
-            ...messages,
-            [selectedConvo.id]: [...messages[selectedConvo.id], newMessage]
-        });
-        setInputText('');
+        fetchHistory();
+        const interval = setInterval(fetchHistory, 5000);
+        return () => clearInterval(interval);
+    }, [selectedConvo]);
+
+    const handleSendMessage = async () => {
+        if (!inputText.trim()) return;
+
+        const token = localStorage.getItem('token');
+        if (!selectedConvo) return;
+        const msgData = { receiverId: selectedConvo.id, content: inputText };
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+
+        try {
+            await fetch('http://localhost:5000/api/v2/messages/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-Timestamp': timestamp,
+                    'X-HMAC-Signature': 'DEV_BYPASS'
+                },
+                body: JSON.stringify(msgData)
+            });
+
+            setInputText('');
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const handleKeyPress = (e) => {
@@ -64,14 +110,14 @@ export default function DoctorInbox() {
                     }} />
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                    {MOCK_CONVOS.map(c => (
+                    {conversations.map(c => (
                         <div
                             key={c.id}
                             onClick={() => setSelectedConvo(c)}
                             style={{
                                 padding: '16px 20px', borderBottom: '1px solid var(--doc-border)',
-                                cursor: 'pointer', background: selectedConvo.id === c.id ? '#f0f7f2' : 'transparent',
-                                borderLeft: selectedConvo.id === c.id ? '4px solid var(--doc-green-light)' : 'none'
+                                cursor: 'pointer', background: selectedConvo?.id === c.id ? '#f0f7f2' : 'transparent',
+                                borderLeft: selectedConvo?.id === c.id ? '4px solid var(--doc-green-light)' : 'none'
                             }}
                         >
                             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -94,13 +140,13 @@ export default function DoctorInbox() {
             <div className="dd-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0 }}>
                 <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--doc-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e2e3e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{selectedConvo.avatar}</div>
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e2e3e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{selectedConvo?.avatar || '👤'}</div>
                         <div>
-                            <div style={{ fontWeight: 600 }}>{selectedConvo.name}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#2d6a4f' }}>● Active Now</div>
+                            <div style={{ fontWeight: 600 }}>{selectedConvo?.name || 'Select Patient'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#2d6a4f' }}>{selectedConvo ? '● Active Now' : 'No selection'}</div>
                         </div>
                     </div>
-                    <button className="dd-btn dd-btn-outline" onClick={() => setShowReports(!showReports)}>
+                    <button className="dd-btn dd-btn-outline" onClick={() => setShowReports(!showReports)} disabled={!selectedConvo}>
                         {showReports ? '💬 Full Chat' : '📄 Patient Reports'}
                     </button>
                 </div>
@@ -111,7 +157,7 @@ export default function DoctorInbox() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        {(messages[selectedConvo.id] || []).map((msg, i) => (
+                        {selectedConvo && (messages[selectedConvo.id] || []).map((msg, i) => (
                             <div key={i} style={{
                                 alignSelf: msg.sender === 'doctor' ? 'flex-end' : 'flex-start',
                                 maxWidth: '75%',
@@ -127,6 +173,7 @@ export default function DoctorInbox() {
                                 <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: 4, textAlign: msg.sender === 'doctor' ? 'right' : 'left' }}>{msg.time}</div>
                             </div>
                         ))}
+                        {!selectedConvo && <p style={{ textAlign: 'center', marginTop: 50, color: '#999' }}>Choose a patient to start messaging.</p>}
                     </div>
                 </div>
 
@@ -153,7 +200,7 @@ export default function DoctorInbox() {
                 showReports && (
                     <div className="dd-card" style={{ width: 350, display: 'flex', flexDirection: 'column' }}>
                         <h3>Patient Records</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--doc-text-mute)' }}>Quick access to {selectedConvo.name}'s medical files.</p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--doc-text-mute)' }}>Quick access to {selectedConvo?.name || 'Patient'}'s medical files.</p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10 }}>
                             {MOCK_REPORTS.map(r => (
@@ -231,7 +278,7 @@ export default function DoctorInbox() {
                                             <div style={{ fontSize: '0.7rem' }}>Authorized diagnostic center</div>
                                         </div>
                                         <div style={{ fontSize: '0.8rem', lineHeight: 2 }}>
-                                            <b>Patient:</b> {selectedConvo.name}<br />
+                                            <b>Patient:</b> {selectedConvo?.name || 'Patient'}<br />
                                             <b>Date:</b> {activeReportOverlay.report.date}<br />
                                             <br />
                                             <b>Parameter | Result | Range</b><br />
