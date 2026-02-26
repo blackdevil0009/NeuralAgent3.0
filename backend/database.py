@@ -80,6 +80,10 @@ def init_db():
             userId INT PRIMARY KEY,
             dob VARCHAR(50),
             gender VARCHAR(20),
+            dosha VARCHAR(50),
+            allergies TEXT,
+            conditions TEXT,
+            medications TEXT,
             FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
@@ -96,6 +100,36 @@ def init_db():
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(senderId) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY(receiverId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Appointments table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS appointments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patientId INT NOT NULL,
+            doctorId INT NOT NULL,
+            appointmentDate DATE NOT NULL,
+            appointmentTime TIME NOT NULL,
+            type VARCHAR(50) NOT NULL, -- 'Video Call' or 'Chat'
+            status VARCHAR(50) DEFAULT 'Scheduled', -- 'Scheduled', 'Completed', 'Cancelled'
+            notes TEXT,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(patientId) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(doctorId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Notifications table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId INT NOT NULL,
+            sourceType ENUM('Appointment', 'Message', 'Call') NOT NULL,
+            content TEXT NOT NULL,
+            isRead BOOLEAN DEFAULT FALSE,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
 

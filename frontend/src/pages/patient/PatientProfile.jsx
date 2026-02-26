@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { handleError, handleSuccess } from '../../utils/error_handlers';
 
 const FIELD_GROUPS = [
     {
@@ -62,21 +63,27 @@ export default function PatientProfile() {
     const handleChange = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
     const handleSubmit = async () => {
-        setLoading(true); setSaved(false);
+        setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('/api/profile', {
+            const res = await fetch('http://localhost:5000/api/profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(form),
             });
             if (res.ok) {
-                const updated = await res.json();
-                localStorage.setItem('user', JSON.stringify(updated));
+                const json = await res.json();
+                localStorage.setItem('user', JSON.stringify(json.data || {}));
+                handleSuccess('Profile updated successfully!');
+            } else {
+                const json = await res.json();
+                handleError(json.data?.error || 'Profile update failed.');
             }
-        } catch { /* offline / mock */ }
-        setLoading(false); setSaved(true);
-        setTimeout(() => setSaved(false), 3500);
+        } catch (err) {
+            handleError(err, 'Failed to save profile changes.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -91,15 +98,6 @@ export default function PatientProfile() {
                 </button>
             </div>
 
-            {saved && (
-                <div style={{
-                    background: '#eafaf1', border: '1.5px solid #27ae60', borderRadius: 12,
-                    padding: '12px 18px', marginBottom: 20, color: '#1e8449', fontSize: '0.88rem',
-                    display: 'flex', alignItems: 'center', gap: 8
-                }}>
-                    ✅ Profile updated successfully!
-                </div>
-            )}
 
             {/* Banner */}
             <div className="pd-profile-banner" style={{ marginBottom: 24 }}>

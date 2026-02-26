@@ -1,16 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const APPOINTMENTS = [
-    { id: 1, doc: 'Dr. Arjun Menon', spec: 'Ayurveda & General', day: '28', month: 'Feb', time: '10:00 AM', type: 'Video Call', status: 'Upcoming', badge: '🌿', doctorId: 1 },
-    { id: 2, doc: 'Dr. Priya Nair', spec: 'Nutrition & Diet', day: '05', month: 'Mar', time: '04:30 PM', type: 'Chat', status: 'Upcoming', badge: '🥗', doctorId: 2 },
-    { id: 3, doc: 'Vaidya R. Tripathi', spec: 'Panchakarma', day: '12', month: 'Feb', time: '11:00 AM', type: 'In-Person', status: 'Completed', badge: '🪴', doctorId: 3 },
-    { id: 4, doc: 'Dr. Kavya Reddy', spec: 'Dermatology', day: '01', month: 'Feb', time: '03:30 PM', type: 'Video Call', status: 'Completed', badge: '✨', doctorId: 4 },
-    { id: 5, doc: 'Dr. Ramesh Sharma', spec: 'Cardiology', day: '19', month: 'Jan', time: '09:00 AM', type: 'In-Person', status: 'Cancelled', badge: '❤️', doctorId: 5 },
-];
+import { handleError, handleSuccess } from '../../utils/error_handlers';
 
 const STATUS_PILL = {
     Upcoming: 'pd-pill-blue',
+    Scheduled: 'pd-pill-blue',
     Completed: 'pd-pill-green',
     Cancelled: 'pd-pill-red',
 };
@@ -21,8 +15,9 @@ export default function Appointments() {
     const navigate = useNavigate();
     const [filter, setFilter] = useState('All');
     const [cancelId, setCancelId] = useState(null);
-    const [reviewAppt, setReviewAppt] = useState(null);  // appt being reviewed
-    const [appointments, setAppointments] = useState(APPOINTMENTS);
+    const [reviewAppt, setReviewAppt] = useState(null);
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     /* Review form state */
     const [stars, setStars] = useState(0);
@@ -31,11 +26,52 @@ export default function Appointments() {
     const [recommend, setRecommend] = useState(null);
     const [submitted, setSubmitted] = useState(false);
 
+    const fetchAppointments = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/appointments', {
+                headers: { 'Authorization': `Bearer ${token} ` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setAppointments(json.data?.appointments || []);
+            }
+        } catch (err) {
+            handleError(err, 'Failed to fetch appointments');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchAppointments();
+    }, []);
+
     const filtered = filter === 'All' ? appointments : appointments.filter(a => a.status === filter);
 
-    const handleCancel = (id) => {
-        setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled', badge: '❌' } : a));
-        setCancelId(null);
+    const handleCancel = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`http://localhost:5000/api/appointments/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ status: 'Cancelled' })
+            });
+            if (res.ok) {
+                setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Cancelled' } : a));
+                setCancelId(null);
+                handleSuccess('Appointment cancelled successfully.');
+            } else {
+                const json = await res.json();
+                handleError(json.data?.error || 'Failed to cancel appointment.');
+            }
+        } catch (err) {
+            handleError(err, 'Failed to cancel appointment. Please try again.');
+        }
     };
 
     const openReview = (appt) => {
@@ -47,7 +83,15 @@ export default function Appointments() {
     const submitReview = () => {
         if (!stars) return;
         setSubmitted(true);
-        // In real app → POST /api/reviews
+    };
+
+    // Helper to format backend date
+    const formatDate = (dateStr) => {
+        const d = new Date(dateStr);
+        return {
+            day: d.getDate().toString().padStart(2, '0'),
+            month: d.toLocaleString('en-IN', { month: 'short' })
+        };
     };
 
     return (
@@ -65,7 +109,7 @@ export default function Appointments() {
             {/* Stats strip */}
             <div className="pd-grid-3" style={{ marginBottom: 24 }}>
                 {[
-                    { icon: '📅', label: 'Upcoming', val: appointments.filter(a => a.status === 'Upcoming').length, color: 'blue' },
+                    { icon: '📅', label: 'Upcoming', val: appointments.filter(a => a.status === 'Scheduled' || a.status === 'Upcoming').length, color: 'blue' },
                     { icon: '✅', label: 'Completed', val: appointments.filter(a => a.status === 'Completed').length, color: 'green' },
                     { icon: '❌', label: 'Cancelled', val: appointments.filter(a => a.status === 'Cancelled').length, color: 'red' },
                 ].map(s => (
@@ -89,48 +133,54 @@ export default function Appointments() {
 
             {/* Appointment list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {filtered.length === 0 ? (
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b8f71' }}>⏳ Loading your calendar…</div>
+                ) : filtered.length === 0 ? (
                     <div className="pd-empty">
                         <div className="pd-empty-icon">📭</div>
                         <h3>No {filter.toLowerCase()} appointments</h3>
                     </div>
-                ) : filtered.map(a => (
-                    <div key={a.id} className="pd-appt-card">
-                        <div className="pd-appt-date-block">
-                            <div className="pd-appt-day">{a.day}</div>
-                            <div className="pd-appt-month">{a.month}</div>
+                ) : filtered.map(a => {
+                    const { day, month } = formatDate(a.appointmentDate);
+                    const isUpcoming = a.status === 'Scheduled' || a.status === 'Upcoming';
+                    return (
+                        <div key={a.id} className="pd-appt-card">
+                            <div className="pd-appt-date-block">
+                                <div className="pd-appt-day">{day}</div>
+                                <div className="pd-appt-month">{month}</div>
+                            </div>
+                            <div className="pd-appt-info">
+                                <div className="pd-appt-title">🌿 {a.doctorName}</div>
+                                <div className="pd-appt-meta">{a.spec} &nbsp;·&nbsp; ⏰ {a.appointmentTime.substring(0, 5)} &nbsp;·&nbsp; {a.type}</div>
+                            </div>
+                            <div className="pd-appt-actions">
+                                <span className={`pd-pill ${STATUS_PILL[a.status] || 'pd-pill-blue'}`}>{a.status}</span>
+                                {isUpcoming && (
+                                    <>
+                                        {a.type === 'Video Call' || a.type === 'Chat' ? (
+                                            <button className="pd-btn pd-btn-primary pd-btn-sm"
+                                                onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>
+                                                ▶ Join
+                                            </button>
+                                        ) : (
+                                            <button className="pd-btn pd-btn-primary pd-btn-sm">📍 Directions</button>
+                                        )}
+                                        <button className="pd-btn pd-btn-danger pd-btn-sm"
+                                            onClick={() => setCancelId(a.id)}>✕ Cancel</button>
+                                    </>
+                                )}
+                                {a.status === 'Completed' && (
+                                    <>
+                                        <button className="pd-btn pd-btn-outline pd-btn-sm"
+                                            onClick={() => openReview(a)}>📝 Review</button>
+                                        <button className="pd-btn pd-btn-outline pd-btn-sm"
+                                            onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>💬 Message</button>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                        <div className="pd-appt-info">
-                            <div className="pd-appt-title">{a.badge} {a.doc}</div>
-                            <div className="pd-appt-meta">{a.spec} &nbsp;·&nbsp; ⏰ {a.time} &nbsp;·&nbsp; {a.type}</div>
-                        </div>
-                        <div className="pd-appt-actions">
-                            <span className={`pd-pill ${STATUS_PILL[a.status]}`}>{a.status}</span>
-                            {a.status === 'Upcoming' && (
-                                <>
-                                    {a.type === 'Video Call' || a.type === 'Chat' ? (
-                                        <button className="pd-btn pd-btn-primary pd-btn-sm"
-                                            onClick={() => navigate(`/patient/vcall?doctor=${a.doctorId}`)}>
-                                            ▶ Join
-                                        </button>
-                                    ) : (
-                                        <button className="pd-btn pd-btn-primary pd-btn-sm">📍 Directions</button>
-                                    )}
-                                    <button className="pd-btn pd-btn-danger pd-btn-sm"
-                                        onClick={() => setCancelId(a.id)}>✕ Cancel</button>
-                                </>
-                            )}
-                            {a.status === 'Completed' && (
-                                <>
-                                    <button className="pd-btn pd-btn-outline pd-btn-sm"
-                                        onClick={() => openReview(a)}>📝 Review</button>
-                                    <button className="pd-btn pd-btn-outline pd-btn-sm"
-                                        onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>💬 Message</button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* ── Cancel Confirm Modal ── */}
@@ -172,7 +222,6 @@ export default function Appointments() {
                     }} onClick={e => e.stopPropagation()}>
 
                         {submitted ? (
-                            /* ── Success state ── */
                             <div style={{ textAlign: 'center', padding: '20px 0' }}>
                                 <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🌿</div>
                                 <h3 style={{ fontFamily: 'Playfair Display,serif', color: '#2d6a4f', marginBottom: 8 }}>
@@ -188,23 +237,18 @@ export default function Appointments() {
                             </div>
                         ) : (
                             <>
-                                {/* Header */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
                                     <div style={{
                                         width: 54, height: 54, borderRadius: '50%', fontSize: '1.6rem',
                                         background: 'linear-gradient(135deg,#2d6a4f,#0d2410)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>{reviewAppt.badge}</div>
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
+                                    }}>🌿</div>
                                     <div>
-                                        <div style={{ fontFamily: 'Playfair Display,serif', fontSize: '1rem' }}>{reviewAppt.doc}</div>
+                                        <div style={{ fontFamily: 'Playfair Display,serif', fontSize: '1rem' }}>{reviewAppt.doctorName}</div>
                                         <div style={{ fontSize: '0.80rem', color: '#2d6a4f', fontWeight: 600 }}>{reviewAppt.spec}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#9aaa9a', marginTop: 2 }}>
-                                            {reviewAppt.day} {reviewAppt.month} · {reviewAppt.time}
-                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Star rating */}
                                 <p style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: 8, color: '#1a2e1a' }}>
                                     How would you rate this consultation?
                                 </p>
@@ -227,7 +271,6 @@ export default function Appointments() {
                                     </p>
                                 )}
 
-                                {/* Feedback text */}
                                 <div className="pd-form-group" style={{ marginTop: 10 }}>
                                     <label>Share your experience (optional)</label>
                                     <textarea className="pd-textarea" rows={3}
@@ -236,9 +279,8 @@ export default function Appointments() {
                                     />
                                 </div>
 
-                                {/* Recommend question */}
                                 <p style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 8, color: '#1a2e1a' }}>
-                                    Would you recommend {reviewAppt.doc} to others?
+                                    Would you recommend this doctor to others?
                                 </p>
                                 <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
                                     {['👍 Yes', '👎 No', '🤷 Maybe'].map(opt => (
@@ -250,7 +292,6 @@ export default function Appointments() {
                                     ))}
                                 </div>
 
-                                {/* Submit */}
                                 {!stars && (
                                     <p style={{ fontSize: '0.74rem', color: '#e74c3c', marginBottom: 8 }}>
                                         ⚠️ Please select a star rating to continue

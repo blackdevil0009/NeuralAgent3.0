@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import './patient_dashboard.css';
+import { handleError } from '../../utils/error_handlers';
 
 const NAV = [
     { id: 'health', label: 'Health Dashboard', icon: '🏥', path: '/patient/health' },
@@ -44,13 +45,36 @@ export default function PatientLayout() {
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState({ name: 'Patient', avatar: '🧘' });
+    const [counts, setCounts] = useState({ notifications: 0, messages: 0 });
+
+    const fetchCounts = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/notifications', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                const notifs = json.notifications || [];
+                const unreadNotifs = notifs.filter(n => !n.read && n.sourceType !== 'Message').length;
+                const unreadMsgs = notifs.filter(n => !n.read && n.sourceType === 'Message').length;
+                setCounts({ notifications: unreadNotifs, messages: unreadMsgs });
+            }
+        } catch (err) {
+            handleError(err, 'Failed to fetch notification counts');
+        }
+    }, []);
 
     useEffect(() => {
         try {
             const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
             if (stored.name) setUser({ name: stored.name, avatar: '🧘' });
         } catch { }
-    }, []);
+
+        fetchCounts();
+        const interval = setInterval(fetchCounts, 30000); // Poll every 30s
+        return () => clearInterval(interval);
+    }, [fetchCounts]);
 
     const currentPath = location.pathname;
     const allNav = [...NAV, ...SETTINGS_NAV];
@@ -100,8 +124,8 @@ export default function PatientLayout() {
                         >
                             <span className="pd-nav-icon">{n.icon}</span>
                             {n.label}
-                            {n.id === 'inbox' && <span className="pd-nav-badge">2</span>}
-                            {n.id === 'notifications' && <span className="pd-nav-badge">3</span>}
+                            {n.id === 'inbox' && counts.messages > 0 && <span className="pd-nav-badge">{counts.messages}</span>}
+                            {n.id === 'notifications' && counts.notifications > 0 && <span className="pd-nav-badge">{counts.notifications}</span>}
                         </Link>
                     ))}
 
@@ -146,11 +170,11 @@ export default function PatientLayout() {
                     <div className="pd-topbar-right">
                         <button className="pd-icon-btn" title="Notifications" onClick={() => navigate('/patient/notifications')}>
                             🔔
-                            <span className="pd-badge">3</span>
+                            {counts.notifications > 0 && <span className="pd-badge">{counts.notifications}</span>}
                         </button>
                         <button className="pd-icon-btn" title="Messages" onClick={() => navigate('/patient/inbox')}>
                             💬
-                            <span className="pd-badge">2</span>
+                            {counts.messages > 0 && <span className="pd-badge">{counts.messages}</span>}
                         </button>
                         <div className="pd-topbar-avatar" onClick={() => navigate('/patient/profile')}>👤</div>
                     </div>

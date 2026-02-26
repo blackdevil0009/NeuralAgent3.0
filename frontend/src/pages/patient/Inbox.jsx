@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { handleError } from '../../utils/error_handlers';
 
 const getAutoReply = () => ""; // Disabled
 
@@ -13,6 +14,8 @@ export default function Inbox() {
     const [input, setInput] = useState('');
     const [typing, setTyping] = useState(false);
     const [searchQ, setSearchQ] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [searching, setSearching] = useState(false);
     const [attachPreview, setAttachPreview] = useState(null);
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [mobileShowChat, setMobileShowChat] = useState(!!preselect);
@@ -80,6 +83,34 @@ export default function Inbox() {
         return () => clearInterval(interval);
     }, [activeId]);
 
+    /* Debounced Doctor Search */
+    useEffect(() => {
+        if (!searchQ || searchQ.length < 2) {
+            setSuggestions([]);
+            return;
+        }
+
+        const delay = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`http://localhost:5000/api/doctors/search?q=${encodeURIComponent(searchQ)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    setSuggestions(json.data?.doctors || []);
+                }
+            } catch (err) {
+                handleError(err, 'Search failed');
+            } finally {
+                setSearching(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(delay);
+    }, [searchQ]);
+
     const selectConv = (id) => {
         setActiveId(id);
         setInput('');
@@ -124,7 +155,7 @@ export default function Inbox() {
                 setInput('');
             }
         } catch (err) {
-            console.error(err);
+            handleError(err, 'Failed to send message');
         }
     }, [input, activeId]);
 
@@ -169,14 +200,59 @@ export default function Inbox() {
                     </h2>
                     <button className="inbox-compose" title="New Message" onClick={() => navigate('/patient/doctors')}>✏️</button>
                 </div>
-                <div className="inbox-search-wrap">
+                <div className="inbox-search-wrap" style={{ position: 'relative' }}>
                     <input
                         type="text"
                         className="inbox-search"
-                        placeholder="🔍  Search conversations…"
+                        placeholder="🔍  Search conversations or find doctors…"
                         value={searchQ}
                         onChange={e => setSearchQ(e.target.value)}
                     />
+                    {suggestions.length > 0 && (
+                        <div className="inbox-suggestions-list" style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0,
+                            background: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                            borderRadius: 12, zIndex: 100, border: '1px solid #eee',
+                            marginTop: 4, overflow: 'hidden'
+                        }}>
+                            <div style={{ padding: '8px 12px', fontSize: '0.75rem', color: '#6b8f71', background: '#f8fbf9', fontWeight: 600 }}>
+                                👨‍⚕️ SUGGESTED DOCTORS
+                            </div>
+                            {suggestions.map(d => (
+                                <div
+                                    key={d.id}
+                                    className="inbox-suggestion-item"
+                                    onClick={() => {
+                                        // If already in convos, just select it
+                                        const exists = conversations.find(c => c.id === d.id);
+                                        if (!exists) {
+                                            const newConvo = {
+                                                id: d.id,
+                                                name: d.name,
+                                                spec: d.spec,
+                                                badge: '🌿',
+                                                online: true,
+                                                lastMsg: 'Start a new conversation',
+                                                messages: []
+                                            };
+                                            setConversations(prev => [newConvo, ...prev]);
+                                        }
+                                        selectConv(d.id);
+                                        setSearchQ('');
+                                        setSuggestions([]);
+                                    }}
+                                    style={{
+                                        padding: '10px 14px', borderTop: '1px solid #f0f0f0',
+                                        cursor: 'pointer', display: 'flex', flexDirection: 'column'
+                                    }}
+                                >
+                                    <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2c3e50' }}>{d.name}</span>
+                                    <span style={{ fontSize: '0.72rem', color: '#27ae60' }}>{d.spec}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {searching && <div style={{ position: 'absolute', right: 12, top: 10, fontSize: '0.8rem' }}>⏳</div>}
                 </div>
                 <ul className="inbox-conv-list">
                     {filteredConvs.map(c => (

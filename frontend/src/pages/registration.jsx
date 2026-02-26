@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './registration_style.css';
+import { handleSuccess, handleError } from '../utils/error_handlers';
 
 /* ─────────────────────────────────────────────
    Utility helpers
@@ -694,12 +695,12 @@ export default function Registration() {
             });
 
             const json = await res.json();
-            if (!res.ok) throw new Error(json.message || 'Registration failed. Please try again.');
+            if (!res.ok) throw new Error(json.data?.message || 'Registration failed. Please try again.');
 
-            setSuccessMsg('🎉 Registration successful! Redirecting to login…');
+            handleSuccess('🎉 Registration successful! Redirecting to login…');
             setTimeout(() => navigate('/login'), 2200);
         } catch (err) {
-            setErrorMsg(err.message);
+            handleError(err);
         } finally {
             setLoading(false);
         }

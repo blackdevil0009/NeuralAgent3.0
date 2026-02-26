@@ -1,28 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { handleError, handleSuccess } from '../../utils/error_handlers';
 
-const CONSULTANTS = [
-    {
-        id: 1, name: 'Dr. Arjun Menon', badge: '🌿', spec: 'Ayurveda & Holistic Health',
-        exp: '14 yrs', rating: 4.9, fee: '₹500', avail: 'Today',
-        about: 'Expert in classical Ayurveda with a focus on Panchakarma therapy, dosha management, and chronic disease reversal. Trained from Kerala Ayurveda Academy.',
-        specialties: ['Dosha Assessment', 'Panchakarma', 'Stress & Anxiety', 'Chronic Conditions'],
-    },
-    {
-        id: 2, name: 'Dr. Meena Krishnan', badge: '🧘', spec: 'Mind-Body Medicine & Yoga',
-        exp: '12 yrs', rating: 4.8, fee: '₹450', avail: 'Tomorrow',
-        about: 'Specialises in integrating yoga therapy, mindfulness, and Ayurvedic medicine for mental and physical wellness. MBBS + MD (Alternative Medicine).',
-        specialties: ['Yoga Therapy', 'Meditation', 'Anxiety & Depression', 'Hormonal Balance'],
-    },
-    {
-        id: 3, name: 'Dr. Priya Nair', badge: '🥗', spec: 'Nutritional & Functional Medicine',
-        exp: '9 yrs', rating: 4.8, fee: '₹400', avail: 'Today',
-        about: 'Combines modern nutritional science with Ayurvedic dietary principles to create personalised meal plans that heal from within.',
-        specialties: ['Diet Planning', 'Weight Management', 'Gut Health', 'Diabetes Management'],
-    },
-];
-
-const FAQS = [
+const CONSULTANT_FAQS = [
     { q: 'How does an online consultation work?', a: 'Once booked, you will receive a link to join a secure video call at your scheduled time. You can also upload reports in advance for the doctor to review.' },
     { q: 'Are the consultants verified?', a: 'Yes. All consultants on NeuralAgent are verified with valid medical council registration numbers, degrees, and identity proof.' },
     { q: 'Can I get an Ayurvedic and allopathic opinion together?', a: 'Absolutely. You can book separate consultations or request a joint opinion. Many of our doctors offer integrated care advice.' },
@@ -31,8 +11,71 @@ const FAQS = [
 
 export default function MedicalConsultant() {
     const navigate = useNavigate();
+    const [doctors, setDoctors] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [openFaq, setOpenFaq] = useState(null);
     const [selected, setSelected] = useState(null);
+
+    // Booking form state
+    const [aptDate, setAptDate] = useState('');
+    const [aptTime, setAptTime] = useState('10:00 AM');
+    const [aptType, setAptType] = useState('Video Call');
+    const [aptNotes, setAptNotes] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    React.useEffect(() => {
+        const fetchDocs = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('http://localhost:5000/api/doctors', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    setDoctors(json.data?.doctors || []);
+                }
+            } catch (err) {
+                handleError(err, 'Failed to fetch doctors list');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDocs();
+    }, []);
+
+    const handleBookSubmit = async () => {
+        if (!aptDate || !aptTime) return alert('Please select date and time');
+        setSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/appointments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    doctorId: selected.id,
+                    date: aptDate,
+                    time: aptTime,
+                    type: aptType,
+                    notes: aptNotes
+                })
+            });
+            if (res.ok) {
+                handleSuccess('Appointment booked successfully!');
+                setSelected(null);
+                navigate('/patient/appointments');
+            } else {
+                const json = await res.json();
+                handleError(json.data?.error || 'Booking failed');
+            }
+        } catch (err) {
+            handleError(err, 'Connection error. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
         <div>
@@ -70,28 +113,26 @@ export default function MedicalConsultant() {
             {/* Featured consultants */}
             <h3 className="pd-section-title">⭐ Featured Consultants</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
-                {CONSULTANTS.map(c => (
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: '#6b8f71' }}>⏳ Loading consultants…</div>
+                ) : doctors.slice(0, 3).map(c => (
                     <div key={c.id} className="pd-card" style={{ cursor: 'default' }}>
                         <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
                             <div style={{
                                 width: 64, height: 64, borderRadius: '50%', fontSize: '1.8rem',
                                 background: 'linear-gradient(135deg,#2d6a4f,#0d2410)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                            }}>{c.badge}</div>
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff'
+                            }}>{c.badge || '🩺'}</div>
                             <div style={{ flex: 1 }}>
                                 <div style={{ fontFamily: 'Playfair Display,serif', fontSize: '1.05rem', marginBottom: 2 }}>{c.name}</div>
                                 <div style={{ fontSize: '0.82rem', color: '#2d6a4f', fontWeight: 600, marginBottom: 6 }}>{c.spec}</div>
-                                <p style={{ fontSize: '0.83rem', color: '#5a755a', lineHeight: 1.7, marginBottom: 10 }}>{c.about}</p>
-                                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 12 }}>
-                                    {c.specialties.map(s => (
-                                        <span key={s} className="pd-pill pd-pill-green">{s}</span>
-                                    ))}
-                                </div>
+                                <p style={{ fontSize: '0.83rem', color: '#5a755a', lineHeight: 1.7, marginBottom: 10 }}>
+                                    {c.experience || '10+ years'} of experience in clinical excellence at {c.hospital || 'NeuralAgent Clinic'}.
+                                </p>
                                 <div style={{ display: 'flex', gap: 20, fontSize: '0.80rem', color: '#6b8f71', marginBottom: 12 }}>
-                                    <span>⭐ {c.rating}</span>
-                                    <span>🕐 {c.exp}</span>
-                                    <span>💰 {c.fee}/session</span>
-                                    <span className="pd-pill pd-pill-green">Available: {c.avail}</span>
+                                    <span>⭐ {c.rating || 4.8}</span>
+                                    <span>💰 ₹{c.fee || 800}/session</span>
+                                    <span className="pd-pill pd-pill-green">Verified Specialist</span>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <button className="pd-btn pd-btn-primary pd-btn-sm"
@@ -103,12 +144,15 @@ export default function MedicalConsultant() {
                         </div>
                     </div>
                 ))}
+                {!loading && doctors.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: '#6b8f71' }}>No doctors available right now.</div>
+                )}
             </div>
 
             {/* FAQ Accordion */}
             <h3 className="pd-section-title">❓ Frequently Asked Questions</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {FAQS.map((f, i) => (
+                {CONSULTANT_FAQS.map((f, i) => (
                     <div key={i} style={{
                         background: '#fff', border: '1px solid rgba(45,106,79,0.12)',
                         borderRadius: 12, overflow: 'hidden'
@@ -149,27 +193,35 @@ export default function MedicalConsultant() {
                         </h3>
                         <div className="pd-form-group">
                             <label>Type</label>
-                            <select className="pd-select"><option>Video Call</option><option>Chat</option></select>
+                            <select className="pd-select" value={aptType} onChange={e => setAptType(e.target.value)}>
+                                <option>Video Call</option>
+                                <option>Chat Consultation</option>
+                            </select>
                         </div>
                         <div className="pd-form-group">
                             <label>Date</label>
-                            <input type="date" className="pd-input" min={new Date().toISOString().split('T')[0]} />
+                            <input type="date" className="pd-input"
+                                min={new Date().toISOString().split('T')[0]}
+                                value={aptDate} onChange={e => setAptDate(e.target.value)} />
                         </div>
                         <div className="pd-form-group">
                             <label>Time Slot</label>
-                            <select className="pd-select">
+                            <select className="pd-select" value={aptTime} onChange={e => setAptTime(e.target.value)}>
                                 <option>10:00 AM</option><option>11:00 AM</option>
                                 <option>02:00 PM</option><option>04:00 PM</option>
                             </select>
                         </div>
                         <div className="pd-form-group">
                             <label>Chief Complaint</label>
-                            <textarea className="pd-textarea" placeholder="Describe your main concern…" rows={3} />
+                            <textarea className="pd-textarea"
+                                placeholder="Describe your main concern…"
+                                rows={3} value={aptNotes} onChange={e => setAptNotes(e.target.value)} />
                         </div>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                            <button className="pd-btn pd-btn-primary" style={{ flex: 1, justifyContent: 'center' }}
-                                onClick={() => { setSelected(null); navigate('/patient/appointments'); }}>
-                                ✅ Confirm ({selected.fee})
+                        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                            <button className="pd-btn pd-btn-primary"
+                                style={{ flex: 1, justifyContent: 'center' }}
+                                onClick={handleBookSubmit} disabled={submitting}>
+                                {submitting ? '⏳ Booking…' : `✅ Confirm (₹${selected.fee || 800})`}
                             </button>
                             <button className="pd-btn pd-btn-outline" onClick={() => setSelected(null)}>Cancel</button>
                         </div>

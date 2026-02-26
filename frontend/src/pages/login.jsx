@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import './login_style.css';
+import { handleSuccess, handleError } from '../utils/error_handlers';
 
 /* ─────────────────────────────────────────────
    Forgot Password Modal
@@ -25,10 +26,11 @@ function ForgotPasswordModal({ onClose }) {
             });
             if (!res.ok) {
                 const j = await res.json();
-                throw new Error(j.message || 'Could not send reset email.');
+                throw new Error(j.data?.message || 'Could not send reset email.');
             }
             setSent(true);
         } catch (e) {
+            handleError(e);
             setErr(e.message);
         } finally {
             setLoading(false);
@@ -133,22 +135,23 @@ export default function Login() {
             });
 
             const json = await res.json();
-            if (!res.ok) throw new Error(json.message || 'Login failed. Please check your credentials.');
+            if (!res.ok) throw new Error(json.data?.message || 'Login failed. Please check your credentials.');
 
             /* Persist token */
             const store = rememberMe ? localStorage : sessionStorage;
-            store.setItem('token', json.token);
-            store.setItem('role', json.role || role);
-            store.setItem('user', JSON.stringify(json.user || {}));
+            const userData = json.data || {};
+            store.setItem('token', userData.token);
+            store.setItem('role', userData.role || role);
+            store.setItem('user', JSON.stringify(userData.user || {}));
 
             /* Route based on role */
-            if (json.role === 'doctor' || role === 'doctor') {
+            if (userData.role === 'doctor' || role === 'doctor') {
                 navigate('/doctor');
             } else {
                 navigate('/patient');
             }
         } catch (err) {
-            setErrorMsg(err.message);
+            handleError(err);
         } finally {
             setLoading(false);
         }

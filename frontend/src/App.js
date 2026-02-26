@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+
+import { ToastProvider, useToast } from './context/ToastContext';
+import { initErrorHandler } from './utils/error_handlers';
 
 import Home from './pages/home';
 import Login from './pages/login';
@@ -40,56 +43,69 @@ import EmergencyDashboard from './pages/doctor/EmergencyDashboard';
 // Emergency (Patient)
 import EmergencyCase from './pages/patient/EmergencyCase';
 
+// Helper to initialize error handler with toast function
+const AppInitializer = () => {
+  const { showToast } = useToast();
+  useEffect(() => {
+    initErrorHandler(showToast);
+  }, [showToast]);
+  return null;
+};
+
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Registration />} />
+    <ToastProvider>
+      <AppInitializer />
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Registration />} />
 
-        {/* Patient Dashboard (nested) */}
-        <Route path="/patient" element={<PatientLayout />}>
-          <Route index element={<Navigate to="health" replace />} />
-          <Route path="health" element={<HealthDashboard />} />
-          <Route path="ai" element={<AIAssistant />} />
-          <Route path="inbox" element={<Inbox />} />
-          <Route path="vcall" element={<VideoCall />} />
-          <Route path="reports" element={<ReportUpload />} />
-          <Route path="consultant" element={<MedicalConsultant />} />
-          <Route path="appointments" element={<Appointments />} />
-          <Route path="doctors" element={<DoctorSearch />} />
-          <Route path="profile" element={<PatientProfile />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="emergency" element={<EmergencyCase />} />
-          <Route path="settings/password" element={<ChangePassword />} />
-          <Route path="settings/mobile" element={<UpdateMobile />} />
-          <Route path="settings/2fa" element={<TwoFactorAuth />} />
-          <Route path="settings/notifications" element={<NotificationSettings />} />
-        </Route>
+          {/* Patient Dashboard (nested) */}
+          <Route path="/patient" element={<PatientLayout />}>
+            <Route index element={<Navigate to="health" replace />} />
+            <Route path="health" element={<HealthDashboard />} />
+            <Route path="ai" element={<AIAssistant />} />
+            <Route path="inbox" element={<Inbox />} />
+            <Route path="vcall" element={<VideoCall />} />
+            <Route path="reports" element={<ReportUpload />} />
+            <Route path="consultant" element={<MedicalConsultant />} />
+            <Route path="appointments" element={<Appointments />} />
+            <Route path="doctors" element={<DoctorSearch />} />
+            <Route path="profile" element={<PatientProfile />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="emergency" element={<EmergencyCase />} />
+            <Route path="settings/password" element={<ChangePassword />} />
+            <Route path="settings/mobile" element={<UpdateMobile />} />
+            <Route path="settings/2fa" element={<TwoFactorAuth />} />
+            <Route path="settings/notifications" element={<NotificationSettings />} />
+          </Route>
 
-        {/* Doctor Portal (nested) */}
-        <Route path="/doctor" element={<DoctorLayout />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<PatientManagement />} />
-          <Route path="schedule" element={<DoctorSchedule />} />
-          <Route path="inbox" element={<DoctorInbox />} />
-          <Route path="ai" element={<DoctorAIAssistant />} />
-          <Route path="profile" element={<DoctorProfile />} />
-          <Route path="settings/password" element={<DoctorChangePassword />} />
-          <Route path="settings/notifications" element={<DoctorNotifications />} />
-          <Route path="settings/mobile" element={<DoctorUpdateMobile />} />
-          <Route path="settings/2fa" element={<Doctor2FA />} />
-          <Route path="emergency" element={<EmergencyDashboard />} />
-        </Route>
-        <Route path="/dashboard" element={<NeuralAgentDashboard />} />
+          {/* Doctor Portal (nested) */}
+          <Route path="/doctor" element={<DoctorLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<PatientManagement />} />
+            <Route path="schedule" element={<DoctorSchedule />} />
+            <Route path="inbox" element={<DoctorInbox />} />
+            <Route path="ai" element={<DoctorAIAssistant />} />
+            <Route path="profile" element={<DoctorProfile />} />
+            <Route path="settings/password" element={<DoctorChangePassword />} />
+            <Route path="settings/notifications" element={<DoctorNotifications />} />
+            <Route path="settings/mobile" element={<DoctorUpdateMobile />} />
+            <Route path="settings/2fa" element={<Doctor2FA />} />
+            <Route path="emergency" element={<EmergencyDashboard />} />
+          </Route>
+          <Route path="/dashboard" element={<NeuralAgentDashboard />} />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </ToastProvider>
   );
 }
 
 export default App;
+

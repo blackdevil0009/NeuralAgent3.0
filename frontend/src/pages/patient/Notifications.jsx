@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const INITIAL_NOTIFS = [
@@ -56,16 +56,54 @@ const TYPE_COLORS = {
 
 export default function Notifications() {
     const navigate = useNavigate();
-    const [notifs, setNotifs] = useState(INITIAL_NOTIFS);
+    const [notifs, setNotifs] = useState([]);
     const [activeFilter, setActiveFilter] = useState('All');
+    const [loading, setLoading] = useState(true);
+
+    const fetchNotifs = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/notifications', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setNotifs(json.notifications || []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch notifications:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchNotifs();
+    }, [fetchNotifs]);
 
     const unreadCount = notifs.filter(n => !n.read).length;
 
-    const markRead = (id) =>
-        setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    const markRead = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n));
+            }
+        } catch (err) {
+            console.error('Failed to mark notification as read:', err);
+        }
+    };
 
-    const markAllRead = () =>
-        setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+    const markAllRead = async () => {
+        const unread = notifs.filter(n => !n.read);
+        for (const n of unread) {
+            await markRead(n.id);
+        }
+    };
 
     const clearRead = () =>
         setNotifs(prev => prev.filter(n => !n.read));
@@ -73,10 +111,36 @@ export default function Notifications() {
     const deleteOne = (id) =>
         setNotifs(prev => prev.filter(n => n.id !== id));
 
+    const getIcon = (type) => {
+        switch (type) {
+            case 'Appointment': return '📅';
+            case 'Message': return '💬';
+            case 'Call': return '📞';
+            default: return '🔔';
+        }
+    };
+
+    const getTypeKey = (type) => {
+        if (type === 'Appointment') return 'appt';
+        if (type === 'Message') return 'msg';
+        return 'system';
+    };
+
+    const formatTime = (ts) => {
+        const d = new Date(ts);
+        const now = new Date();
+        const diff = Math.floor((now - d) / 60000);
+        if (diff < 1) return 'Just now';
+        if (diff < 60) return `${diff}m ago`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+        return d.toLocaleDateString();
+    };
+
     const filtered = notifs.filter(n =>
         activeFilter === 'All' ||
         (activeFilter === 'Unread' && !n.read) ||
-        n.type === activeFilter.toLowerCase()
+        (activeFilter === 'Appt' && n.type === 'Appointment') ||
+        (activeFilter === 'Msg' && n.type === 'Message')
     );
 
     return (
@@ -115,7 +179,9 @@ export default function Notifications() {
             </div>
 
             {/* Notification list */}
-            {filtered.length === 0 ? (
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--green-mid)' }}>⏳ Loading your notifications...</div>
+            ) : filtered.length === 0 ? (
                 <div className="pd-empty">
                     <div className="pd-empty-icon">🔕</div>
                     <h3>No notifications here</h3>
@@ -134,19 +200,20 @@ export default function Notifications() {
                                 transition: 'all 0.20s',
                             }}
                             onClick={() => {
-                                markRead(n.id);
-                                if (n.action) navigate(n.action.path);
+                                if (!n.read) markRead(n.id);
+                                if (n.type === 'Message') navigate('/patient/inbox');
+                                if (n.type === 'Appointment') navigate('/patient/appointments');
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                                 {/* Icon badge */}
                                 <div style={{
                                     width: 46, height: 46, borderRadius: 14, flexShrink: 0,
-                                    background: TYPE_COLORS[n.type]?.bg || 'rgba(0,0,0,0.06)',
-                                    color: TYPE_COLORS[n.type]?.color || '#333',
+                                    background: TYPE_COLORS[getTypeKey(n.type)]?.bg || 'rgba(0,0,0,0.06)',
+                                    color: TYPE_COLORS[getTypeKey(n.type)]?.color || '#333',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: '1.4rem',
-                                }}>{n.icon}</div>
+                                }}>{getIcon(n.type)}</div>
 
                                 {/* Text */}
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -155,7 +222,7 @@ export default function Notifications() {
                                             fontWeight: n.read ? 500 : 700,
                                             fontSize: '0.90rem',
                                             color: 'var(--text-dark)',
-                                        }}>{n.title}</span>
+                                        }}>{n.type} Alert</span>
                                         {!n.read && (
                                             <span style={{
                                                 width: 9, height: 9, borderRadius: '50%',
@@ -165,16 +232,10 @@ export default function Notifications() {
                                         )}
                                     </div>
                                     <p style={{ fontSize: '0.82rem', color: 'var(--text-mute)', lineHeight: 1.60, margin: 0, marginBottom: 6 }}>
-                                        {n.body}
+                                        {n.message}
                                     </p>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                        <span style={{ fontSize: '0.70rem', color: 'var(--text-mute)' }}>⏱ {n.time}</span>
-                                        {n.action && (
-                                            <span style={{
-                                                fontSize: '0.74rem', fontWeight: 600,
-                                                color: 'var(--green-mid)', cursor: 'pointer',
-                                            }}>{n.action.label} →</span>
-                                        )}
+                                        <span style={{ fontSize: '0.70rem', color: 'var(--text-mute)' }}>⏱ {formatTime(n.timestamp)}</span>
                                         {!n.read && (
                                             <span
                                                 style={{ fontSize: '0.70rem', color: 'var(--text-mute)', cursor: 'pointer' }}

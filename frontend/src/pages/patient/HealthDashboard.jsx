@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { handleError } from '../../utils/error_handlers';
 
 const VITALS = [
     { icon: '❤️', label: 'Heart Rate', value: '72', unit: 'bpm', change: '+2%', dir: 'up', color: 'red' },
@@ -18,14 +19,11 @@ const ACTIVITY = [
     { title: 'Prescription renewed', time: '3 days ago', dot: '#e9c46a' },
 ];
 
-const UPCOMING = [
-    { doc: 'Dr. Arjun Menon', spec: 'Ayurveda & General', date: '28 Feb', time: '10:00 AM', type: 'Video Call' },
-    { doc: 'Dr. Priya Nair', spec: 'Nutrition & Diet', date: '05 Mar', time: '4:30 PM', type: 'Chat' },
-];
-
 export default function HealthDashboard() {
     const [greeting, setGreeting] = useState('');
     const [userName, setUserName] = useState('Friend');
+    const [upcoming, setUpcoming] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const h = new Date().getHours();
@@ -34,7 +32,39 @@ export default function HealthDashboard() {
             const u = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
             if (u.name) setUserName(u.name.split(' ')[0]);
         } catch { }
+
+        const fetchUpcoming = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('http://localhost:5000/api/appointments', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    const all = json.data?.appointments || [];
+                    const filtered = all
+                        .filter(a => a.status === 'Scheduled' || a.status === 'Upcoming')
+                        .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
+                        .slice(0, 2);
+                    setUpcoming(filtered);
+                }
+            } catch (err) {
+                handleError(err, 'Failed to fetch upcoming appointments');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchUpcoming();
     }, []);
+
+    // Helper to format date
+    const formatDate = (dateStr) => {
+        const d = new Date(dateStr);
+        return {
+            day: d.getDate().toString().padStart(2, '0'),
+            month: d.toLocaleString('en-IN', { month: 'short' })
+        };
+    };
 
     return (
         <div>
@@ -107,31 +137,38 @@ export default function HealthDashboard() {
                 <div className="pd-card">
                     <h3 className="pd-section-title">📅 Upcoming Appointments</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {UPCOMING.map((u, i) => (
-                            <div key={i} style={{
-                                display: 'flex', gap: 14, alignItems: 'center', padding: '12px 16px',
-                                background: 'rgba(45,106,79,0.05)', borderRadius: 12,
-                                border: '1px solid rgba(45,106,79,0.10)'
-                            }}>
-                                <div style={{
-                                    background: 'rgba(45,106,79,0.10)', borderRadius: 10,
-                                    padding: '8px 10px', textAlign: 'center', flexShrink: 0
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '20px 0', color: '#6b8f71', fontSize: '0.88rem' }}>⏳ Fetching your schedule…</div>
+                        ) : upcoming.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '20px 0', color: '#999', fontSize: '0.88rem' }}>No upcoming appointments.</div>
+                        ) : upcoming.map((u, i) => {
+                            const { day, month } = formatDate(u.appointmentDate);
+                            return (
+                                <div key={u.id} style={{
+                                    display: 'flex', gap: 14, alignItems: 'center', padding: '12px 16px',
+                                    background: 'rgba(45,106,79,0.05)', borderRadius: 12,
+                                    border: '1px solid rgba(45,106,79,0.10)'
                                 }}>
-                                    <div style={{ fontSize: '0.65rem', color: '#6b8f71', textTransform: 'uppercase' }}>
-                                        {u.date.split(' ')[1]}
+                                    <div style={{
+                                        background: 'rgba(45,106,79,0.10)', borderRadius: 10,
+                                        padding: '8px 10px', textAlign: 'center', flexShrink: 0
+                                    }}>
+                                        <div style={{ fontSize: '0.65rem', color: '#6b8f71', textTransform: 'uppercase' }}>
+                                            {month}
+                                        </div>
+                                        <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.3rem', color: '#2d6a4f', lineHeight: 1 }}>
+                                            {day}
+                                        </div>
                                     </div>
-                                    <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.3rem', color: '#2d6a4f', lineHeight: 1 }}>
-                                        {u.date.split(' ')[0]}
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{u.doctorName}</div>
+                                        <div style={{ fontSize: '0.76rem', color: '#6b8f71' }}>{u.spec}</div>
+                                        <div style={{ fontSize: '0.76rem', color: '#6b8f71', marginTop: 2 }}>⏰ {u.appointmentTime.substring(0, 5)} · {u.type}</div>
                                     </div>
+                                    <span className={`pd-pill ${u.type === 'Video Call' ? 'pd-pill-blue' : 'pd-pill-green'}`}>{u.type}</span>
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{u.doc}</div>
-                                    <div style={{ fontSize: '0.76rem', color: '#6b8f71' }}>{u.spec}</div>
-                                    <div style={{ fontSize: '0.76rem', color: '#6b8f71', marginTop: 2 }}>⏰ {u.time} · {u.type}</div>
-                                </div>
-                                <span className={`pd-pill ${u.type === 'Video Call' ? 'pd-pill-blue' : 'pd-pill-green'}`}>{u.type}</span>
-                            </div>
-                        ))}
+                            );
+                        })}
                         <Link to="/patient/appointments" className="pd-btn pd-btn-outline" style={{ justifyContent: 'center', marginTop: 4 }}>
                             View All Appointments
                         </Link>

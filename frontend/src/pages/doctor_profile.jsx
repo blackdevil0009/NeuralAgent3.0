@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { handleSuccess } from '../utils/error_handlers';
 
 const SPEC_OPTIONS = ['General Ayurveda', 'Panchakarma', 'Internal Medicine (Kayachikitsa)', 'Rasayana & Clinical Nutrition', 'Nadi Vigyan Specialist'];
 
@@ -14,8 +15,7 @@ export default function DoctorProfile() {
     const [saved, setSaved] = useState(false);
 
     const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        handleSuccess('Professional profile has been updated and synced with the patient search registry.');
     };
 
     return (
@@ -28,11 +28,6 @@ export default function DoctorProfile() {
                 <button className="dd-btn dd-btn-primary" onClick={handleSave}>💾 Save Profile</button>
             </div>
 
-            {saved && (
-                <div style={{ background: '#d1e7dd', color: '#0f5132', padding: 14, borderRadius: 12, marginBottom: 20, fontSize: '0.9rem' }}>
-                    ✅ Professional profile has been updated and synced with the patient search registry.
-                </div>
-            )}
 
             <div className="dd-grid">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

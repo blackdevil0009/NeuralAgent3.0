@@ -1,34 +1,85 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const DOCTORS = [
-    { id: 1, name: 'Dr. Arjun Menon', spec: 'Ayurveda & General Medicine', exp: '14 yrs', rating: 4.9, reviews: 312, fee: '₹500', lang: 'English, Malayalam', avail: 'Today', badge: '🌿', type: 'Ayurveda' },
-    { id: 2, name: 'Dr. Priya Nair', spec: 'Nutrition & Dietetics', exp: '9 yrs', rating: 4.8, reviews: 185, fee: '₹400', lang: 'English, Tamil', avail: 'Tomorrow', badge: '🥗', type: 'Nutrition' },
-    { id: 3, name: 'Dr. Ramesh Sharma', spec: 'Cardiology', exp: '22 yrs', rating: 4.7, reviews: 523, fee: '₹900', lang: 'Hindi, English', avail: '3 Mar', badge: '❤️', type: 'Cardio' },
-    { id: 4, name: 'Dr. Kavya Reddy', spec: 'Dermatology & Skin', exp: '11 yrs', rating: 4.8, reviews: 290, fee: '₹600', lang: 'Telugu, English', avail: 'Today', badge: '✨', type: 'Derm' },
-    { id: 5, name: 'Vaidya R. Tripathi', spec: 'Classical Ayurveda & Panchakarma', exp: '18 yrs', rating: 4.9, reviews: 407, fee: '₹700', lang: 'Hindi, Sanskrit', avail: 'Today', badge: '🪴', type: 'Ayurveda' },
-    { id: 6, name: 'Dr. Siddharth Iyer', spec: 'Orthopedics & Sports Medicine', exp: '16 yrs', rating: 4.6, reviews: 214, fee: '₹750', lang: 'English,Kannada', avail: '4 Mar', badge: '🦴', type: 'Ortho' },
-];
-
 const SPECIALIZATIONS = ['All', 'Ayurveda', 'Nutrition', 'Cardio', 'Derm', 'Ortho'];
 
 export default function DoctorSearch() {
     const navigate = useNavigate();
+    const [doctors, setDoctors] = useState([]);
     const [query, setQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
     const [bookingDoc, setBookingDoc] = useState(null);
     const [booked, setBooked] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    const filtered = DOCTORS.filter(d => {
-        const matchQ = !query || d.name.toLowerCase().includes(query.toLowerCase()) || d.spec.toLowerCase().includes(query.toLowerCase());
-        const matchF = activeFilter === 'All' || d.type === activeFilter;
+    // Booking form state
+    const [aptDate, setAptDate] = useState('');
+    const [aptTime, setAptTime] = useState('09:00 AM');
+    const [aptType, setAptType] = useState('Video Call');
+    const [aptNotes, setAptNotes] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    React.useEffect(() => {
+        const fetchDocs = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('http://localhost:5000/api/doctors', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    setDoctors(json.data?.doctors || []);
+                }
+            } catch (err) {
+                console.error('Failed to fetch doctors:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDocs();
+    }, []);
+
+    const filtered = doctors.filter(d => {
+        const queryLower = query.toLowerCase();
+        const specLower = (d.spec || '').toLowerCase();
+        const nameLower = (d.name || '').toLowerCase();
+        const filterLower = activeFilter.toLowerCase();
+
+        const matchQ = !query || nameLower.includes(queryLower) || specLower.includes(queryLower);
+        const matchF = activeFilter === 'All' || specLower.includes(filterLower);
         return matchQ && matchF;
     });
 
-    const handleBook = async (doc) => {
-        setBookingDoc(doc); setBooked(false);
-        await new Promise(r => setTimeout(r, 1400));
-        setBooked(true);
+    const handleBookSubmit = async () => {
+        if (!aptDate || !aptTime) return alert('Please select date and time');
+        setSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/appointments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    doctorId: bookingDoc.id,
+                    date: aptDate,
+                    time: aptTime,
+                    type: aptType,
+                    notes: aptNotes
+                })
+            });
+            if (res.ok) {
+                setBooked(true);
+            } else {
+                const json = await res.json();
+                alert(json.data?.error || 'Booking failed');
+            }
+        } catch (err) {
+            alert('Connection error. Try again.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -36,9 +87,9 @@ export default function DoctorSearch() {
             <div className="pd-page-header">
                 <div>
                     <h1>🔍 Find Doctors</h1>
-                    <p>Search from 200+ verified doctors — Ayurvedic, Allopathic & Specialist</p>
+                    <p>Search from our network of verified clinical experts</p>
                 </div>
-                <span className="pd-pill pd-pill-green">200+ Doctors Available</span>
+                <span className="pd-pill pd-pill-green">{doctors.length} Doctors Online</span>
             </div>
 
             {/* Search bar */}
@@ -62,7 +113,9 @@ export default function DoctorSearch() {
             </div>
 
             {/* Results */}
-            {filtered.length === 0 ? (
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b8f71' }}>⏳ Loading verified doctors…</div>
+            ) : filtered.length === 0 ? (
                 <div className="pd-empty">
                     <div className="pd-empty-icon">👨‍⚕️</div>
                     <h3>No doctors found</h3>
@@ -72,18 +125,15 @@ export default function DoctorSearch() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {filtered.map(d => (
                         <div key={d.id} className="pd-doctor-card">
-                            <div className="pd-doctor-avatar">{d.badge}</div>
+                            <div className="pd-doctor-avatar">{d.badge || '🩺'}</div>
                             <div style={{ flex: 1 }}>
                                 <div className="pd-doctor-name">{d.name}</div>
                                 <div className="pd-doctor-spec">{d.spec}</div>
                                 <div className="pd-doctor-meta">
-                                    <span>⭐ {d.rating} ({d.reviews} reviews)</span>
-                                    <span>🕐 {d.exp} experience</span>
-                                    <span>🗣️ {d.lang}</span>
-                                    <span>💰 {d.fee}/consult</span>
-                                </div>
-                                <div style={{ marginTop: 8 }}>
-                                    <span className="pd-pill pd-pill-green" style={{ marginRight: 6 }}>Available: {d.avail}</span>
+                                    <span>⭐ {d.rating || 4.8}</span>
+                                    <span>🕐 {d.experience || '10+ yrs'} exp</span>
+                                    <span>🏥 {d.hospital || 'NeuralAgent Clinic'}</span>
+                                    <span>💰 ₹{d.fee || 800}/consult</span>
                                 </div>
                                 <div className="pd-doctor-actions">
                                     <button className="pd-btn pd-btn-primary pd-btn-sm"
@@ -93,10 +143,6 @@ export default function DoctorSearch() {
                                     <button className="pd-btn pd-btn-outline pd-btn-sm"
                                         onClick={() => navigate(`/patient/inbox?doctor=${d.id}`)}>
                                         💬 Send Message
-                                    </button>
-                                    <button className="pd-btn pd-btn-outline pd-btn-sm"
-                                        onClick={() => navigate('/patient/appointments')}>
-                                        👁️ View Profile
                                     </button>
                                 </div>
                             </div>
@@ -123,7 +169,7 @@ export default function DoctorSearch() {
                                 <h2 style={{ fontFamily: 'Playfair Display, serif', color: '#2d6a4f', marginBottom: 6 }}>Appointment Booked!</h2>
                                 <p style={{ color: '#6b8f71', fontSize: '0.88rem', lineHeight: 1.7 }}>
                                     Your appointment with <strong>{bookingDoc.name}</strong> has been confirmed.<br />
-                                    You'll receive a confirmation on your registered email & phone.
+                                    You can view the details in your dashboard.
                                 </p>
                                 <button className="pd-btn pd-btn-primary" style={{ marginTop: 20, width: '100%', justifyContent: 'center' }}
                                     onClick={() => { setBookingDoc(null); navigate('/patient/appointments'); }}>
@@ -136,8 +182,8 @@ export default function DoctorSearch() {
                                     <div style={{
                                         width: 56, height: 56, borderRadius: '50%', fontSize: '1.6rem',
                                         background: 'linear-gradient(135deg,#2d6a4f,#0d2410)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>{bookingDoc.badge}</div>
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
+                                    }}>{bookingDoc.badge || '🩺'}</div>
                                     <div>
                                         <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.1rem' }}>{bookingDoc.name}</div>
                                         <div style={{ fontSize: '0.80rem', color: '#6b8f71' }}>{bookingDoc.spec}</div>
@@ -146,19 +192,20 @@ export default function DoctorSearch() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <div className="pd-form-group">
                                         <label>Consultation Type</label>
-                                        <select className="pd-select">
+                                        <select className="pd-select" value={aptType} onChange={e => setAptType(e.target.value)}>
                                             <option>Video Call</option>
                                             <option>Chat Consultation</option>
-                                            <option>In-Person Visit</option>
                                         </select>
                                     </div>
                                     <div className="pd-form-group">
                                         <label>Preferred Date</label>
-                                        <input type="date" className="pd-input" min={new Date().toISOString().split('T')[0]} />
+                                        <input type="date" className="pd-input"
+                                            min={new Date().toISOString().split('T')[0]}
+                                            value={aptDate} onChange={e => setAptDate(e.target.value)} />
                                     </div>
                                     <div className="pd-form-group">
                                         <label>Preferred Time</label>
-                                        <select className="pd-select">
+                                        <select className="pd-select" value={aptTime} onChange={e => setAptTime(e.target.value)}>
                                             <option>09:00 AM</option><option>10:00 AM</option>
                                             <option>11:00 AM</option><option>02:00 PM</option>
                                             <option>03:00 PM</option><option>04:30 PM</option>
@@ -166,13 +213,16 @@ export default function DoctorSearch() {
                                     </div>
                                     <div className="pd-form-group">
                                         <label>Reason for visit</label>
-                                        <textarea className="pd-textarea" placeholder="Briefly describe your symptoms or reason…" rows={3} />
+                                        <textarea className="pd-textarea"
+                                            placeholder="Briefly describe your symptoms or reason…"
+                                            rows={3} value={aptNotes} onChange={e => setAptNotes(e.target.value)} />
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                                    <button className="pd-btn pd-btn-primary" style={{ flex: 1, justifyContent: 'center' }}
-                                        onClick={() => handleBook(bookingDoc)}>
-                                        ✅ Confirm Booking ({bookingDoc.fee})
+                                <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                                    <button className="pd-btn pd-btn-primary"
+                                        style={{ flex: 1, justifyContent: 'center' }}
+                                        onClick={handleBookSubmit} disabled={submitting}>
+                                        {submitting ? '⏳ Booking…' : `✅ Confirm Booking (₹${bookingDoc.fee || 800})`}
                                     </button>
                                     <button className="pd-btn pd-btn-outline" onClick={() => setBookingDoc(null)}>Cancel</button>
                                 </div>

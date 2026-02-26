@@ -72,6 +72,68 @@ def signed_json_response(data, status=200):
         "server_time": int(time.time())
     }), status
 
+def create_notification(user_id, source_type, content):
+    """Internal helper to create a secure notification."""
+    conn = get_db_connection()
+    if not conn: return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO notifications (userId, sourceType, content)
+            VALUES (%s, %s, %s)
+        ''', (user_id, source_type, content))
+        conn.commit()
+        return True
+    except Exception as e:
+        app.logger.error(f"Failed to create notification: {e}")
+        return False
+    finally:
+        conn.close()
+
+@app.route('/api/notifications', methods=['GET'])
+@jwt_required()
+def get_notifications():
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute('''
+            SELECT id, sourceType, content, isRead, createdAt
+            FROM notifications
+            WHERE userId = %s
+            ORDER BY createdAt DESC
+            LIMIT 50
+        ''', (current_user_id,))
+        notifs = cursor.fetchall()
+        for n in notifs:
+            n['createdAt'] = n['createdAt'].isoformat()
+        return signed_json_response({"notifications": notifs})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/notifications/<int:notif_id>/read', methods=['PUT'])
+@jwt_required()
+def mark_notification_read(notif_id):
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Security check: ensure user owns the notification
+        cursor.execute('SELECT userId FROM notifications WHERE id = %s', (notif_id,))
+        row = cursor.fetchone()
+        if not row or row['userId'] != current_user_id:
+            return signed_json_response({"error": "Unauthorized"}, 403)
+            
+        cursor.execute('UPDATE notifications SET isRead = TRUE WHERE id = %s', (notif_id,))
+        conn.commit()
+        return signed_json_response({"message": "Notification marked as read"})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
 @app.route('/')
 def home():
     return signed_json_response({
@@ -282,6 +344,8 @@ def send_hybrid_message():
     is_doctor = user['role'] == 'doctor' if user else False
     
     result, status = chat_vcall.send_chat_message(current_user_id, receiver_id, content, is_doctor)
+    if status == 201:
+        create_notification(receiver_id, 'Message', f"New secure message from user #{current_user_id}")
     return signed_json_response(result, status)
 
 @app.route('/api/v2/messages/history/<int:other_id>', methods=['GET'])
@@ -307,23 +371,107 @@ def initiate_vcall():
     content = f"VIDEO_CALL_INITIATED:{int(time.time())}"
     
     result, status = chat_vcall.send_chat_message(current_user_id, receiver_id, content, False)
+    if status == 201:
+        create_notification(receiver_id, 'Call', f"Incoming video call request from user #{current_user_id}")
     return signed_json_response({"message": "Video call signal sent!", "detail": result}, status)
 
 @app.route('/api/doctors', methods=['GET'])
 @jwt_required()
 def get_doctors():
-    """Lists all registered doctors."""
+    """Lists all registered doctors with details."""
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute('''
-        SELECT u.id, u.fullName, d.specialization, d.degree 
+        SELECT u.id, u.fullName as name, d.specialization as spec, d.degree, d.experience, d.hospital
         FROM users u 
         JOIN doctor_details d ON u.id = d.userId 
         WHERE u.role = 'doctor'
     ''')
     doctors = cursor.fetchall()
     conn.close()
+    
+    # Add mock rating/fee if not in DB yet for rich UI
+    for d in doctors:
+        d['rating'] = 4.8
+        d['fee'] = 800
+        
     return signed_json_response({"doctors": doctors})
+
+@app.route('/api/doctors/search', methods=['GET'])
+@jwt_required()
+def search_doctors():
+    """Searches doctors by name for messaging suggestions."""
+    query = request.args.get('q', '')
+    if not query:
+        return signed_json_response({"doctors": []})
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        search_term = f"%{query}%"
+        cursor.execute('''
+            SELECT u.id, u.fullName as name, d.specialization as spec
+            FROM users u 
+            JOIN doctor_details d ON u.id = d.userId 
+            WHERE u.role = 'doctor' AND u.fullName LIKE %s
+            LIMIT 10
+        ''', (search_term,))
+        doctors = cursor.fetchall()
+        return signed_json_response({"doctors": doctors})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # 1. Update basic user info
+        cursor.execute('''
+            UPDATE users 
+            SET fullName = %s, mobile = %s, address = %s, city = %s, state = %s, pincode = %s
+            WHERE id = %s
+        ''', (
+            data.get('name'), data.get('mobile'), data.get('address'), data.get('city'),
+            data.get('state'), data.get('pin'), current_user_id
+        ))
+        
+        # 2. Update role-specific details
+        cursor.execute('SELECT role FROM users WHERE id = %s', (current_user_id,))
+        role = cursor.fetchone()['role']
+        
+        if role == 'patient':
+            cursor.execute('''
+                UPDATE patient_details 
+                SET dob = %s, gender = %s, dosha = %s, allergies = %s, conditions = %s, medications = %s
+                WHERE userId = %s
+            ''', (
+                data.get('dob'), data.get('gender'), data.get('dosha'),
+                data.get('allergies'), data.get('conditions'), data.get('medications'),
+                current_user_id
+            ))
+        elif role == 'doctor':
+            # Add doctor update logic if needed
+            pass
+            
+        conn.commit()
+        
+        # Return updated user object
+        cursor.execute('SELECT id, fullName as name, email, mobile, role FROM users WHERE id = %s', (current_user_id,))
+        updated_user = cursor.fetchone()
+        
+        return signed_json_response(updated_user, 200)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
 
 @app.route('/api/patients', methods=['GET'])
 @jwt_required()
@@ -339,6 +487,123 @@ def get_patients():
     patients = cursor.fetchall()
     conn.close()
     return signed_json_response({"patients": patients})
+
+@app.route('/api/appointments', methods=['POST'])
+@jwt_required()
+def book_appointment():
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    
+    doctor_id = data.get('doctorId')
+    date = data.get('date')
+    time = data.get('time')
+    app_type = data.get('type')
+    notes = data.get('notes', '')
+    
+    if not all([doctor_id, date, time, app_type]):
+        return signed_json_response({"error": "Missing booking details"}, 400)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Fetch doctor name for patient notification
+        cursor.execute('SELECT fullName FROM users WHERE id = %s', (doctor_id,))
+        doc_data = cursor.fetchone()
+        doc_name = doc_data[0] if doc_data else "Doctor"
+
+        cursor.execute('''
+            INSERT INTO appointments (patientId, doctorId, appointmentDate, appointmentTime, type, notes)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (current_user_id, doctor_id, date, time, app_type, notes))
+        app_id = cursor.lastrowid
+        conn.commit()
+        
+        # Notify Doctor
+        create_notification(doctor_id, 'Appointment', f"New {app_type} appointment booked for {date} at {time}")
+        
+        # Notify Patient
+        create_notification(current_user_id, 'Appointment', f"Confirmed: Your appointment with {doc_name} is set for {date} at {time}")
+        
+        return signed_json_response({"message": "Appointment booked successfully!", "appointmentId": app_id}, 201)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/appointments', methods=['GET'])
+@jwt_required()
+def get_appointments():
+    current_user_id = int(get_jwt_identity())
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # Check role to fetch correct associations
+        cursor.execute('SELECT role FROM users WHERE id = %s', (current_user_id,))
+        role_data = cursor.fetchone()
+        if not role_data:
+            return signed_json_response({"error": "User not found"}, 404)
+        role = role_data['role']
+        
+        if role == 'patient':
+            cursor.execute('''
+                SELECT a.*, u.fullName as doctorName, d.specialization as spec
+                FROM appointments a
+                JOIN users u ON a.doctorId = u.id
+                LEFT JOIN doctor_details d ON u.id = d.userId
+                WHERE a.patientId = %s
+                ORDER BY a.appointmentDate DESC, a.appointmentTime DESC
+            ''', (current_user_id,))
+        else:
+            cursor.execute('''
+                SELECT a.*, u.fullName as patientName
+                FROM appointments a
+                JOIN users u ON a.patientId = u.id
+                WHERE a.doctorId = %s
+                ORDER BY a.appointmentDate DESC, a.appointmentTime DESC
+            ''', (current_user_id,))
+            
+        appointments = cursor.fetchall()
+        # Format dates/times for JSON
+        for a in appointments:
+            a['appointmentDate'] = a['appointmentDate'].isoformat()
+            a['appointmentTime'] = str(a['appointmentTime'])
+            
+        return signed_json_response({"appointments": appointments})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/appointments/<int:app_id>', methods=['PUT'])
+@jwt_required()
+def update_appointment(app_id):
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    status = data.get('status')
+    
+    if not status:
+        return signed_json_response({"error": "Status required"}, 400)
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # Verify ownership
+        cursor.execute('SELECT patientId, doctorId FROM appointments WHERE id = %s', (app_id,))
+        app_data = cursor.fetchone()
+        if not app_data or (current_user_id not in app_data.values()):
+            return signed_json_response({"error": "Unauthorized"}, 403)
+            
+        cursor.execute('UPDATE appointments SET status = %s WHERE id = %s', (status, app_id))
+        conn.commit()
+        return signed_json_response({"message": f"Appointment {status.lower()} successfully!"})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
     init_db()
