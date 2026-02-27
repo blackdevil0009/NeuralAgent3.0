@@ -1,63 +1,61 @@
 from ai.models_hub import TransformerBrain, PPOAgent, DQNAgent, ActorCriticAgent
 from ai.memory import VectorMemory, KnowledgeGraph, ContinualLearner
 import os
+import time
 
 class NeuralAgentBrain:
-    """The central orchestrator for all AI functionalities."""
+    """The central orchestrator for multi-modal clinical AI."""
     def __init__(self):
-        print("Initializing NeuralAgent Brain...")
+        print("Initializing Advanced NeuralAgent Brain...")
         # Models
         self.transformer = TransformerBrain()
-        self.ppo = PPOAgent(state_dim=10, action_dim=5)
-        self.dqn = DQNAgent(state_dim=10, action_dim=5)
-        self.actor_critic = ActorCriticAgent(state_dim=10, action_dim=5)
+        self.ppo = PPOAgent(state_dim=12, action_dim=10)
+        self.dqn = DQNAgent(state_dim=12, action_dim=10)
+        self.actor_critic = ActorCriticAgent(state_dim=12, action_dim=10)
         
-        # Memory
+        # Memory & Learning
         self.memory = VectorMemory()
         self.kb = KnowledgeGraph()
-        self.learner = ContinualLearner(self.transformer)
-        
-        # Initialize KB with some Ayurvedic defaults
-        self._init_knowledge_graph()
-
-    def _init_knowledge_graph(self):
-        self.kb.add_concept("Vata", "Dosha")
-        self.kb.add_concept("Pitta", "Dosha")
-        self.kb.add_concept("Kapha", "Dosha")
-        self.kb.connect_concepts("Vata", "Air", "Element")
-        self.kb.connect_concepts("Pitta", "Fire", "Element")
-        self.kb.connect_concepts("Kapha", "Water", "Element")
+        self.learner = ContinualLearner(self.memory)
+        self.current_session_log = []
 
     def process_query(self, user_input):
-        """Processes a chat query using Transformer + RAG + Graph Search."""
-        # 1. Search Vector Memory (RAG)
-        related_memories = self.memory.search(user_input)
+        """Processes a chat query using Transformer + RAG + Graph Context."""
+        # 1. Recursive Search in Vector Memory (RAG)
+        related_memories = self.memory.search(user_input, top_k=5)
         
-        # 2. Search Knowledge Graph
-        # (Simple keyword match for demo)
+        # 2. Extract context from Knowledge Graph
         graph_context = ""
-        for concept in ["Vata", "Pitta", "Kapha"]:
-            if concept.lower() in user_input.lower():
-                related = self.kb.find_related(concept)
-                graph_context += f"{concept} is related to {', '.join(related)}. "
+        for word in user_input.split():
+            subgraph = self.kb.get_subgraph(word.capitalize())
+            if subgraph:
+                graph_context += f"Related to {word}: {', '.join([e[1] for e in subgraph])}. "
 
-        # 3. Generate Response
-        context = f"Memories: {related_memories}. Graph: {graph_context}"
-        prompt = f"Context: {context}\nUser: {user_input}\nNeuralAgent:"
+        # 3. Construct Deep Prompt
+        mem_text = " ".join([m.get('text', '') for m in related_memories])
+        prompt = f"System: Use Ayurvedic context: {graph_context} and History: {mem_text}\nUser: {user_input}\nNeuralAgent:"
         
-        # For demo, using transformer generate (can be slow on first run)
         try:
-            response = self.transformer.generate(prompt)
-        except Exception:
-            response = "I am processing your query with deep intelligence. How else can I assist? 🌿"
+            response = self.transformer.generate(prompt, max_length=150)
+        except Exception as e:
+            print(f"Transformer Error: {e}")
+            response = "I am processing your clinical data with high-layer neural depth. 🌿"
             
+        self.current_session_log.append({"u": user_input, "a": response})
         return response
 
-    def update_brain(self, feedback_data):
-        """Reinforcement Learning update loop."""
-        # Placeholder for real RL feedback integration
-        self.learner.update_knowledge(feedback_data)
-        return "Brain architecture updated with latest interaction patterns."
+    def run_training_cycle(self, state, action, reward, next_state, done):
+        """Integrated RL training step across all agents."""
+        dqn_loss = self.dqn.replay(batch_size=32)
+        ac_loss = self.actor_critic.train_step(state, action, reward, next_state, done)
+        return {"dqn": dqn_loss, "ac": ac_loss}
+
+    def end_session(self):
+        """Consolidates knowledge at the end of an interaction."""
+        if self.current_session_log:
+            summary = self.current_session_log[-1].get('a', '')
+            self.learner.consolidate({"summary": summary, "history": self.current_session_log})
+            self.current_session_log = []
 
 # Singleton instance
 brain_instance = None

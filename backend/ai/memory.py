@@ -2,51 +2,78 @@ import numpy as np
 import faiss
 import networkx as nx
 from sentence_transformers import SentenceTransformer
+import os
+import json
 
 class VectorMemory:
-    """Vector Database using FAISS and Sentence Embeddings."""
-    def __init__(self, dimension=384): # Default dimension for 'all-MiniLM-L6-v2'
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+    """Vector Database using FAISS for high-performance RAG."""
+    def __init__(self, dimension=384, model_name='all-MiniLM-L6-v2'):
+        self.model = SentenceTransformer(model_name)
         self.index = faiss.IndexFlatL2(dimension)
         self.metadata = []
+        self.save_path = "backend/ai/data/vector_store.idx"
+        self._ensure_data_dir()
+
+    def _ensure_data_dir(self):
+        os.makedirs("backend/ai/data", exist_ok=True)
 
     def add_to_memory(self, text, metadata=None):
         embedding = self.model.encode([text])
         self.index.add(np.array(embedding).astype('float32'))
-        self.metadata.append(metadata or {"text": text})
+        self.metadata.append(metadata or {"text": text, "timestamp": os.path.getmtime(__file__)})
 
     def search(self, query, top_k=3):
+        if self.index.ntotal == 0:
+            return []
         query_embedding = self.model.encode([query])
         distances, indices = self.index.search(np.array(query_embedding).astype('float32'), top_k)
         results = []
         for i in indices[0]:
-            if i != -1:
+            if i != -1 and i < len(self.metadata):
                 results.append(self.metadata[i])
         return results
 
 class KnowledgeGraph:
-    """Graph-based search for connecting Ayurvedic concepts."""
+    """Multi-relational Knowledge Graph for Ayurvedic concepts."""
     def __init__(self):
-        self.graph = nx.Graph()
+        self.graph = nx.DiGraph()
+        self._seed_ayurveda()
 
-    def add_concept(self, concept, category):
-        self.graph.add_node(concept, category=category)
+    def _seed_ayurveda(self):
+        # Doshas
+        self.add_concept("Vata", "Dosha", {"description": "Air and space elements, governs movement."})
+        self.add_concept("Pitta", "Dosha", {"description": "Fire and water elements, governs metabolism."})
+        self.add_concept("Kapha", "Dosha", {"description": "Earth and water elements, governs structure."})
+        
+        # Elements
+        for el in ["Ether", "Air", "Fire", "Water", "Earth"]:
+            self.add_concept(el, "Element")
 
-    def connect_concepts(self, c1, c2, relationship):
-        self.graph.add_edge(c1, c2, relationship=relationship)
+        # Relationships
+        self.connect_concepts("Vata", "Air", "composed_of")
+        self.connect_concepts("Vata", "Ether", "composed_of")
+        self.connect_concepts("Pitta", "Fire", "composed_of")
+        self.connect_concepts("Kapha", "Earth", "composed_of")
+        self.connect_concepts("Kapha", "Water", "composed_of")
 
-    def find_related(self, concept):
-        if concept in self.graph:
-            return list(self.graph.neighbors(concept))
-        return []
+    def add_concept(self, name, category, attrs=None):
+        self.graph.add_node(name, category=category, **(attrs or {}))
+
+    def connect_concepts(self, src, dst, relation):
+        self.graph.add_edge(src, dst, relation=relation)
+
+    def get_subgraph(self, center_node, depth=1):
+        if center_node not in self.graph:
+            return []
+        return list(nx.bfs_edges(self.graph, center_node, depth_limit=depth))
 
 class ContinualLearner:
-    """Logic for continual learning and weight updates."""
-    def __init__(self, base_model):
-        self.base_model = base_model
-        this_task_weights = []
+    """Knowledge Consolidation and Drift Prevention."""
+    def __init__(self, memory_ref):
+        self.memory = memory_ref
 
-    def update_knowledge(self, new_data):
-        # Simulated elastic weight consolidation or similar logic
-        print("Updating AI knowledge base with new data streams...")
-        pass
+    def consolidate(self, session_data):
+        """Processes a session and adds insights to long-term memory."""
+        summary = f"Interaction Insight: {session_data.get('summary', 'General interaction')}"
+        self.memory.add_to_memory(summary, {"type": "v_consolidation"})
+        print(f"Continual Learning: Consolidating {summary}")

@@ -13,6 +13,8 @@ import chat_vcall
 from datetime import timedelta
 import functools
 import time
+from ai.brain import get_brain
+from ai.audio_utils import VoiceAssistant
 
 app = Flask(__name__)
 CORS(app)
@@ -604,6 +606,55 @@ def update_appointment(app_id):
         return signed_json_response({"error": str(e)}, 500)
     finally:
         conn.close()
+
+# --- AI Brain & Voice Endpoints ---
+
+@app.route('/api/ai/chat', methods=['POST'])
+@jwt_required()
+@limiter.limit("20 per minute")
+def ai_chat():
+    data = request.get_json()
+    user_query = data.get('message')
+    if not user_query:
+        return signed_json_response({"error": "Message required"}, 400)
+    
+    brain = get_brain()
+    response = brain.process_query(user_query)
+    
+    # Optional: Log for reinforcement learning
+    brain.update_brain({"user_query": user_query, "timestamp": time.time()})
+    
+    return signed_json_response({"response": response})
+
+@app.route('/api/ai/voice', methods=['POST'])
+@jwt_required()
+def ai_voice():
+    if 'audio' not in request.files:
+        return signed_json_response({"error": "Audio file required"}, 400)
+    
+    file = request.files['audio']
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    voice = VoiceAssistant()
+    text = voice.speech_to_text(filepath)
+    
+    brain = get_brain()
+    response = brain.process_query(text)
+    
+    audio_response_path = voice.text_to_speech(response)
+    
+    return signed_json_response({
+        "text": text,
+        "response": response,
+        "audio_url": f"/api/uploads/{os.path.basename(audio_response_path)}"
+    })
+
+@app.route('/api/uploads/<path:filename>')
+def download_file(filename):
+    from flask import send_from_directory
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
     init_db()
