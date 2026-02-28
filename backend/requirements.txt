@@ -8,3 +8,12 @@ mysql-connector-python
 flask-limiter
 cryptography
 pydantic
+torch
+transformers
+sentence-transformers
+faiss-cpu
+numpy
+networkx
+SpeechRecognition
+gTTS
+pydub

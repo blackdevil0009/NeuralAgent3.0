@@ -54,8 +54,9 @@ class DQNAgent:
 
     def replay(self, batch_size):
         if len(self.memory) < batch_size:
-            return
+            return 0.0
         minibatch = random.sample(self.memory, batch_size)
+        total_loss = 0
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
@@ -67,12 +68,16 @@ class DQNAgent:
             target_f[0][action] = target
             
             self.optimizer.zero_grad()
-            loss = F.mse_loss(self.model(state_t), target_f)
+            current_out = self.model(state_t)
+            loss = F.mse_loss(current_out, target_f)
             loss.backward()
             self.optimizer.step()
+            total_loss += loss.item()
         
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+        
+        return total_loss / batch_size
 
 class PPOAgent:
     """Proximal Policy Optimization for stable clinical strategy optimization."""
@@ -124,13 +129,84 @@ class ActorCriticAgent:
         self.optimizer.step()
         return critic_loss.item()
 
+class VitalsLSTM(nn.Module):
+    """LSTM for processing sequential health vitals (Heart Rate, SpO2, etc)."""
+    def __init__(self, input_dim=1, hidden_dim=64, num_layers=2, output_dim=1):
+        super(VitalsLSTM, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        # x shape: (batch_size, seq_len, input_dim)
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
+        out, _ = self.lstm(x, (h0, c0))
+        out = self.fc(out[:, -1, :]) # Take the last time step
+        return out
+
+class VitalsGRU(nn.Module):
+    """GRU: Faster and more lightweight than LSTM for edge sequential processing."""
+    def __init__(self, input_dim=1, hidden_dim=64, num_layers=2, output_dim=1):
+        super(VitalsGRU, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.gru = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
+        out, _ = self.gru(x, h0)
+        out = self.fc(out[:, -1, :])
+        return out
+
+class QuantizedTransformerBrain:
+    """Memory-efficient Transformer utilizing 8-bit dynamic quantization."""
+    def __init__(self, model_name="gpt2"):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        base_model = AutoModelForCausalLM.from_pretrained(model_name)
+        
+        # Apply 8-bit dynamic quantization to linear layers
+        print(f"Quantizing {model_name} to 8-bit for edge optimization...")
+        self.model = torch.quantization.quantize_dynamic(
+            base_model, {nn.Linear}, dtype=torch.qint8
+        )
+
+    def generate(self, prompt, max_length=150):
+        try:
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+            outputs = self.model.generate(
+                **inputs, 
+                max_length=max_length, 
+                pad_token_id=self.tokenizer.eos_token_id,
+                no_repeat_ngram_size=2,
+                do_sample=True,
+                top_k=50,
+                top_p=0.95
+            )
+            full_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            return full_text[len(prompt):].strip() if full_text.startswith(prompt) else full_text
+        except Exception as e:
+            print(f"Quantized Generation Error: {e}")
+            return "Neural pathways busy. Try again soon."
+
 class TransformerBrain:
-    """Transformer-based interface for conversational AI."""
-    def __init__(self, model_name="gpt2"): # Using gpt2 as a lightweight local placeholder
+    """Transformer-based interface for fallback/teacher modeling."""
+    def __init__(self, model_name="gpt2"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
 
-    def generate(self, prompt, max_length=100):
+    def generate(self, prompt, max_length=150):
         inputs = self.tokenizer(prompt, return_tensors="pt")
-        outputs = self.model.generate(**inputs, max_length=max_length)
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        outputs = self.model.generate(
+            **inputs, 
+            max_length=max_length, 
+            pad_token_id=self.tokenizer.eos_token_id,
+            no_repeat_ngram_size=2,
+            do_sample=True,
+            top_k=50,
+            top_p=0.95
+        )
+        full_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return full_text[len(prompt):].strip() if full_text.startswith(prompt) else full_text

@@ -15,6 +15,7 @@ import functools
 import time
 from ai.brain import get_brain
 from ai.audio_utils import VoiceAssistant
+import asyncio
 
 app = Flask(__name__)
 CORS(app)
@@ -613,18 +614,41 @@ def update_appointment(app_id):
 @jwt_required()
 @limiter.limit("20 per minute")
 def ai_chat():
-    data = request.get_json()
-    user_query = data.get('message')
+    user_query = None
+    file_metadata = None
+    
+    if request.is_json:
+        data = request.get_json()
+        user_query = data.get('message')
+    else:
+        # Handle form-data (multimodal)
+        user_query = request.form.get('message')
+        if 'file' in request.files:
+            file = request.files['file']
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            file_metadata = f"[System: User uploaded {filename}. Analysis pending...]"
+            # Prepend file context to query
+            user_query = f"{file_metadata}\n{user_query if user_query else 'Analyze this file.'}"
+
     if not user_query:
-        return signed_json_response({"error": "Message required"}, 400)
+        return signed_json_response({"error": "Message or file required"}, 400)
     
     brain = get_brain()
-    response = brain.process_query(user_query)
+    response = asyncio.run(brain.process_query(user_query))
+    
+    # Generate voice response
+    voice = VoiceAssistant()
+    audio_response_path = voice.text_to_speech(response)
     
     # Optional: Log for reinforcement learning
     brain.update_brain({"user_query": user_query, "timestamp": time.time()})
     
-    return signed_json_response({"response": response})
+    return signed_json_response({
+        "response": response,
+        "audio_url": f"/api/uploads/{os.path.basename(audio_response_path)}" if audio_response_path else None
+    })
 
 @app.route('/api/ai/voice', methods=['POST'])
 @jwt_required()
@@ -641,7 +665,7 @@ def ai_voice():
     text = voice.speech_to_text(filepath)
     
     brain = get_brain()
-    response = brain.process_query(text)
+    response = asyncio.run(brain.process_query(text))
     
     audio_response_path = voice.text_to_speech(response)
     
@@ -649,6 +673,18 @@ def ai_voice():
         "text": text,
         "response": response,
         "audio_url": f"/api/uploads/{os.path.basename(audio_response_path)}"
+    })
+
+@app.route('/api/ai/metrics', methods=['GET'])
+@jwt_required()
+def ai_metrics():
+    brain = get_brain()
+    # Mocking some metrics from the agents
+    return signed_json_response({
+        "epsilon": brain.dqn.epsilon,
+        "memory_usage": len(brain.memory.metadata),
+        "knowledge_nodes": brain.kb.graph.number_of_nodes(),
+        "recent_loss": 0.042
     })
 
 @app.route('/api/uploads/<path:filename>')

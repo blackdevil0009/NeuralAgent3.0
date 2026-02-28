@@ -12,7 +12,9 @@ class VectorMemory:
         self.index = faiss.IndexFlatL2(dimension)
         self.metadata = []
         self.save_path = "backend/ai/data/vector_store.idx"
+        self.meta_path = "backend/ai/data/vector_meta.json"
         self._ensure_data_dir()
+        self.load_from_disk()
 
     def _ensure_data_dir(self):
         os.makedirs("backend/ai/data", exist_ok=True)
@@ -21,6 +23,7 @@ class VectorMemory:
         embedding = self.model.encode([text])
         self.index.add(np.array(embedding).astype('float32'))
         self.metadata.append(metadata or {"text": text, "timestamp": os.path.getmtime(__file__)})
+        self.save_to_disk()
 
     def search(self, query, top_k=3):
         if self.index.ntotal == 0:
@@ -32,6 +35,18 @@ class VectorMemory:
             if i != -1 and i < len(self.metadata):
                 results.append(self.metadata[i])
         return results
+
+    def save_to_disk(self):
+        faiss.write_index(self.index, self.save_path)
+        with open(self.meta_path, 'w') as f:
+            json.dump(self.metadata, f)
+
+    def load_from_disk(self):
+        if os.path.exists(self.save_path) and os.path.exists(self.meta_path):
+            self.index = faiss.read_index(self.save_path)
+            with open(self.meta_path, 'r') as f:
+                self.metadata = json.load(f)
+            print(f"VectorMemory: Loaded {len(self.metadata)} entries from disk.")
 
 class KnowledgeGraph:
     """Multi-relational Knowledge Graph for Ayurvedic concepts."""
