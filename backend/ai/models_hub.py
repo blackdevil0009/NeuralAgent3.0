@@ -162,34 +162,38 @@ class VitalsGRU(nn.Module):
         return out
 
 class QuantizedTransformerBrain:
-    """Memory-efficient Transformer utilizing 8-bit dynamic quantization."""
-    def __init__(self, model_name="gpt2"):
+    """Memory-efficient Transformer utilizing stable sampling and fallback logic."""
+    def __init__(self, model_name="distilgpt2"):
+        print(f"Initializing {model_name} for MedNeuro-AI...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        base_model = AutoModelForCausalLM.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name)
         
-        # Apply 8-bit dynamic quantization to linear layers
-        print(f"Quantizing {model_name} to 8-bit for edge optimization...")
-        self.model = torch.quantization.quantize_dynamic(
-            base_model, {nn.Linear}, dtype=torch.qint8
-        )
+        # We'll skip dynamic quantization for now as it's causing gibberish on local environments
+        # self.model = torch.quantization.quantize_dynamic(
+        #     base_model, {nn.Linear}, dtype=torch.qint8
+        # )
 
     def generate(self, prompt, max_length=150):
         try:
             inputs = self.tokenizer(prompt, return_tensors="pt")
+            
+            # Optimized generation for coherence
             outputs = self.model.generate(
                 **inputs, 
                 max_length=max_length, 
                 pad_token_id=self.tokenizer.eos_token_id,
-                no_repeat_ngram_size=2,
+                no_repeat_ngram_size=3,
                 do_sample=True,
-                top_k=50,
-                top_p=0.95
+                temperature=0.7,
+                top_k=40,
+                top_p=0.9,
+                repetition_penalty=1.2
             )
             full_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
             return full_text[len(prompt):].strip() if full_text.startswith(prompt) else full_text
         except Exception as e:
-            print(f"Quantized Generation Error: {e}")
-            return "Neural pathways busy. Try again soon."
+            print(f"Transformer Generation Error: {e}")
+            return ""
 
 class TransformerBrain:
     """Transformer-based interface for fallback/teacher modeling."""

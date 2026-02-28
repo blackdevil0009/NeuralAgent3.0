@@ -1,0 +1,241 @@
+[debug] [2026-02-28T11:42:24.292Z] ----------------------------------------------------------------------
+[debug] [2026-02-28T11:42:24.297Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting
+[debug] [2026-02-28T11:42:24.297Z] CLI Version:   15.8.0
+[debug] [2026-02-28T11:42:24.298Z] Platform:      win32
+[debug] [2026-02-28T11:42:24.298Z] Node Version:  v24.12.0
+[debug] [2026-02-28T11:42:24.298Z] Time:          Sat Feb 28 2026 17:12:24 GMT+0530 (India Standard Time)
+[debug] [2026-02-28T11:42:24.298Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-28T11:42:27.929Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-28T11:42:27.929Z] > authorizing via signed-in user (black0009devil@gmail.com)
+[debug] [2026-02-28T11:42:27.930Z] [iam] checking project myapplication-b1b40f06 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-02-28T11:42:27.932Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:27.932Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:27.933Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/myapplication-b1b40f06:testIamPermissions [none]
+[debug] [2026-02-28T11:42:27.934Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/myapplication-b1b40f06:testIamPermissions  x-goog-user-project=myapplication-b1b40f06
+[debug] [2026-02-28T11:42:27.934Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/myapplication-b1b40f06:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-28T11:42:47.399Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/myapplication-b1b40f06:testIamPermissions 200
+[debug] [2026-02-28T11:42:47.400Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/myapplication-b1b40f06:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-28T11:42:47.401Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:47.401Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:47.401Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/myapplication-b1b40f06 [none]
+[debug] [2026-02-28T11:42:49.608Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/myapplication-b1b40f06 200
+[debug] [2026-02-28T11:42:49.608Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/myapplication-b1b40f06 {"projectId":"myapplication-b1b40f06","projectNumber":"478842936405","name":"projects/myapplication-b1b40f06","resources":{"hostingSite":"myapplication-b1b40f06"},"state":"ACTIVE","etag":"1_50d0c9f5-fea6-48ea-be6b-5146eb2db472"}
+[info] 
+[info] === Deploying to 'myapplication-b1b40f06'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-02-28T11:42:49.620Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:49.621Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:49.621Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions [none]
+[debug] [2026-02-28T11:42:49.621Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2026-02-28T11:42:53.466Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions 200
+[debug] [2026-02-28T11:42:53.466Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions {"name":"projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[myapplication-b1b40f06]: beginning deploy... 
+[info] i  hosting[myapplication-b1b40f06]: found 14 files in build 
+[debug] [2026-02-28T11:42:53.515Z] [hosting] uploading with 200 concurrency
+[debug] [2026-02-28T11:42:53.517Z] [hosting] hash cache [YnVpbGQ] not populated
+[debug] [2026-02-28T11:42:54.084Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:54.084Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:42:54.120Z] [hosting] hash cache [YnVpbGQ] stored for 14 files
+[debug] [2026-02-28T11:42:54.121Z] [hosting][hash queue][FINAL] {"max":552,"min":22,"avg":69,"active":0,"complete":14,"success":14,"errored":0,"retried":0,"total":14,"elapsed":600}
+[debug] [2026-02-28T11:42:54.122Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f:populateFiles [none]
+[debug] [2026-02-28T11:42:54.122Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f:populateFiles {"files":{"/asset-manifest.json":"f69bad0a728badd5adb4101ea7b1774a6c5b6932bfb17bfc02be0e92e6cef679","/index.html":"d55641600d1eb2cf40b6d39b1d9578473ce7ae26071d7c18bfdfb6045e503209","/robots.txt":"bfe106a3fb878dc83461c86818bf74fc1bdc7f28538ba613cd3e775516ce8b49","/logo512.png":"212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d","/static/js/main.8fa1800b.js.LICENSE.txt":"593580877b1cf0af48a7748cfbec4bde62b914a2a8b727e4135a6dd9fe0510e6","/static/js/453.20359781.chunk.js":"592d842e157fdf80ec4960dd8ae0749c28fa2f3f28d23cd97a74954e7bd82cf2","/static/js/453.20359781.chunk.js.map":"45cffd3a219691d489e0c14130197861324c5d94e38d3c444f80330931c693dd","/logo192.png":"79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0","/manifest.json":"ee04fb47e525c67d8424ffe9b4d8a8a24e434504478afca4e0ca602146836d4c","/favicon.ico":"27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d","/static/css/main.86108914.css":"1baaa994b31206a4f289cd9726c41c4d55033d6998ce41833f04785a77796bc3","/static/css/main.86108914.css.map":"2f16ea7ee0507caa50ae86fde45b562c981a844577138f307c021c5a4a68e94a","/static/js/main.8fa1800b.js":"8798c50115f1b0a27c97e9a61bf355c6037ef01e631a7b53cf7258a6214dd6c0","/static/js/main.8fa1800b.js.map":"7e55d2676599c9fc388d580ec5ebb2ff67dc34cb98073624f283e7e21a350441"}}
+[debug] [2026-02-28T11:43:04.106Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f:populateFiles 200
+[debug] [2026-02-28T11:43:04.106Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f:populateFiles {"uploadRequiredHashes":["ee04fb47e525c67d8424ffe9b4d8a8a24e434504478afca4e0ca602146836d4c","212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d","7e55d2676599c9fc388d580ec5ebb2ff67dc34cb98073624f283e7e21a350441","f69bad0a728badd5adb4101ea7b1774a6c5b6932bfb17bfc02be0e92e6cef679","d55641600d1eb2cf40b6d39b1d9578473ce7ae26071d7c18bfdfb6045e503209","bfe106a3fb878dc83461c86818bf74fc1bdc7f28538ba613cd3e775516ce8b49","2f16ea7ee0507caa50ae86fde45b562c981a844577138f307c021c5a4a68e94a","593580877b1cf0af48a7748cfbec4bde62b914a2a8b727e4135a6dd9fe0510e6","592d842e157fdf80ec4960dd8ae0749c28fa2f3f28d23cd97a74954e7bd82cf2","79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0","27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d","1baaa994b31206a4f289cd9726c41c4d55033d6998ce41833f04785a77796bc3","8798c50115f1b0a27c97e9a61bf355c6037ef01e631a7b53cf7258a6214dd6c0","45cffd3a219691d489e0c14130197861324c5d94e38d3c444f80330931c693dd"],"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files"}
+[debug] [2026-02-28T11:43:04.107Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.108Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.108Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.108Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.108Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.108Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.109Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.109Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.109Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.109Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.109Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.110Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.110Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.110Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.110Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.110Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.111Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.112Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.112Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.112Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.112Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.112Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:04.113Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/ee04fb47e525c67d8424ffe9b4d8a8a24e434504478afca4e0ca602146836d4c [none]
+[debug] [2026-02-28T11:43:04.113Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/ee04fb47e525c67d8424ffe9b4d8a8a24e434504478afca4e0ca602146836d4c [stream]
+[debug] [2026-02-28T11:43:04.115Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d [none]
+[debug] [2026-02-28T11:43:04.116Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d [stream]
+[debug] [2026-02-28T11:43:04.119Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/7e55d2676599c9fc388d580ec5ebb2ff67dc34cb98073624f283e7e21a350441 [none]
+[debug] [2026-02-28T11:43:04.119Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/7e55d2676599c9fc388d580ec5ebb2ff67dc34cb98073624f283e7e21a350441 [stream]
+[debug] [2026-02-28T11:43:04.122Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/f69bad0a728badd5adb4101ea7b1774a6c5b6932bfb17bfc02be0e92e6cef679 [none]
+[debug] [2026-02-28T11:43:04.122Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/f69bad0a728badd5adb4101ea7b1774a6c5b6932bfb17bfc02be0e92e6cef679 [stream]
+[debug] [2026-02-28T11:43:04.124Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/d55641600d1eb2cf40b6d39b1d9578473ce7ae26071d7c18bfdfb6045e503209 [none]
+[debug] [2026-02-28T11:43:04.124Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/d55641600d1eb2cf40b6d39b1d9578473ce7ae26071d7c18bfdfb6045e503209 [stream]
+[debug] [2026-02-28T11:43:04.127Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/bfe106a3fb878dc83461c86818bf74fc1bdc7f28538ba613cd3e775516ce8b49 [none]
+[debug] [2026-02-28T11:43:04.127Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/bfe106a3fb878dc83461c86818bf74fc1bdc7f28538ba613cd3e775516ce8b49 [stream]
+[debug] [2026-02-28T11:43:04.130Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/2f16ea7ee0507caa50ae86fde45b562c981a844577138f307c021c5a4a68e94a [none]
+[debug] [2026-02-28T11:43:04.130Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/2f16ea7ee0507caa50ae86fde45b562c981a844577138f307c021c5a4a68e94a [stream]
+[debug] [2026-02-28T11:43:04.132Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/593580877b1cf0af48a7748cfbec4bde62b914a2a8b727e4135a6dd9fe0510e6 [none]
+[debug] [2026-02-28T11:43:04.132Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/593580877b1cf0af48a7748cfbec4bde62b914a2a8b727e4135a6dd9fe0510e6 [stream]
+[debug] [2026-02-28T11:43:04.134Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/592d842e157fdf80ec4960dd8ae0749c28fa2f3f28d23cd97a74954e7bd82cf2 [none]
+[debug] [2026-02-28T11:43:04.135Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/592d842e157fdf80ec4960dd8ae0749c28fa2f3f28d23cd97a74954e7bd82cf2 [stream]
+[debug] [2026-02-28T11:43:04.138Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 [none]
+[debug] [2026-02-28T11:43:04.138Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 [stream]
+[debug] [2026-02-28T11:43:04.140Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d [none]
+[debug] [2026-02-28T11:43:04.140Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d [stream]
+[debug] [2026-02-28T11:43:04.142Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/1baaa994b31206a4f289cd9726c41c4d55033d6998ce41833f04785a77796bc3 [none]
+[debug] [2026-02-28T11:43:04.143Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/1baaa994b31206a4f289cd9726c41c4d55033d6998ce41833f04785a77796bc3 [stream]
+[debug] [2026-02-28T11:43:04.144Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/8798c50115f1b0a27c97e9a61bf355c6037ef01e631a7b53cf7258a6214dd6c0 [none]
+[debug] [2026-02-28T11:43:04.144Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/8798c50115f1b0a27c97e9a61bf355c6037ef01e631a7b53cf7258a6214dd6c0 [stream]
+[debug] [2026-02-28T11:43:04.146Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/45cffd3a219691d489e0c14130197861324c5d94e38d3c444f80330931c693dd [none]
+[debug] [2026-02-28T11:43:04.146Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/45cffd3a219691d489e0c14130197861324c5d94e38d3c444f80330931c693dd [stream]
+[debug] [2026-02-28T11:43:04.148Z] [hosting][populate queue][FINAL] {"max":10028,"min":10028,"avg":10028,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":10064}
+[debug] [2026-02-28T11:43:04.148Z] [hosting] uploads queued: 14
+[debug] [2026-02-28T11:43:07.921Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d 200
+[debug] [2026-02-28T11:43:07.921Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d [stream]
+[debug] [2026-02-28T11:43:08.567Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/ee04fb47e525c67d8424ffe9b4d8a8a24e434504478afca4e0ca602146836d4c 200
+[debug] [2026-02-28T11:43:08.568Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/ee04fb47e525c67d8424ffe9b4d8a8a24e434504478afca4e0ca602146836d4c [stream]
+[debug] [2026-02-28T11:43:08.870Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/f69bad0a728badd5adb4101ea7b1774a6c5b6932bfb17bfc02be0e92e6cef679 200
+[debug] [2026-02-28T11:43:08.870Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/f69bad0a728badd5adb4101ea7b1774a6c5b6932bfb17bfc02be0e92e6cef679 [stream]
+[debug] [2026-02-28T11:43:09.637Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/d55641600d1eb2cf40b6d39b1d9578473ce7ae26071d7c18bfdfb6045e503209 200
+[debug] [2026-02-28T11:43:09.638Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/d55641600d1eb2cf40b6d39b1d9578473ce7ae26071d7c18bfdfb6045e503209 [stream]
+[debug] [2026-02-28T11:43:11.779Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/2f16ea7ee0507caa50ae86fde45b562c981a844577138f307c021c5a4a68e94a 200
+[debug] [2026-02-28T11:43:11.780Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/2f16ea7ee0507caa50ae86fde45b562c981a844577138f307c021c5a4a68e94a [stream]
+[debug] [2026-02-28T11:43:16.810Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/8798c50115f1b0a27c97e9a61bf355c6037ef01e631a7b53cf7258a6214dd6c0 200
+[debug] [2026-02-28T11:43:16.810Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/8798c50115f1b0a27c97e9a61bf355c6037ef01e631a7b53cf7258a6214dd6c0 [stream]
+[debug] [2026-02-28T11:43:18.113Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/592d842e157fdf80ec4960dd8ae0749c28fa2f3f28d23cd97a74954e7bd82cf2 200
+[debug] [2026-02-28T11:43:18.113Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/592d842e157fdf80ec4960dd8ae0749c28fa2f3f28d23cd97a74954e7bd82cf2 [stream]
+[debug] [2026-02-28T11:43:18.215Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/593580877b1cf0af48a7748cfbec4bde62b914a2a8b727e4135a6dd9fe0510e6 200
+[debug] [2026-02-28T11:43:18.216Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/593580877b1cf0af48a7748cfbec4bde62b914a2a8b727e4135a6dd9fe0510e6 [stream]
+[debug] [2026-02-28T11:43:20.675Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d 200
+[debug] [2026-02-28T11:43:20.675Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d [stream]
+[debug] [2026-02-28T11:43:23.155Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/bfe106a3fb878dc83461c86818bf74fc1bdc7f28538ba613cd3e775516ce8b49 200
+[debug] [2026-02-28T11:43:23.156Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/bfe106a3fb878dc83461c86818bf74fc1bdc7f28538ba613cd3e775516ce8b49 [stream]
+[debug] [2026-02-28T11:43:26.118Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 200
+[debug] [2026-02-28T11:43:26.118Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 [stream]
+[debug] [2026-02-28T11:43:27.188Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/7e55d2676599c9fc388d580ec5ebb2ff67dc34cb98073624f283e7e21a350441 200
+[debug] [2026-02-28T11:43:27.188Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/7e55d2676599c9fc388d580ec5ebb2ff67dc34cb98073624f283e7e21a350441 [stream]
+[debug] [2026-02-28T11:43:27.340Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/45cffd3a219691d489e0c14130197861324c5d94e38d3c444f80330931c693dd 200
+[debug] [2026-02-28T11:43:27.341Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/45cffd3a219691d489e0c14130197861324c5d94e38d3c444f80330931c693dd [stream]
+[debug] [2026-02-28T11:43:31.102Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/1baaa994b31206a4f289cd9726c41c4d55033d6998ce41833f04785a77796bc3 200
+[debug] [2026-02-28T11:43:31.102Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f/files/1baaa994b31206a4f289cd9726c41c4d55033d6998ce41833f04785a77796bc3 [stream]
+[debug] [2026-02-28T11:43:31.103Z] [hosting][upload queue][FINAL] {"max":26992,"min":3814,"avg":14140.142857142857,"active":0,"complete":14,"success":14,"errored":0,"retried":0,"total":14,"elapsed":26996}
+[info] +  hosting[myapplication-b1b40f06]: file upload complete 
+[debug] [2026-02-28T11:43:31.106Z] [hosting] deploy completed after 37630ms
+[debug] [2026-02-28T11:43:31.107Z] [
+  {
+    "config": {
+      "public": "build",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "site": "myapplication-b1b40f06"
+    },
+    "version": "projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f"
+  }
+]
+[info] i  hosting[myapplication-b1b40f06]: finalizing version... 
+[debug] [2026-02-28T11:43:31.113Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:31.113Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:31.118Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f updateMask=status%2Cconfig
+[debug] [2026-02-28T11:43:31.118Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f {"status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]}}
+[debug] [2026-02-28T11:43:33.595Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f 200
+[debug] [2026-02-28T11:43:33.595Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f {"name":"projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-02-28T11:42:49.083912Z","createUser":{"email":"black0009devil@gmail.com"},"finalizeTime":"2026-02-28T11:43:30.739329Z","finalizeUser":{"email":"black0009devil@gmail.com"}}
+[debug] [2026-02-28T11:43:33.596Z] [hosting] finalized version for myapplication-b1b40f06:[object Object]
+[info] +  hosting[myapplication-b1b40f06]: version finalized 
+[info] i  hosting[myapplication-b1b40f06]: releasing new version... 
+[debug] [2026-02-28T11:43:33.598Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:33.599Z] Checked if tokens are valid: true, expires at: 1772280850594
+[debug] [2026-02-28T11:43:33.599Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/channels/live/releases versionName=projects%2F478842936405%2Fsites%2Fmyapplication-b1b40f06%2Fversions%2F37b179c5b6d23f7f
+[debug] [2026-02-28T11:43:33.599Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/channels/live/releases {}
+[debug] [2026-02-28T11:43:34.551Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/channels/live/releases 200
+[debug] [2026-02-28T11:43:34.551Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/myapplication-b1b40f06/channels/live/releases {"name":"projects/478842936405/sites/myapplication-b1b40f06/channels/live/releases/1772279011006000","version":{"name":"projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-02-28T11:42:49.083912Z","createUser":{"email":"black0009devil@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocIehBK5FZ4TI2fyeUbvD4hQP52nYxRkfC7xpINd5V9apC1pA3M"},"finalizeTime":"2026-02-28T11:43:30.739329Z","finalizeUser":{"email":"black0009devil@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocIehBK5FZ4TI2fyeUbvD4hQP52nYxRkfC7xpINd5V9apC1pA3M"}},"type":"DEPLOY","releaseTime":"2026-02-28T11:43:31.006Z","releaseUser":{"email":"black0009devil@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocIehBK5FZ4TI2fyeUbvD4hQP52nYxRkfC7xpINd5V9apC1pA3M"}}
+[debug] [2026-02-28T11:43:34.552Z] [hosting] release: {"name":"projects/478842936405/sites/myapplication-b1b40f06/channels/live/releases/1772279011006000","version":{"name":"projects/478842936405/sites/myapplication-b1b40f06/versions/37b179c5b6d23f7f","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-02-28T11:42:49.083912Z","createUser":{"email":"black0009devil@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocIehBK5FZ4TI2fyeUbvD4hQP52nYxRkfC7xpINd5V9apC1pA3M"},"finalizeTime":"2026-02-28T11:43:30.739329Z","finalizeUser":{"email":"black0009devil@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocIehBK5FZ4TI2fyeUbvD4hQP52nYxRkfC7xpINd5V9apC1pA3M"}},"type":"DEPLOY","releaseTime":"2026-02-28T11:43:31.006Z","releaseUser":{"email":"black0009devil@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocIehBK5FZ4TI2fyeUbvD4hQP52nYxRkfC7xpINd5V9apC1pA3M"}}
+[info] +  hosting[myapplication-b1b40f06]: release complete 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/myapplication-b1b40f06/overview
+[info] Hosting URL: https://myapplication-b1b40f06.web.app
+[debug] [2026-02-28T11:43:44.586Z] Error: Timed out.
+    at Timeout._onTimeout (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\utils.js:308:49)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-02-28T12:25:43.278Z] ----------------------------------------------------------------------
+[debug] [2026-02-28T12:25:43.280Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2026-02-28T12:25:43.281Z] CLI Version:   15.8.0
+[debug] [2026-02-28T12:25:43.281Z] Platform:      win32
+[debug] [2026-02-28T12:25:43.281Z] Node Version:  v24.12.0
+[debug] [2026-02-28T12:25:43.281Z] Time:          Sat Feb 28 2026 17:55:43 GMT+0530 (India Standard Time)
+[debug] [2026-02-28T12:25:43.281Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  D:\NeuralAgent3.0\frontend
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2026-02-28T12:27:14.256Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-28T12:27:14.257Z] > authorizing via signed-in user (black0009devil@gmail.com)
+[debug] [2026-02-28T12:27:14.260Z] Checked if tokens are valid: false, expires at: 1772280850594
+[debug] [2026-02-28T12:27:14.261Z] Checked if tokens are valid: false, expires at: 1772280850594
+[debug] [2026-02-28T12:27:14.261Z] > refreshing access token with scopes: []
+[debug] [2026-02-28T12:27:14.263Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-02-28T12:27:14.263Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-28T12:27:26.330Z] *** [apiv2] error from fetch(https://www.googleapis.com/oauth2/v3/token, {"headers":{},"method":"POST","body":{"_overheadLength":545,"_valueLength":212,"_valuesToMeasure":[],"writable":false,"readable":true,"dataSize":0,"maxDataSize":2097152,"pauseStreams":true,"_released":true,"_streams":[],"_currentStream":null,"_insideLoop":false,"_pendingNext":false,"_boundary":"--------------------------b5d9f9d138e9c3118f47a89f","_events":{},"_eventsCount":1}}): FetchError: request to https://www.googleapis.com/oauth2/v3/token failed, reason: getaddrinfo ENOTFOUND www.googleapis.com
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-02-28T12:27:26.332Z] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-02-28T12:27:27.516Z] FirebaseError: Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+    at invalidCredentialError (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\auth.js:177:12)
+    at refreshTokens (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\auth.js:590:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async getAccessToken (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:49:18)
+    at async Client.addAuthHeader (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:179:21)
+    at async Client.request (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:126:34)
+    at async getFirebaseProject (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\management\projects.js:361:21)
+    at async usingProject (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\init\features\project.js:77:16)
+    at async Object.doSetup (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\init\features\project.js:29:9)
+    at async init (C:\Users\black\AppData\Roaming\npm\node_modules\firebase-tools\lib\init\index.js:92:13)
+[error] 
+[error] Error: Failed to get Firebase project myapplication-b1b40f06. Please make sure the project exists and your account has permission to access it.

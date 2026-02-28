@@ -57,52 +57,67 @@ class NeuralAgentBrain:
         )
 
     async def process_query(self, user_input):
-        """Async processing for high-volume clinical analysis with MedNeuro-AI logic."""
-        # Check Cache first
+        """Async processing for MedNeuro-AI with robust fallback & gibberish detection."""
+        # 1. Check Cache
         cached_res = self.cache.get(user_input.lower())
         if cached_res:
             return f"(Cached) {cached_res}"
 
-        # 1. Recursive Search in Vector Memory (RAG)
+        # 2. Sequential RAG & KG Context Extraction
         related_memories = self.memory.search(user_input, top_k=3)
-        
-        # 2. Extract context from Knowledge Graph
         graph_context = []
         for word in user_input.split():
             subgraph = self.kb.get_subgraph(word.capitalize())
             if subgraph:
                 graph_context.append(f"{word} -> {', '.join([e[1] for e in subgraph])}")
 
-        # 3. Construct Meta-Prompt (MedNeuro-AI Persona)
         knowledge_base = "\n".join([m.get('text', '') for m in related_memories])
         kb_context = knowledge_base if knowledge_base else "General Clinical Knowledge"
         
+        # 3. Emergency Detection (Heuristic)
+        emergency_keywords = ["chest pain", "stroke", "bleeding", "unconscious", "cannot breathe"]
+        is_emergency = any(kw in user_input.lower() for kw in emergency_keywords)
+
+        # 4. Construct Structured Meta-Prompt
         prompt = (
-            f"Role: You are MedNeuro-AI, an advanced medical assistant designed to provide structured health guidance.\n\n"
-            f"Responsibilities:\n"
-            f"1. Understand patient symptoms clearly.\n"
-            f"2. Classify case severity (Level 1: Minor, Level 2: Moderate, Level 3: Emergency).\n"
-            f"3. Always provide structured fields: Possible Causes, Severity Level, Allopathic Approach, Ayurvedic Approach, Diet & Lifestyle, and When to See a Doctor.\n"
-            f"4. Never give exact dosages or replace a licensed professional.\n"
-            f"5. If symbols indicate emergency (chest pain, stroke), immediately advise emergency services.\n\n"
-            f"Knowledge Base:\n{kb_context}\n\n"
+            f"Role: You are MedNeuro-AI, an advanced medical assistant. Provide structured guidance.\n"
+            f"Rules: Classify severity (Level 1-3). Provide Allopathic & Ayurvedic approaches.\n"
+            f"Knowledge Context: {kb_context}\n"
+            f"Graph Info: {', '.join(graph_context)}\n\n"
             f"{self.few_shot_examples}"
             f"Patient Symptoms: {user_input}\n"
             f"Possible Causes:"
         )
         
         try:
-            # Simulate async processing for the transformer
+            # 5. Model Generation
             response = await asyncio.to_thread(self.transformer.generate, prompt, max_length=500)
             
-            # Reconstruct the structure if the model is too brief
-            if not response or "Severity Level" not in response:
-                response = f"Possible Causes: Analysis based on KB context. 🌿\n{response}"
-            
-            # Ensure the response starts with the structure since we cut it at 'Possible Causes' 
-            # in the prompt to lead the model.
-            if not response.startswith("Possible Causes:"):
-                response = "Possible Causes: " + response
+            # 6. Gibberish Detection (Uniqueness & Repetitive token ratio)
+            tokens = response.lower().split()
+            if len(tokens) > 5:
+                unique_ratio = len(set(tokens)) / len(tokens)
+                if unique_ratio < 0.3: # High repetition detected
+                    response = "" # Trigger fallback
+
+            # 7. Validation & Fallback Logic
+            if not response or "Severity Level" not in response or len(response) < 20:
+                severity = "Level 3 – Emergency" if is_emergency else "Level 2 – Moderate"
+                if not is_emergency and len(related_memories) > 0 and "mild" in user_input.lower():
+                    severity = "Level 1 – Minor"
+                
+                # Template Fallback using RAG context
+                response = f"Possible Causes: Analysis indicates symptoms related to {', '.join(graph_context) if graph_context else 'clinical observation'}.\n"
+                response += f"Severity Level: {severity}\n"
+                response += f"Allopathic Approach: Standard care includes symptom management and consultation with a specialist.\n"
+                response += f"Ayurvedic Approach: Focus on balancing Doshas. Recommended: {related_memories[0]['text'] if related_memories else 'General herbs like Tulsi and Turmeric'}.\n"
+                response += f"Diet & Lifestyle Advice: Rest, hydration, and light Sattvic meals.\n"
+                response += f"When to See a Doctor: {'IMMEDIATELY - Emergency signs detected.' if is_emergency else 'If symptoms persist beyond 24-48 hours.'}\n"
+                response += f"Disclaimer: This information is for educational purposes only. MedNeuro-AI is an assistant, not a doctor. 🌿"
+            else:
+                # Ensure the response starts correctly
+                if not response.startswith("Possible Causes:"):
+                    response = "Possible Causes: " + response
 
             # Update Cache
             self.cache.put(user_input.lower(), response)

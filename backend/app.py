@@ -601,6 +601,18 @@ def update_appointment(app_id):
             return signed_json_response({"error": "Unauthorized"}, 403)
             
         cursor.execute('UPDATE appointments SET status = %s WHERE id = %s', (status, app_id))
+        
+        # Notify the other party
+        other_user_id = app_data['doctorId'] if current_user_id == app_data['patientId'] else app_data['patientId']
+        
+        # Get names for the notification
+        cursor.execute('SELECT fullName FROM users WHERE id = %s', (current_user_id,))
+        caller_name = cursor.fetchone()['fullName']
+        
+        content = f"Appointment {app_id} has been {status.lower()} by {caller_name}."
+        from database import create_notification
+        create_notification(other_user_id, 'Appointment', content)
+        
         conn.commit()
         return signed_json_response({"message": f"Appointment {status.lower()} successfully!"})
     except Exception as e:
