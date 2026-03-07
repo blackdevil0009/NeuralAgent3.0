@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const STEPS = [
     { num: '01', icon: '📋', title: 'Register & Profile', desc: 'Create your account as a patient or doctor. Fill in your health profile / credentials in minutes.' },
-    { num: '02', icon: '🤖', title: 'Consult the AI', desc: 'Chat with NeuralAgent, upload reports, describe symptoms — get instant Ayurvedic + modern insights.' },
+    { num: '02', icon: '🤖', title: 'Consult the AI', desc: 'Chat with VaidyaMed-X, upload reports, describe symptoms — get instant Ayurvedic + modern insights.' },
     { num: '03', icon: '🌿', title: 'Heal & Thrive', desc: 'Follow personalised remedies, connect with verified doctors, and track your wellness journey.' },
 ];
 
@@ -25,7 +25,7 @@ export default function Dashboard() {
                     <div className="na-section-header">
                         <span className="na-badge">Simple Process</span>
                         <h2 className="na-section-title">
-                            How <span className="na-gradient-text">NeuralAgent</span> Works
+                            How <span className="na-gradient-text">VaidyaMed-X</span> Works
                         </h2>
                         <p className="na-section-sub">
                             Start your holistic health journey in three effortless steps.
@@ -72,7 +72,7 @@ export default function Dashboard() {
                     <div className="na-cta-banner">
                         <div className="na-cta-text">
                             <h3>Ready to experience the future of healthcare?</h3>
-                            <p>Join thousands of patients and doctors already using NeuralAgent.</p>
+                            <p>Join thousands of patients and doctors already using VaidyaMed-X.</p>
                         </div>
                         <div className="na-cta-actions">
                             <Link to="/register" className="na-btn-solid na-btn-lg">Start Free Today 🌿</Link>

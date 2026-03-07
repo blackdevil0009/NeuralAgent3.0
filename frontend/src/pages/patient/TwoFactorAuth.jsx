@@ -8,7 +8,7 @@ const BACKUP_CODES = [
 function MockQR() {
     /* A purely decorative SVG QR placeholder */
     const cells = [];
-    const seed = 'NeuralAgent2FA';
+    const seed = 'VaidyaMed-X2FA';
     for (let r = 0; r < 21; r++) {
         for (let c = 0; c < 21; c++) {
             const on = (seed.charCodeAt((r * 21 + c) % seed.length) + r + c) % 3 !== 0;
@@ -131,7 +131,7 @@ export default function TwoFactorAuth() {
                                 textAlign: 'center', marginBottom: 18, wordBreak: 'break-all',
                                 border: '1px dashed var(--border-light)',
                             }}>
-                                JBSWY3DPEHPK3PXP · NeuralAgent · {new Date().toLocaleDateString('en-IN')}
+                                JBSWY3DPEHPK3PXP · VaidyaMed-X · {new Date().toLocaleDateString('en-IN')}
                             </div>
 
                             <h3 className="pd-section-title">Step 2 · Enter Code</h3>

@@ -14,8 +14,6 @@ from datetime import timedelta
 import functools
 import time
 from ai.brain import get_brain
-from ai.audio_utils import VoiceAssistant
-import asyncio
 
 app = Flask(__name__)
 CORS(app)
@@ -27,13 +25,28 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 jwt = JWTManager(app)
 
+@jwt.invalid_token_loader
+def invalid_token_callback(error_string):
+    app.logger.error(f"JWT Invalid Token Error: {error_string}")
+    return jsonify({"error": f"Invalid token: {error_string}"}), 422
+
+@jwt.unauthorized_loader
+def missing_token_callback(error_string):
+    app.logger.error(f"JWT Missing Token Error: {error_string}")
+    return jsonify({"error": f"Missing token: {error_string}"}), 401
+
 # Rate Limiting
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["1000 per day", "200 per hour"],
     storage_uri="memory://",
 )
+
+# Exempt CORS preflight (OPTIONS) requests from rate limiting
+@limiter.request_filter
+def exempt_options():
+    return request.method == 'OPTIONS'
 
 # Ensure upload directory exists
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -620,46 +633,35 @@ def update_appointment(app_id):
     finally:
         conn.close()
 
-# --- AI Brain & Voice Endpoints ---
+# --- MedAssist-X AI Endpoints ---
 
 @app.route('/api/ai/chat', methods=['POST'])
 @jwt_required()
-@limiter.limit("20 per minute")
+@limiter.limit("30 per minute")
 def ai_chat():
     user_query = None
-    file_metadata = None
     
     if request.is_json:
         data = request.get_json()
         user_query = data.get('message')
     else:
-        # Handle form-data (multimodal)
         user_query = request.form.get('message')
         if 'file' in request.files:
             file = request.files['file']
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-            file_metadata = f"[System: User uploaded {filename}. Analysis pending...]"
-            # Prepend file context to query
-            user_query = f"{file_metadata}\n{user_query if user_query else 'Analyze this file.'}"
+            user_query = f"[Patient uploaded: {filename}] {user_query or 'Analyze this file.'}"
 
     if not user_query:
         return signed_json_response({"error": "Message or file required"}, 400)
     
     brain = get_brain()
-    response = asyncio.run(brain.process_query(user_query))
-    
-    # Generate voice response
-    voice = VoiceAssistant()
-    audio_response_path = voice.text_to_speech(response)
-    
-    # Optional: Log for reinforcement learning
-    brain.update_brain({"user_query": user_query, "timestamp": time.time()})
+    response = brain.process_query(user_query)
     
     return signed_json_response({
         "response": response,
-        "audio_url": f"/api/uploads/{os.path.basename(audio_response_path)}" if audio_response_path else None
+        "audio_url": None
     })
 
 @app.route('/api/ai/voice', methods=['POST'])
@@ -668,36 +670,28 @@ def ai_voice():
     if 'audio' not in request.files:
         return signed_json_response({"error": "Audio file required"}, 400)
     
-    file = request.files['audio']
+    file = request.files['file'] if 'file' in request.files else request.files['audio']
     filename = secure_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
     
-    voice = VoiceAssistant()
-    text = voice.speech_to_text(filepath)
+    # Use browser-side STT (Web Speech API) — just process the text
+    text = request.form.get('message', 'Voice input received')
     
     brain = get_brain()
-    response = asyncio.run(brain.process_query(text))
-    
-    audio_response_path = voice.text_to_speech(response)
+    response = brain.process_query(text)
     
     return signed_json_response({
         "text": text,
         "response": response,
-        "audio_url": f"/api/uploads/{os.path.basename(audio_response_path)}"
+        "audio_url": None
     })
 
 @app.route('/api/ai/metrics', methods=['GET'])
 @jwt_required()
 def ai_metrics():
     brain = get_brain()
-    # Mocking some metrics from the agents
-    return signed_json_response({
-        "epsilon": brain.dqn.epsilon,
-        "memory_usage": len(brain.memory.metadata),
-        "knowledge_nodes": brain.kb.graph.number_of_nodes(),
-        "recent_loss": 0.042
-    })
+    return signed_json_response(brain.get_metrics())
 
 @app.route('/api/uploads/<path:filename>')
 def download_file(filename):

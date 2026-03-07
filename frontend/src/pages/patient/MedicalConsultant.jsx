@@ -4,7 +4,7 @@ import { handleError, handleSuccess } from '../../utils/error_handlers';
 
 const CONSULTANT_FAQS = [
     { q: 'How does an online consultation work?', a: 'Once booked, you will receive a link to join a secure video call at your scheduled time. You can also upload reports in advance for the doctor to review.' },
-    { q: 'Are the consultants verified?', a: 'Yes. All consultants on NeuralAgent are verified with valid medical council registration numbers, degrees, and identity proof.' },
+    { q: 'Are the consultants verified?', a: 'Yes. All consultants on VaidyaMed-X are verified with valid medical council registration numbers, degrees, and identity proof.' },
     { q: 'Can I get an Ayurvedic and allopathic opinion together?', a: 'Absolutely. You can book separate consultations or request a joint opinion. Many of our doctors offer integrated care advice.' },
     { q: 'What if I\'m not satisfied?', a: 'We offer a 100% satisfaction guarantee. If unhappy within 24 hours, you can request a free repeat consultation or a refund.' },
 ];
@@ -127,7 +127,7 @@ export default function MedicalConsultant() {
                                 <div style={{ fontFamily: 'Playfair Display,serif', fontSize: '1.05rem', marginBottom: 2 }}>{c.name}</div>
                                 <div style={{ fontSize: '0.82rem', color: '#2d6a4f', fontWeight: 600, marginBottom: 6 }}>{c.spec}</div>
                                 <p style={{ fontSize: '0.83rem', color: '#5a755a', lineHeight: 1.7, marginBottom: 10 }}>
-                                    {c.experience || '10+ years'} of experience in clinical excellence at {c.hospital || 'NeuralAgent Clinic'}.
+                                    {c.experience || '10+ years'} of experience in clinical excellence at {c.hospital || 'VaidyaMed-X Clinic'}.
                                 </p>
                                 <div style={{ display: 'flex', gap: 20, fontSize: '0.80rem', color: '#6b8f71', marginBottom: 12 }}>
                                     <span>⭐ {c.rating || 4.8}</span>

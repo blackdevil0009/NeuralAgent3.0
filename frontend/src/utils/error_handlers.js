@@ -1,5 +1,5 @@
 /**
- * Centralized error handling utility for the NeuralAgent frontend.
+ * Centralized error handling utility for the VaidyaMed-X frontend.
  */
 
 let showToastFn = null;

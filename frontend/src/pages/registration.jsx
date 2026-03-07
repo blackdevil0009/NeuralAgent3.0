@@ -23,21 +23,21 @@ const strengthWidth = ['0%', '25%', '50%', '75%', '100%'];
    Terms & Conditions text
 ───────────────────────────────────────────── */
 const TERMS_TEXT = `
-Welcome to NeuralAgent – an Ayurvedic AI Health Companion. By registering, you agree to:
+Welcome to VaidyaMed-X – an Ayurvedic AI Health Companion. By registering, you agree to:
 
 1. Accuracy of Information: All information provided during registration is accurate, current, and complete.
 
-2. Medical Disclaimer: NeuralAgent provides Ayurvedic guidance and general health information for educational purposes only. It does NOT replace professional medical diagnosis, treatment, or advice. Always consult a qualified physician or healthcare provider for medical decisions.
+2. Medical Disclaimer: VaidyaMed-X provides Ayurvedic guidance and general health information for educational purposes only. It does NOT replace professional medical diagnosis, treatment, or advice. Always consult a qualified physician or healthcare provider for medical decisions.
 
 3. Privacy & Data: Your personal data is collected, stored, and processed as per our Privacy Policy. We never sell your data to third parties.
 
-4. Patient Responsibility: Patients are solely responsible for following any health recommendations. NeuralAgent and its affiliated practitioners bear no liability for outcomes resulting from misuse of information.
+4. Patient Responsibility: Patients are solely responsible for following any health recommendations. VaidyaMed-X and its affiliated practitioners bear no liability for outcomes resulting from misuse of information.
 
 5. Doctor Verification: Doctors must upload valid credentials. Providing false credentials is grounds for immediate account termination and may result in legal action.
 
 6. Confidentiality: All consultations, medical records, and conversations on this platform are strictly confidential per applicable data protection laws.
 
-7. Amendments: NeuralAgent reserves the right to update these terms. Continued use of the platform constitutes acceptance of updated terms.
+7. Amendments: VaidyaMed-X reserves the right to update these terms. Continued use of the platform constitutes acceptance of updated terms.
 
 8. Governing Law: These terms are governed by the laws of India and the Information Technology Act, 2000.
 
@@ -718,7 +718,7 @@ export default function Registration() {
             <div className="reg-container">
                 {/* ── Header ── */}
                 <div className="reg-header">
-                    <div className="reg-logo">🌿 NeuralAgent</div>
+                    <div className="reg-logo">🌿 VaidyaMed-X</div>
                     <p className="reg-tagline">Ayurvedic AI Health Companion — आरोग्यं परमं भाग्यम्</p>
                 </div>
 

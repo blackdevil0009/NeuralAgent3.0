@@ -115,7 +115,7 @@ export default function Footer() {
 
             {/* Bottom bar */}
             <div className="na-footer-bottom">
-                <span>© {new Date().getFullYear()} NeuralAgent. All rights reserved.</span>
+                <span>© {new Date().getFullYear()} VaidyaMed-X. All rights reserved.</span>
                 <span>Made with 🌿 &amp; ❤️ in India</span>
             </div>
         </footer>

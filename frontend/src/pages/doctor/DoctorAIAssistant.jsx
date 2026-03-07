@@ -33,7 +33,7 @@ export default function DoctorAIAssistant() {
         <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
             <div className="dd-header" style={{ marginBottom: 30 }}>
                 <div>
-                    <h1>🤖 NeuralAgent Clinical Assistant</h1>
+                    <h1>🤖 VaidyaMed-X Clinical Assistant</h1>
                     <p style={{ color: 'var(--doc-text-mute)' }}>Hospital-wide AI ecosystem: Report Analysis, IoT Control, and Multi-Voice Collaboration</p>
                 </div>
             </div>

@@ -1,17 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 const QUICK_PROMPTS = [
-    '🌿 What is my Dosha type?',
-    '💊 Ayurvedic remedies for headache',
-    '🍃 Diet plan for Pitta dosha',
-    '🩺 Explain my blood report',
+    '🤒 I have headache and fever for 2 days',
+    '💊 Ayurvedic remedies for joint pain',
+    '🩺 Symptoms of diabetes',
+    '😰 I feel anxious and stressed',
     '📹 Live AI Consultation',
 ];
 
 const INITIAL_MESSAGES = [
     {
         id: 1, from: 'ai',
-        text: `🌿 Namaste! I'm **NeuralAgent**, your Ayurvedic AI companion.\n\nI can help you analyze medical reports, monitor your smart health devices, and even connect you to a live consultant.\n\nHow can I help you today?`,
+        text: `🏥 Namaste! I'm **VaidyaMed-X**, your evidence-based clinical assistant.\n\n• 🩺 Describe symptoms for structured analysis\n• 💊 Get Allopathic + Ayurvedic management options\n• ⚠️ Identify red flags and emergency warnings\n• 🔬 Know what investigations may be needed\n\nHow can I help you today?`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
 ];
@@ -33,7 +33,7 @@ export default function AIAssistant() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isRecording, setIsRecording] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [brainModel, setBrainModel] = useState('DQN-PPO Hybrid');
+    const [brainModel, setBrainModel] = useState('VaidyaMed-X Clinical Engine');
     const [interimTranscript, setInterimTranscript] = useState('');
 
     // Refs
@@ -166,7 +166,8 @@ export default function AIAssistant() {
         setMessages(prev => [...prev, userMsg]);
         setTyping(true);
 
-        const token = localStorage.getItem('token');
+        const rawToken = localStorage.getItem('token');
+        const token = rawToken ? rawToken.replace(/^"|"$/g, '') : '';
         const timestamp = Math.floor(Date.now() / 1000).toString();
 
         try {
@@ -219,7 +220,7 @@ export default function AIAssistant() {
             console.error("AI Error:", err);
             const errorMsg = {
                 id: Date.now() + 1, from: 'ai',
-                text: "My neural pathways are experiencing high latency. Please try again in a moment. 🍃",
+                text: "VaidyaMed-X is temporarily unable to process your query. Please try again in a moment. 🏥",
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
             setMessages(prev => [...prev, errorMsg]);
@@ -313,7 +314,7 @@ export default function AIAssistant() {
                         {isSpeaking && <div className="speaking-ring"></div>}
                     </div>
                     <div>
-                        <h1 style={{ fontSize: '1.4rem' }}>NeuralAgent AI</h1>
+                        <h1 style={{ fontSize: '1.4rem' }}>VaidyaMed-X</h1>
                         <p style={{ fontSize: '0.85rem' }}>Engine: <strong>{brainModel}</strong> | Status: Online</p>
                     </div>
                 </div>
@@ -354,7 +355,7 @@ export default function AIAssistant() {
                         <button className="pd-chat-send" onClick={() => fileInputRef.current.click()} style={{ background: '#f1f1f1', color: '#666', borderRadius: '50%', width: 45, height: 45 }}>📎</button>
                         <button className="pd-chat-send" onClick={startCamera} style={{ background: '#f1f1f1', color: '#666', borderRadius: '50%', width: 45, height: 45 }}>📷</button>
 
-                        <textarea className="pd-chat-input" placeholder="Ask anything to the AI Brain..." value={input} onChange={e => setInput(e.target.value)} rows={1} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())} />
+                        <textarea className="pd-chat-input" placeholder="Describe your symptoms to VaidyaMed-X..." value={input} onChange={e => setInput(e.target.value)} rows={1} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())} />
 
                         <button className={`pd-chat-send ${isRecording ? 'recording-active' : ''}`} onClick={handleVoiceToggle} style={{ background: isRecording ? '#ff4757' : 'var(--green-mid)', border: 'none', borderRadius: '50%', width: 45, height: 45, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                             {isRecording ? '🛑' : '🎤'}
@@ -387,13 +388,13 @@ export default function AIAssistant() {
                             <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>98%</div>
                         </div>
                         <div className="pd-card" style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>AI BRAIN SYNC</div>
-                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'blue', marginTop: 10 }}>● Syncing Vectors</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>MEDASSIST STATUS</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'blue', marginTop: 10 }}>● Clinical Engine Active</div>
                         </div>
                     </div>
                     <div className="pd-card" style={{ marginTop: 20, background: '#f9f9f9', border: '1px dashed #ccc' }}>
-                        <h4 style={{ margin: 0 }}>Continual Learning Insights</h4>
-                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: 10 }}>The AI Brain has updated its model weights based on your recent activity patterns. Current recommendation: Increase 'Sattva' herbs in diet.</p>
+                        <h4 style={{ margin: 0 }}>VaidyaMed-X Clinical Notes</h4>
+                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: 10 }}>VaidyaMed-X supports 10+ clinical conditions with structured assessments. Describe your symptoms for evidence-based differential diagnosis and management options.</p>
                     </div>
                 </div>
             )}
@@ -414,9 +415,9 @@ export default function AIAssistant() {
                                     }}></div>
                                     <span style={{ fontSize: '5rem', filter: isSpeaking ? 'drop-shadow(0 0 10px #52b788)' : 'none' }}>🧠</span>
                                 </div>
-                                <h3 style={{ fontFamily: 'Playfair Display, serif', letterSpacing: 1, color: isSpeaking ? 'var(--doc-green-light)' : '#fff' }}>NeuralAgent Live Brain</h3>
+                                <h3 style={{ fontFamily: 'Playfair Display, serif', letterSpacing: 1, color: isSpeaking ? 'var(--doc-green-light)' : '#fff' }}>VaidyaMed-X Live</h3>
                                 <p style={{ opacity: 0.8, fontSize: '0.95rem', maxWidth: 400, margin: '0 auto' }}>
-                                    {isSpeaking ? "NeuralAgent is responding..." : "Deep neural pathways active. Ready for clinical input."}
+                                    {isSpeaking ? "VaidyaMed-X is responding..." : "Clinical engine active. Ready for symptom input."}
                                 </p>
                                 <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 25, height: 40, alignItems: 'center' }}>
                                     {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -434,16 +435,16 @@ export default function AIAssistant() {
                         ) : (
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '4.5rem', marginBottom: 20 }}>🤖</div>
-                                <h2 style={{ marginBottom: 12, fontFamily: 'Playfair Display, serif' }}>AI Live Brain Consultation</h2>
+                                <h2 style={{ marginBottom: 12, fontFamily: 'Playfair Display, serif' }}>VaidyaMed-X Live Consultation</h2>
                                 <p style={{ opacity: 0.6, maxWidth: 350, margin: '0 auto 30px', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                                    Engage in real-time "live talking" with our Transformer-based AI Brain. Multi-modal clinical analysis active.
+                                    Engage in real-time voice consultation with VaidyaMed-X. Evidence-based clinical analysis active.
                                 </p>
-                                <button className="pd-btn pd-btn-primary" style={{ padding: '14px 30px', fontSize: '1rem' }} onClick={() => setCameraActive(true)}>💡 Connect to Neural Brain</button>
+                                <button className="pd-btn pd-btn-primary" style={{ padding: '14px 30px', fontSize: '1rem' }} onClick={() => setCameraActive(true)}>🏥 Connect to VaidyaMed-X</button>
                             </div>
                         )}
                         <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: 'rgba(0,0,0,0.5)', borderRadius: 20, fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.15)' }}>
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00ff00', boxShadow: '0 0 8px #00ff00', animation: 'blink 1.5s infinite' }}></span>
-                            AI BRAIN ARCHITECTURE v5.2 ACTIVE
+                            MEDASSIST-X v1.0 ACTIVE
                         </div>
                     </div>
                     <div style={{ height: 90, display: 'flex', gap: 12, marginTop: 20 }}>

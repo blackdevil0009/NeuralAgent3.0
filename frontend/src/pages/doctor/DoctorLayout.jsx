@@ -54,7 +54,7 @@ export default function DoctorLayout() {
             <aside className="dd-sidebar">
                 <Link to="/" className="dd-sidebar-logo">
                     <span className="dd-logo-icon">🌿</span>
-                    <span className="dd-logo-text">NeuralAgent</span>
+                    <span className="dd-logo-text">VaidyaMed-X</span>
                 </Link>
 
                 <div className="dd-sidebar-user">

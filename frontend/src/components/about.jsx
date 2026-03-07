@@ -64,7 +64,7 @@ export default function About() {
                 {/* Team */}
                 <div className="na-section-header" style={{ marginTop: '60px' }}>
                     <span className="na-badge">Meet the Team</span>
-                    <h2 className="na-section-title">The Minds Behind <span className="na-gradient-text">NeuralAgent</span></h2>
+                    <h2 className="na-section-title">The Minds Behind <span className="na-gradient-text">VaidyaMed-X</span></h2>
                 </div>
                 <div className="na-team-grid">
                     {TEAM.map(m => (

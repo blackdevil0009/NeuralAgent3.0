@@ -132,7 +132,7 @@ export default function DoctorSearch() {
                                 <div className="pd-doctor-meta">
                                     <span>⭐ {d.rating || 4.8}</span>
                                     <span>🕐 {d.experience || '10+ yrs'} exp</span>
-                                    <span>🏥 {d.hospital || 'NeuralAgent Clinic'}</span>
+                                    <span>🏥 {d.hospital || 'VaidyaMed-X Clinic'}</span>
                                     <span>💰 ₹{d.fee || 800}/consult</span>
                                 </div>
                                 <div className="pd-doctor-actions">

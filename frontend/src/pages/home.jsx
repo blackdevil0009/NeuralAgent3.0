@@ -122,7 +122,7 @@ export default function Home() {
             {/* ──────── FEATURES HIGHLIGHT ──────── */}
             <section className="features-highlight" id="features">
                 <div className="features-container">
-                    <span className="na-badge">Why Choose NeuralAgent</span>
+                    <span className="na-badge">Why Choose VaidyaMed-X</span>
                     <h2 className="na-section-title">
                         Cutting-Edge <span className="na-gradient-text">Holistic Medicine</span>
                     </h2>

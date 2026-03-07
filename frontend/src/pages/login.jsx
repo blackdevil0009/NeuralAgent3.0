@@ -188,7 +188,7 @@ export default function Login() {
 
                 {/* ── Header ── */}
                 <div className="login-header">
-                    <div className="login-logo">🌿 NeuralAgent</div>
+                    <div className="login-logo">🌿 VaidyaMed-X</div>
                     <p className="login-tagline">Ayurvedic AI Health Companion</p>
                     <span className="login-lotus">🪷</span>
                 </div>
@@ -305,7 +305,7 @@ export default function Login() {
                         </button>
 
                         <p className="login-register-cta">
-                            New to NeuralAgent?&nbsp;
+                            New to VaidyaMed-X?&nbsp;
                             <Link to="/register">Create an account</Link>
                         </p>
                     </div>

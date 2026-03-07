@@ -24,7 +24,7 @@ export default function Header() {
                 {/* Logo */}
                 <Link to="/" className="na-logo">
                     <span className="na-logo-icon">🌿</span>
-                    <span className="na-logo-text">NeuralAgent</span>
+                    <span className="na-logo-text">VaidyaMed-X</span>
                 </Link>
 
                 {/* Desktop Nav */}

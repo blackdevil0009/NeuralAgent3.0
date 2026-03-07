@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
 
@@ -11,6 +11,24 @@ const STATUS_PILL = {
 
 const STAR_LABELS = ['Terrible', 'Poor', 'Okay', 'Good', 'Excellent'];
 
+const SPEC_COLORS = {
+    ayurveda: { bg: '#e8f5e9', color: '#2d6a4f', icon: '🌿' },
+    nutrition: { bg: '#fff3e0', color: '#e65100', icon: '🥗' },
+    cardio: { bg: '#fce4ec', color: '#c62828', icon: '❤️' },
+    derm: { bg: '#f3e5f5', color: '#6a1b9a', icon: '🧴' },
+    ortho: { bg: '#e3f2fd', color: '#1565c0', icon: '🦴' },
+    default: { bg: '#f1f8e9', color: '#33691e', icon: '🩺' },
+};
+
+function getSpecStyle(spec) {
+    if (!spec) return SPEC_COLORS.default;
+    const key = spec.toLowerCase();
+    for (const [k, v] of Object.entries(SPEC_COLORS)) {
+        if (key.includes(k)) return v;
+    }
+    return SPEC_COLORS.default;
+}
+
 export default function Appointments() {
     const navigate = useNavigate();
     const [filter, setFilter] = useState('All');
@@ -18,6 +36,10 @@ export default function Appointments() {
     const [reviewAppt, setReviewAppt] = useState(null);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    /* Registered doctors state */
+    const [doctors, setDoctors] = useState([]);
+    const [doctorsLoading, setDoctorsLoading] = useState(true);
 
     /* Review form state */
     const [stars, setStars] = useState(0);
@@ -31,7 +53,7 @@ export default function Appointments() {
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('http://localhost:5000/api/appointments', {
-                headers: { 'Authorization': `Bearer ${token} ` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
             if (res.ok) {
@@ -44,8 +66,27 @@ export default function Appointments() {
         }
     };
 
-    React.useEffect(() => {
+    const fetchDoctors = async () => {
+        setDoctorsLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:5000/api/doctors', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setDoctors(json.data?.doctors || []);
+            }
+        } catch (err) {
+            handleError(err, 'Failed to fetch doctors');
+        } finally {
+            setDoctorsLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchAppointments();
+        fetchDoctors();
     }, []);
 
     const filtered = filter === 'All' ? appointments : appointments.filter(a => a.status === filter);
@@ -121,6 +162,85 @@ export default function Appointments() {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* ── Registered Doctors Section ── */}
+            <h3 className="pd-section-title" style={{ marginBottom: 14 }}>👨‍⚕️ Registered Doctors ({doctors.length})</h3>
+            <div style={{ marginBottom: 28 }}>
+                {doctorsLoading ? (
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b8f71', fontSize: '0.88rem' }}>⏳ Loading registered doctors…</div>
+                ) : doctors.length === 0 ? (
+                    <div className="pd-empty" style={{ padding: '20px 0' }}>
+                        <div className="pd-empty-icon">👨‍⚕️</div>
+                        <h3>No registered doctors yet</h3>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+                        {doctors.map(d => {
+                            const specStyle = getSpecStyle(d.spec);
+                            return (
+                                <div key={d.id} style={{
+                                    background: '#fff', borderRadius: 16, padding: '18px 20px',
+                                    border: '1px solid rgba(45,106,79,0.12)',
+                                    boxShadow: '0 2px 12px rgba(10,40,20,0.06)',
+                                    transition: 'transform 0.2s, box-shadow 0.2s',
+                                    cursor: 'pointer',
+                                    display: 'flex', flexDirection: 'column', gap: 10
+                                }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(10,40,20,0.12)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(10,40,20,0.06)'; }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <div style={{
+                                            width: 48, height: 48, borderRadius: '50%', fontSize: '1.4rem',
+                                            background: 'linear-gradient(135deg, #2d6a4f, #0d2410)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                                            flexShrink: 0
+                                        }}>{specStyle.icon}</div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontFamily: 'Playfair Display, serif', fontSize: '0.95rem', fontWeight: 600, color: '#1a2e1a' }}>
+                                                {d.name}
+                                            </div>
+                                            {d.degree && (
+                                                <div style={{ fontSize: '0.75rem', color: '#6b8f71' }}>{d.degree}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* Category/Specialization Badge */}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        <span style={{
+                                            display: 'inline-block', padding: '3px 12px', borderRadius: 20,
+                                            fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.02em',
+                                            background: specStyle.bg, color: specStyle.color
+                                        }}>
+                                            {d.spec || 'General'}
+                                        </span>
+                                        {d.experience && (
+                                            <span style={{
+                                                display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                                                fontSize: '0.72rem', fontWeight: 500,
+                                                background: '#f5f5f5', color: '#555'
+                                            }}>🕐 {d.experience} exp</span>
+                                        )}
+                                    </div>
+                                    {d.hospital && (
+                                        <div style={{ fontSize: '0.78rem', color: '#6b8f71' }}>🏥 {d.hospital}</div>
+                                    )}
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                        <button className="pd-btn pd-btn-primary pd-btn-sm" style={{ flex: 1, justifyContent: 'center' }}
+                                            onClick={() => navigate('/patient/doctors')}>
+                                            📅 Book
+                                        </button>
+                                        <button className="pd-btn pd-btn-outline pd-btn-sm" style={{ flex: 1, justifyContent: 'center' }}
+                                            onClick={() => navigate(`/patient/inbox?doctor=${d.id}`)}>
+                                            💬 Message
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Filter tabs */}
