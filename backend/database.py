@@ -5,8 +5,8 @@ from mysql.connector import Error
 # MySQL Configuration
 DB_CONFIG = {
     'host': 'localhost',
-    'user': 'root',
-    'password': '2007',
+    'user': 'vaidyamedx',
+    'password': 'Devil@2007%',
     'database': 'neuralagent_db'
 }
 
@@ -130,6 +130,19 @@ def init_db():
             isRead BOOLEAN DEFAULT FALSE,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # OTP Verification table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS otp_verification (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            mobile VARCHAR(20) NOT NULL,
+            otp VARCHAR(6) NOT NULL,
+            attempts INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
 

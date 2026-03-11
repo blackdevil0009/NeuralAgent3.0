@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 export default function PatientManagement() {
     const [appointments, setAppointments] = useState([]);
@@ -13,7 +14,7 @@ export default function PatientManagement() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/appointments', {
+            const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
@@ -128,7 +129,7 @@ export default function PatientManagement() {
                                             <td>{a.type}</td>
                                             <td>
                                                 <span className={`dd-status-pill ${a.status === 'Confirmed' ? 'status-active' :
-                                                        a.status === 'Cancelled' ? 'status-cancelled' : 'status-waiting'
+                                                    a.status === 'Cancelled' ? 'status-cancelled' : 'status-waiting'
                                                     }`}>
                                                     {a.status}
                                                 </span>

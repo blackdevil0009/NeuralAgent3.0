@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { API_BASE_URL } from '../../utils/config';
 
 const QUICK_PROMPTS = [
     '🤒 I have headache and fever for 2 days',
@@ -177,30 +178,32 @@ export default function AIAssistant() {
                 formData.append('file', fileData);
                 formData.append('message', msg || "Analyze this content.");
 
-                response = await fetch('http://localhost:5000/api/ai/chat', {
+                response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'X-Timestamp': timestamp,
-                        'X-HMAC-Signature': 'DEV_BYPASS'
+                        'X-HMAC-Signature': 'DEV_BYPASS',
+                        'ngrok-skip-browser-warning': '69420'
                     },
                     body: formData
                 });
             } else {
-                response = await fetch('http://localhost:5000/api/ai/chat', {
+                response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`,
                         'X-Timestamp': timestamp,
-                        'X-HMAC-Signature': 'DEV_BYPASS'
+                        'X-HMAC-Signature': 'DEV_BYPASS',
+                        'ngrok-skip-browser-warning': '69420'
                     },
                     body: JSON.stringify({ message: msg })
                 });
             }
 
             const resData = await response.json();
-            const aiResponseText = resData.data?.response || "I am connected but need a moment to process. 🌿";
+            const aiResponseText = resData.data?.response || resData.data?.error || resData.error || "I am connected but need a moment to process. 🌿";
 
             const aiMsg = {
                 id: Date.now() + 1, from: 'ai',
@@ -210,7 +213,7 @@ export default function AIAssistant() {
             setMessages(prev => [...prev, aiMsg]);
 
             if (resData.data?.audio_url) {
-                const audioUrl = `http://localhost:5000${resData.data.audio_url}?t=${Date.now()}`;
+                const audioUrl = `${API_BASE_URL}${resData.data.audio_url}?t=${Date.now()}`;
                 playAIVoice(audioUrl, aiResponseText);
             } else {
                 playAIVoice(null, aiResponseText);

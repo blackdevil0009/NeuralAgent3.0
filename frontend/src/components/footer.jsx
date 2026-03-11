@@ -52,7 +52,7 @@ export default function Footer() {
 
                 {/* Brand column */}
                 <div className="na-footer-brand">
-                    <div className="na-footer-logo">🌿 NeuralAgent</div>
+                    <div className="na-footer-logo">🌿 VaidyaMed-X</div>
                     <p className="na-footer-tagline">
                         Bridging Ayurvedic wisdom and modern AI to bring you compassionate, intelligent healthcare.
                     </p>

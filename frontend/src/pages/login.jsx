@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import './login_style.css';
 import { handleSuccess, handleError } from '../utils/error_handlers';
+import { API_BASE_URL } from '../utils/config';
 
 /* ─────────────────────────────────────────────
    Forgot Password Modal
@@ -19,7 +20,7 @@ function ForgotPasswordModal({ onClose }) {
         setErr('');
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5000/api/forgot-password', {
+            const res = await fetch(`${API_BASE_URL}/api/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
@@ -128,7 +129,7 @@ export default function Login() {
         setLoading(true);
         setErrorMsg('');
         try {
-            const res = await fetch('http://localhost:5000/api/login', {
+            const res = await fetch(`${API_BASE_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password, role, rememberMe }),

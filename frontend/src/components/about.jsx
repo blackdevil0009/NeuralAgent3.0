@@ -26,7 +26,7 @@ export default function About() {
                         Bridging <span className="na-gradient-text">Ancient Wisdom</span> &amp; Modern Medicine
                     </h2>
                     <p className="na-section-sub">
-                        NeuralAgent was born from a belief — that everyone deserves intelligent, compassionate healthcare.
+                        VaidyaMed-X was born from a belief — that everyone deserves intelligent, compassionate healthcare.
                         We combine the timeless principles of Ayurveda with cutting-edge AI to redefine what health support looks like.
                     </p>
                 </div>

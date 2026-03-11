@@ -9,7 +9,7 @@ export const initErrorHandler = (showToast) => {
 };
 
 export const handleError = (error, customMessage = null) => {
-    console.error('NeuralAgent Error Caught:', error);
+    console.error('VaidyaMed-X Error Caught:', error);
 
     let message = customMessage;
 

@@ -1,5 +1,5 @@
 /* ============================================================
-   home.css  –  NeuralAgent 3.0 Home Page Styles
+   home.css  –  VaidyaMed-X 3.0 Home Page Styles
    Ayurvedic theme with modern UI
    ============================================================ */
 
@@ -325,7 +325,6 @@ body {
         radial-gradient(ellipse at 12% 20%, rgba(82, 183, 136, 0.30) 0%, transparent 52%),
         radial-gradient(ellipse at 88% 78%, rgba(201, 168, 76, 0.22) 0%, transparent 50%),
         linear-gradient(155deg, #0d2410 0%, #1a4228 38%, #2d6a4f 70%, #111e13 100%);
-    id: hero;
 }
 
 /* Decorative leaf SVG overlay */

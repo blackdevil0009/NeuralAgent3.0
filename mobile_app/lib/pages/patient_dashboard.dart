@@ -5,6 +5,7 @@ import '../widgets/gradient_background.dart';
 import '../widgets/glass_card.dart';
 import 'ai_assistant_page.dart';
 import 'login_page.dart';
+import '../services/api_client.dart';
 
 class PatientDashboard extends StatefulWidget {
   const PatientDashboard({super.key});
@@ -98,7 +99,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
           _buildDrawerItem(Icons.person_search_outlined, 'Find Doctors'),
           const Divider(),
           _buildDrawerItem(Icons.settings_outlined, 'Settings'),
-          _buildDrawerItem(Icons.logout, 'Logout', isLogout: true, onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()))),
+          _buildDrawerItem(Icons.logout, 'Logout', isLogout: true, onTap: () {
+            apiClient.setToken('');
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+          }),
         ],
       ),
     );

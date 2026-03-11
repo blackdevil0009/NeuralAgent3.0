@@ -77,7 +77,7 @@ export default function ReportUpload() {
     const handleDownload = (report) => {
         const content = [
             '=================================================',
-            `  NeuralAgent Medical Report`,
+            `  VaidyaMed-X Medical Report`,
             '=================================================',
             `Report Name : ${report.name}`,
             `Date        : ${report.date}`,

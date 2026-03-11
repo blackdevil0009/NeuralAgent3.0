@@ -1,0 +1,41 @@
+**🏥 MedAssist-X Clinical Assessment**
+
+---
+
+**Patient Summary:**
+Patient presents with: **Headache**
+Input: *"I have a headache and blurred vision for the past 4 hours."*
+ℹ️ Provide age, gender, duration for a more precise assessment.
+
+**Differential Diagnosis:**
+1. Tension-type headache (most common, bilateral, pressing quality)
+2. Migraine (unilateral, throbbing, with nausea/photophobia)
+3. Sinusitis (frontal/maxillary pain, nasal congestion)
+4. Cluster headache (severe, unilateral, periorbital)
+5. Secondary causes (hypertension, intracranial pathology)
+
+**Recommended Investigations:**
+• CBC
+• Blood pressure
+• CT/MRI brain if red flags
+• ESR/CRP
+
+**Management Options:**
+
+*Allopathic:*
+**Headache:** Paracetamol 500mg or Ibuprofen 400mg. Triptans for confirmed migraine.
+
+*Ayurvedic:*
+**Headache:** Brahmi, peppermint oil topical, Shirolepa, Nasya with Anu taila.
+
+**Red Flag Warnings:**
+🔴 Thunderclap onset
+🔴 Fever with neck stiffness
+🔴 New headache after 50
+🔴 Neurological deficits
+
+**Confidence Level:** Moderate
+
+---
+
+**Medical Disclaimer:** This is for clinical decision support only. Not a final diagnosis. Always consult a licensed physician.

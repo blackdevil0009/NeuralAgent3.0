@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { handleError } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const VITALS = [
     { icon: '❤️', label: 'Heart Rate', value: '72', unit: 'bpm', change: '+2%', dir: 'up', color: 'red' },
@@ -36,7 +37,7 @@ export default function HealthDashboard() {
         const fetchUpcoming = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch('http://localhost:5000/api/appointments', {
+                const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const json = await res.json();

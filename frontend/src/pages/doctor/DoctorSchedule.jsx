@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { handleSuccess, handleError } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const TIME_SLOTS = [
     '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM',
@@ -24,7 +25,7 @@ export default function DoctorSchedule() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/appointments', {
+            const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
@@ -45,7 +46,7 @@ export default function DoctorSchedule() {
     const handleConfirm = async (id) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`http://localhost:5000/api/appointments/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

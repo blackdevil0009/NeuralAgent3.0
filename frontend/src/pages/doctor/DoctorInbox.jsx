@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../utils/config';
 
 // Mock data removed
 const MOCK_REPORTS = [
@@ -9,6 +10,7 @@ const MOCK_REPORTS = [
 
 export default function DoctorInbox() {
     const navigate = useNavigate();
+    const chatEndRef = React.useRef(null);
     const [conversations, setConversations] = useState([]);
     const [selectedConvo, setSelectedConvo] = useState(null);
     const [showReports, setShowReports] = useState(false);
@@ -22,7 +24,7 @@ export default function DoctorInbox() {
         if (!token) return;
 
         // 1. Fetch Patient list
-        fetch('http://localhost:5000/api/patients', {
+        fetch(`${API_BASE_URL}/api/patients`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
@@ -47,7 +49,7 @@ export default function DoctorInbox() {
         const token = localStorage.getItem('token');
 
         const fetchHistory = () => {
-            fetch(`http://localhost:5000/api/v2/messages/history/${selectedConvo.id}`, {
+            fetch(`${API_BASE_URL}/api/v2/messages/history/${selectedConvo.id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
                 .then(res => res.json())
@@ -68,6 +70,13 @@ export default function DoctorInbox() {
         return () => clearInterval(interval);
     }, [selectedConvo]);
 
+    // Auto-scroll when messages update
+    useEffect(() => {
+        if (chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, selectedConvo]);
+
     const handleSendMessage = async () => {
         if (!inputText.trim()) return;
 
@@ -76,8 +85,24 @@ export default function DoctorInbox() {
         const msgData = { receiverId: selectedConvo.id, content: inputText };
         const timestamp = Math.floor(Date.now() / 1000).toString();
 
+        // Optimistic UI Update
+        const optimisticMsg = {
+            sender: 'doctor',
+            id: 'temp-' + Date.now(),
+            text: inputText,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setMessages(prev => ({
+            ...prev,
+            [selectedConvo.id]: [...(prev[selectedConvo.id] || []), optimisticMsg]
+        }));
+
+        // Clear input early
+        setInputText('');
+
         try {
-            await fetch('http://localhost:5000/api/v2/messages/send', {
+            await fetch(`${API_BASE_URL}/api/v2/messages/send`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -88,7 +113,6 @@ export default function DoctorInbox() {
                 body: JSON.stringify(msgData)
             });
 
-            setInputText('');
         } catch (err) {
             console.error(err);
         }
@@ -174,6 +198,7 @@ export default function DoctorInbox() {
                             </div>
                         ))}
                         {!selectedConvo && <p style={{ textAlign: 'center', marginTop: 50, color: '#999' }}>Choose a patient to start messaging.</p>}
+                        <div ref={chatEndRef} />
                     </div>
                 </div>
 

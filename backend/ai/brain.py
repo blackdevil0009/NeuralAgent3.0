@@ -10,7 +10,7 @@ from collections import OrderedDict
 # ─── Gemini API Integration ─────────────────────────────────────────────
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBGScuXAZxk5eGvrsBGAw82usi9xT0e89U")
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-1.5-flash"
 
 SYSTEM_PROMPT = """You are VaidyaMed-X, an integrated medical knowledge AI trained in both Ayurveda and modern allopathic medicine.
 

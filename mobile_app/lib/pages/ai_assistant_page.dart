@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import '../constants/app_colors.dart';
+import '../services/api_client.dart';
+import '../services/api_config.dart';
 
 class AIAssistantPage extends StatefulWidget {
   const AIAssistantPage({super.key});
@@ -19,25 +21,46 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
   ];
 
   final TextEditingController _controller = TextEditingController();
+  bool _isLoading = false;
 
-  void _sendMessage() {
-    if (_controller.text.trim().isEmpty) return;
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    
     setState(() {
-      _messages.add({'role': 'user', 'text': _controller.text});
+      _messages.add({'role': 'user', 'text': text});
       _controller.clear();
+      _isLoading = true;
     });
 
-    // Mock AI response
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final response = await apiClient.post(ApiConfig.aiChat, data: {'message': text});
+      
+      if (response.statusCode == 200) {
+        final data = response.data['data'];
+        final aiText = data['response'] ?? 'I processed your request, but the response was empty.';
+        
+        if (mounted) {
+          setState(() {
+            _messages.add({'role': 'ai', 'text': aiText});
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _messages.add({'role': 'ai', 'text': 'Connection to clinical engine failed. Please try again.'});
+          });
+        }
+      }
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _messages.add({
-            'role': 'ai',
-            'text': 'I am analyzing your query with our clinical engine. Based on Ayurvedic principles and your history, I recommend focusing on balancing your Vata dosha through warm, grounding foods and regular sleep patterns. Would you like a detailed plan?'
-          });
+          _messages.add({'role': 'ai', 'text': 'I am having trouble connecting to the neural engine. Please check your internet.'});
         });
       }
-    });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -147,14 +170,16 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
                 hintStyle: GoogleFonts.poppins(color: AppColors.textMute, fontSize: 14),
                 border: InputBorder.none,
               ),
-              onSubmitted: (_) => _sendMessage(),
+              onSubmitted: (_) => _isLoading ? null : _sendMessage(),
             ),
           ),
           IconButton(
-            onPressed: _sendMessage,
-            icon: const CircleAvatar(
-              backgroundColor: AppColors.gGreen,
-              child: Icon(Icons.send, color: AppColors.white, size: 18),
+            onPressed: _isLoading ? null : _sendMessage,
+            icon: CircleAvatar(
+              backgroundColor: _isLoading ? Colors.grey : AppColors.gGreen,
+              child: _isLoading 
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.send, color: AppColors.white, size: 18),
             ),
           ),
         ],

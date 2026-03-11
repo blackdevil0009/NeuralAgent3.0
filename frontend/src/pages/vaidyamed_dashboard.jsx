@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function NeuralAgentDashboard() {
+export default function VaidyaMedDashboard() {
     const navigate = useNavigate();
     return (
         <div style={{
@@ -12,7 +12,7 @@ export default function NeuralAgentDashboard() {
         }}>
             <div style={{ fontSize: '4rem' }}>🧠</div>
             <h1 style={{ fontFamily: 'Playfair Display,serif', color: '#c9a84c', fontSize: '2rem' }}>
-                NeuralAgent Admin
+                VaidyaMed-X Admin
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.92rem' }}>
                 Admin dashboard coming soon.

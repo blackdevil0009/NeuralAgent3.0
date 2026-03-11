@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/primary_button.dart';
+import '../services/api_client.dart';
+import '../services/api_config.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -13,6 +15,63 @@ class RegistrationPage extends StatefulWidget {
 
 class _RegistrationPageState extends State<RegistrationPage> {
   bool isPatient = true;
+  bool isLoading = false;
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  Future<void> _handleRegister() async {
+    if (nameController.text.isEmpty || emailController.text.isEmpty || phoneController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+    try {
+      final response = await apiClient.post(ApiConfig.register, data: {
+        'name': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'phone': phoneController.text.trim(),
+        'password': passwordController.text,
+        'role': isPatient ? 'patient' : 'doctor',
+      });
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registration successful! Please login.')),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.data['data']?['error'] ?? 'Registration failed')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection error. Please try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,17 +154,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
           const SizedBox(height: 20),
           _buildRoleToggle(),
           const SizedBox(height: 24),
-          _buildField('FULL NAME', 'John Doe', Icons.person_outline),
+          _buildField('FULL NAME', 'John Doe', Icons.person_outline, controller: nameController),
           const SizedBox(height: 16),
-          _buildField('EMAIL ADDRESS', 'john@example.com', Icons.email_outlined),
+          _buildField('EMAIL ADDRESS', 'john@example.com', Icons.email_outlined, controller: emailController),
           const SizedBox(height: 16),
-          _buildField('MOBILE NUMBER', '+91 9876543210', Icons.phone_android_outlined),
+          _buildField('MOBILE NUMBER', '+91 9876543210', Icons.phone_android_outlined, controller: phoneController),
           const SizedBox(height: 16),
-          _buildField('PASSWORD', '••••••••', Icons.lock_outline, isPassword: true),
+          _buildField('PASSWORD', '••••••••', Icons.lock_outline, isPassword: true, controller: passwordController),
           const SizedBox(height: 30),
           PrimaryButton(
-            text: 'CREATE ACCOUNT',
-            onPressed: () {},
+            text: isLoading ? 'REGISTERING...' : 'CREATE ACCOUNT',
+            onPressed: isLoading ? null : _handleRegister,
           ),
         ],
       ),
@@ -144,7 +203,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  Widget _buildField(String label, String hint, IconData icon, {bool isPassword = false}) {
+  Widget _buildField(String label, String hint, IconData icon, {bool isPassword = false, TextEditingController? controller}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -159,6 +218,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
         ),
         const SizedBox(height: 4),
         TextField(
+          controller: controller,
           obscureText: isPassword,
           decoration: InputDecoration(
             hintText: hint,

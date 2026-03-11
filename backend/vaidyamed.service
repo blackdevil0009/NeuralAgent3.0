@@ -1,0 +1,19 @@
+[Unit]
+Description=VaidyaMed-X Backend API Server
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/opt/backend
+Environment="PATH=/opt/backend/venv/bin"
+ExecStart=/opt/backend/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vaidyamed
+
+[Install]
+WantedBy=multi-user.target

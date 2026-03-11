@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../utils/config';
 
 const INITIAL_NOTIFS = [
     {
@@ -63,7 +64,7 @@ export default function Notifications() {
     const fetchNotifs = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/notifications', {
+            const res = await fetch(`${API_BASE_URL}/api/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
@@ -86,7 +87,7 @@ export default function Notifications() {
     const markRead = async (id) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
+            const res = await fetch(`${API_BASE_URL}/api/notifications/${id}/read`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

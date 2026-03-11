@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import './patient_dashboard.css';
 import { handleError } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const NAV = [
     { id: 'health', label: 'Health Dashboard', icon: '🏥', path: '/patient/health' },
@@ -50,7 +51,7 @@ export default function PatientLayout() {
     const fetchCounts = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/notifications', {
+            const res = await fetch(`${API_BASE_URL}/api/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const CONSULTANT_FAQS = [
     { q: 'How does an online consultation work?', a: 'Once booked, you will receive a link to join a secure video call at your scheduled time. You can also upload reports in advance for the doctor to review.' },
@@ -27,7 +28,7 @@ export default function MedicalConsultant() {
         const fetchDocs = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch('http://localhost:5000/api/doctors', {
+                const res = await fetch(`${API_BASE_URL}/api/doctors`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const json = await res.json();
@@ -48,7 +49,7 @@ export default function MedicalConsultant() {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/appointments', {
+            const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

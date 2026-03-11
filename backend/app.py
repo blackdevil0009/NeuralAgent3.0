@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Load .env before any other config reads
 import mysql.connector
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
@@ -14,6 +16,8 @@ from datetime import timedelta
 import functools
 import time
 from ai.brain import get_brain
+from utils.otp_utils import generate_otp
+from utils.sms_utils import send_fast2sms_otp
 
 app = Flask(__name__)
 CORS(app)
@@ -697,6 +701,145 @@ def ai_metrics():
 def download_file(filename):
     from flask import send_from_directory
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+# ---- OTP VERIFICATION API ----
+@app.route('/api/send-otp', methods=['POST'])
+@jwt_required()
+@require_hmac
+def send_otp():
+    """Generates and sends a 6-digit OTP to the requested mobile number via Fast2SMS."""
+    current_user_id = get_jwt_identity()
+    data = request.json
+    mobile = data.get('mobile')
+
+    if not mobile:
+        return jsonify({"error": "Mobile number is required"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database error"}), 500
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        
+        # 1. Check Rate Limiting for the user (Max 3 attempts per 5 mins)
+        cursor.execute('''
+            SELECT COUNT(*) AS count 
+            FROM otp_verification 
+            WHERE user_id = %s AND created_at >= NOW() - INTERVAL 5 MINUTE
+        ''', (current_user_id,))
+        
+        attempt_count = cursor.fetchone()['count']
+        if attempt_count >= 3:
+            return jsonify({"error": "Too many OTP requests. Please wait 5 minutes."}), 429
+            
+        # 2. Generate cryptographically secure OTP
+        otp = generate_otp()
+        
+        # 3. Clean up older/pending OTPs for this user
+        cursor.execute("DELETE FROM otp_verification WHERE user_id = %s", (current_user_id,))
+        
+        # 4. Save new OTP to the database
+        cursor.execute('''
+            INSERT INTO otp_verification (user_id, mobile, otp, attempts, created_at)
+            VALUES (%s, %s, %s, 0, NOW())
+        ''', (current_user_id, mobile, otp))
+        
+        conn.commit()
+
+        # 5. Send via Fast2SMS
+        sms_sent = send_fast2sms_otp(mobile, otp)
+        
+        if sms_sent:
+            return jsonify({"success": True, "message": "OTP sent successfully. Valid for 5 minutes."}), 200
+        else:
+            app.logger.warning(f"Fast2SMS API failed or missing key. Simulated OTP for {mobile}: {otp}")
+            return jsonify({"success": True, "message": "OTP simulated successfully (Check Server Console for code)."}), 200
+
+    except Exception as e:
+        app.logger.error(f"Error in send-otp: {e}")
+        conn.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route('/api/verify-otp', methods=['POST'])
+@jwt_required()
+@require_hmac
+def verify_otp():
+    """Verifies the OTP and updates the mobile number in the users table."""
+    current_user_id = get_jwt_identity()
+    data = request.json
+    otp_input = data.get('otp')
+
+    if not otp_input:
+        return jsonify({"error": "OTP is required"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database error"}), 500
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        
+        # 1. Fetch latest OTP record for user (Must be within 5 mins to be valid time)
+        cursor.execute('''
+            SELECT id, otp, mobile, attempts, 
+                   (created_at >= NOW() - INTERVAL 5 MINUTE) AS is_valid_time
+            FROM otp_verification 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC LIMIT 1
+        ''', (current_user_id,))
+        
+        record = cursor.fetchone()
+        
+        if not record:
+            return jsonify({"error": "No pending OTP request found."}), 404
+            
+        record_id = record['id']
+        attempts_made = record['attempts']
+        
+        # 2. Check hard attempt limit (Max 3 failed entries)
+        if attempts_made >= 3:
+            cursor.execute("DELETE FROM otp_verification WHERE id = %s", (record_id,))
+            conn.commit()
+            return jsonify({"error": "Maximum OTP attempts exceeded. Request a new OTP."}), 403
+            
+        # 3. Check expiration
+        if not record['is_valid_time']:
+            cursor.execute("DELETE FROM otp_verification WHERE id = %s", (record_id,))
+            conn.commit()
+            return jsonify({"error": "OTP has expired. Please request a new one."}), 400
+            
+        # 4. Verify given OTP
+        if str(record['otp']) != str(otp_input):
+            cursor.execute("UPDATE otp_verification SET attempts = attempts + 1 WHERE id = %s", (record_id,))
+            conn.commit()
+            return jsonify({"error": "Invalid OTP. Please try again."}), 401
+            
+        # 5. OTP Valid -> Update 'mobile' on user 
+        new_mobile = record['mobile']
+        cursor.execute("UPDATE users SET mobile = %s WHERE id = %s", (new_mobile, current_user_id))
+        
+        # 6. Cleanup successful OTP
+        cursor.execute("DELETE FROM otp_verification WHERE user_id = %s", (current_user_id,))
+        
+        conn.commit()
+        return jsonify({
+            "success": True, 
+            "message": "Mobile number updated successfully"
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error in verify-otp: {e}")
+        conn.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == '__main__':
     init_db()

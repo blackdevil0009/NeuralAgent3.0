@@ -9,6 +9,8 @@ import 'patient_dashboard.dart';
 import 'doctor_dashboard.dart';
 import 'registration_page.dart';
 import 'ai_assistant_page.dart';
+import '../services/api_client.dart';
+import '../services/api_config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -20,6 +22,62 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   bool isPatient = true;
   bool obscurePassword = true;
+  bool isLoading = false;
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  Future<void> _handleLogin() async {
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both email and password')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+    try {
+      final response = await apiClient.post(ApiConfig.login, data: {
+        'email': emailController.text.trim(),
+        'password': passwordController.text,
+        'role': isPatient ? 'patient' : 'doctor',
+      });
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'];
+        final token = data['token'];
+        apiClient.setToken(token);
+        
+        if (mounted) {
+          if (isPatient) {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PatientDashboard()));
+          } else {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DoctorDashboard()));
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.data['data']?['error'] ?? 'Login failed')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection error. Please try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +168,7 @@ class _LoginPageState extends State<LoginPage> {
                   label: 'EMAIL ADDRESS',
                   hint: 'Enter your email',
                   icon: Icons.email_outlined,
+                  controller: emailController,
                 ),
                 const SizedBox(height: 20),
                 _buildTextField(
@@ -118,6 +177,7 @@ class _LoginPageState extends State<LoginPage> {
                   icon: Icons.lock_outline,
                   isPassword: true,
                   obscure: obscurePassword,
+                  controller: passwordController,
                   onToggleObscure: () {
                     setState(() => obscurePassword = !obscurePassword);
                   },
@@ -126,14 +186,8 @@ class _LoginPageState extends State<LoginPage> {
                 _buildLoginActions(),
                 const SizedBox(height: 24),
                 PrimaryButton(
-                  text: 'LOGIN',
-                  onPressed: () {
-                    if (isPatient) {
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PatientDashboard()));
-                    } else {
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DoctorDashboard()));
-                    }
-                  },
+                  text: isLoading ? 'LOADING...' : 'LOGIN',
+                  onPressed: isLoading ? null : _handleLogin,
                 ),
               ],
             ),
@@ -194,6 +248,7 @@ class _LoginPageState extends State<LoginPage> {
     required IconData icon,
     bool isPassword = false,
     bool obscure = false,
+    TextEditingController? controller,
     VoidCallback? onToggleObscure,
   }) {
     return Column(
@@ -210,6 +265,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 6),
         TextField(
+          controller: controller,
           obscureText: obscure,
           decoration: InputDecoration(
             hintText: hint,

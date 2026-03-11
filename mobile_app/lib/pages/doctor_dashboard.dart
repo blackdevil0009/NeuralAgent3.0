@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../constants/app_colors.dart';
 import '../widgets/primary_button.dart';
+import 'login_page.dart';
+import '../services/api_client.dart';
 
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
@@ -81,7 +80,10 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           const Spacer(),
           const Divider(),
           _buildDrawerItem(Icons.settings_outlined, 'Settings'),
-          _buildDrawerItem(Icons.logout, 'Logout', isLogout: true),
+          _buildDrawerItem(Icons.logout, 'Logout', isLogout: true, onTap: () {
+            apiClient.setToken('');
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+          }),
           const SizedBox(height: 20),
         ],
       ),

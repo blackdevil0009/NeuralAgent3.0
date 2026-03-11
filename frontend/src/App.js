@@ -9,7 +9,7 @@ import Home from './pages/home';
 import Login from './pages/login';
 import Registration from './pages/registration';
 import DoctorProfile from './pages/doctor_profile';
-import NeuralAgentDashboard from './pages/neural_agent_dashboard';
+import VaidyaMedDashboard from './pages/vaidyamed_dashboard';
 
 // Patient Dashboard
 import PatientLayout from './pages/patient/PatientLayout';
@@ -97,7 +97,7 @@ function App() {
             <Route path="settings/2fa" element={<Doctor2FA />} />
             <Route path="emergency" element={<EmergencyDashboard />} />
           </Route>
-          <Route path="/dashboard" element={<NeuralAgentDashboard />} />
+          <Route path="/dashboard" element={<VaidyaMedDashboard />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

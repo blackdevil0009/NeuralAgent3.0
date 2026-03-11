@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../utils/config';
 
 const SPECIALIZATIONS = ['All', 'Ayurveda', 'Nutrition', 'Cardio', 'Derm', 'Ortho'];
 
@@ -23,7 +24,7 @@ export default function DoctorSearch() {
         const fetchDocs = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch('http://localhost:5000/api/doctors', {
+                const res = await fetch(`${API_BASE_URL}/api/doctors`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const json = await res.json();
@@ -55,7 +56,7 @@ export default function DoctorSearch() {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/appointments', {
+            const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

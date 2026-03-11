@@ -4,6 +4,19 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+  let [resource, config] = args;
+  config = config || {};
+  config.headers = config.headers || {};
+  if (config.headers instanceof Headers) {
+    config.headers.append('ngrok-skip-browser-warning', '69420');
+  } else {
+    config.headers['ngrok-skip-browser-warning'] = '69420';
+  }
+  return originalFetch(resource, config);
+};
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>

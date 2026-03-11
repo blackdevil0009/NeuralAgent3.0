@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const FIELD_GROUPS = [
     {
@@ -66,7 +67,7 @@ export default function PatientProfile() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/profile', {
+            const res = await fetch(`${API_BASE_URL}/api/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(form),

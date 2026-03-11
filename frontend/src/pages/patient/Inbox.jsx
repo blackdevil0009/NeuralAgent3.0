@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { handleError } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const getAutoReply = () => ""; // Disabled
 
@@ -32,7 +33,7 @@ export default function Inbox() {
         if (!token) return;
 
         // 1. Fetch Doctor list
-        fetch('http://localhost:5000/api/doctors', {
+        fetch(`${API_BASE_URL}/api/doctors`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
@@ -40,8 +41,8 @@ export default function Inbox() {
                 if (res.data && res.data.doctors) {
                     const convos = res.data.doctors.map(d => ({
                         id: d.id,
-                        name: d.fullName,
-                        spec: d.specialization,
+                        name: d.name,
+                        spec: d.spec,
                         badge: '🌿',
                         online: true,
                         lastMsg: 'Connect to chat',
@@ -58,7 +59,7 @@ export default function Inbox() {
         const token = localStorage.getItem('token');
 
         const fetchHistory = () => {
-            fetch(`http://localhost:5000/api/v2/messages/history/${activeId}`, {
+            fetch(`${API_BASE_URL}/api/v2/messages/history/${activeId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
                 .then(res => res.json())
@@ -83,6 +84,13 @@ export default function Inbox() {
         return () => clearInterval(interval);
     }, [activeId]);
 
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        if (endRef.current) {
+            endRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [active?.messages]);
+
     /* Debounced Doctor Search */
     useEffect(() => {
         if (!searchQ || searchQ.length < 2) {
@@ -94,7 +102,7 @@ export default function Inbox() {
             setSearching(true);
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`http://localhost:5000/api/doctors/search?q=${encodeURIComponent(searchQ)}`, {
+                const res = await fetch(`${API_BASE_URL}/api/doctors/search?q=${encodeURIComponent(searchQ)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const json = await res.json();
@@ -127,20 +135,29 @@ export default function Inbox() {
         const msgData = { receiverId: activeId, content: text };
         const timestamp = Math.floor(Date.now() / 1000).toString();
 
-        // HMAC Generation (Note: In a real app, this should be done securely. For demo, we might need a helper)
-        // For simplicity in this step, I'll assume the client is configured with HMAC_SECRET
-        // or we use a more standard auth for now if HMAC is too complex to implement here.
-        // But wait, the backend REQUIRES HMAC. 
-        // I should probably add an endpoint or a client-side HMAC utility.
+        // Optimistic UI Update: Instantly add the message to the active conversation
+        const optimisticMsg = {
+            id: 'temp-' + Date.now(),
+            from: 'me',
+            text: text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
 
-        // TEMPORARY: Assuming simplified HMAC or skipping required HMAC for now if possible? 
-        // No, backend enforces it. I'll need a way to generate it.
+        setConversations(prev => prev.map(c => {
+            if (c.id !== activeId) return c;
+            return {
+                ...c,
+                messages: [...c.messages, optimisticMsg],
+                lastMsg: text,
+                lastTime: optimisticMsg.time
+            };
+        }));
 
-        // I will use a simplified fetch with headers
-        const hmac_sig = "DUMMY_FOR_NOW_FIX_THIS"; // TODO: Implement real HMAC in frontend
+        // Clear input immediately for better UX
+        setInput('');
 
         try {
-            const resp = await fetch('http://localhost:5000/api/v2/messages/send', {
+            const resp = await fetch(`${API_BASE_URL}/api/v2/messages/send`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -151,8 +168,9 @@ export default function Inbox() {
                 body: JSON.stringify(msgData)
             });
 
-            if (resp.ok) {
-                setInput('');
+            if (!resp.ok) {
+                // If it failed, we could revert the optimistic update here, but for simplicity we log error
+                throw new Error('Message sending failed');
             }
         } catch (err) {
             handleError(err, 'Failed to send message');

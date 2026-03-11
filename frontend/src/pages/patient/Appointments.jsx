@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
+import { API_BASE_URL } from '../../utils/config';
 
 const STATUS_PILL = {
     Upcoming: 'pd-pill-blue',
@@ -52,7 +53,7 @@ export default function Appointments() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/appointments', {
+            const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
@@ -70,7 +71,7 @@ export default function Appointments() {
         setDoctorsLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:5000/api/doctors', {
+            const res = await fetch(`${API_BASE_URL}/api/doctors`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
@@ -94,7 +95,7 @@ export default function Appointments() {
     const handleCancel = async (id) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`http://localhost:5000/api/appointments/${id}`, {
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

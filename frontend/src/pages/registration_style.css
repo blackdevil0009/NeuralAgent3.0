@@ -1,7 +1,7 @@
 /* ============================================================
    registration_style.css
-   NeuralAgent 3.0 – Ayurvedic Registration Page Styles
-   Maintainer: NeuralAgent Dev Team
+   VaidyaMed-X 3.0 – Ayurvedic Registration Page Styles
+   Maintainer: VaidyaMed-X Dev Team
    Last Updated: 2026-02-25
    ============================================================ */
 
@@ -10,32 +10,35 @@
 
 /* ---------- CSS Variables / Design Tokens ---------- */
 :root {
-  --primary-green    : #2d6a4f;
-  --primary-light    : #52b788;
-  --accent-gold      : #c9a84c;
-  --accent-amber     : #e9c46a;
-  --bg-dark          : rgba(20, 40, 25, 0.78);
-  --card-bg          : rgba(255, 255, 255, 0.93);
-  --card-shadow      : 0 24px 60px rgba(20, 60, 30, 0.30);
-  --input-border     : #b7d9c2;
-  --input-focus      : #2d6a4f;
-  --error-red        : #c0392b;
-  --text-dark        : #1a2e1a;
-  --text-muted       : #5a755a;
-  --text-light       : #ffffff;
-  --radius-card      : 22px;
-  --radius-input     : 10px;
-  --transition       : 0.28s ease;
+  --primary-green: #2d6a4f;
+  --primary-light: #52b788;
+  --accent-gold: #c9a84c;
+  --accent-amber: #e9c46a;
+  --bg-dark: rgba(20, 40, 25, 0.78);
+  --card-bg: rgba(255, 255, 255, 0.93);
+  --card-shadow: 0 24px 60px rgba(20, 60, 30, 0.30);
+  --input-border: #b7d9c2;
+  --input-focus: #2d6a4f;
+  --error-red: #c0392b;
+  --text-dark: #1a2e1a;
+  --text-muted: #5a755a;
+  --text-light: #ffffff;
+  --radius-card: 22px;
+  --radius-input: 10px;
+  --transition: 0.28s ease;
 }
 
 /* ---------- Reset & Base ---------- */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   min-height: 100vh;
   font-family: 'Poppins', sans-serif;
@@ -104,8 +107,15 @@ html, body {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ---------- Card Header Banner ---------- */
@@ -120,7 +130,8 @@ html, body {
   content: '';
   position: absolute;
   bottom: -1px;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   height: 22px;
   background: var(--card-bg);
   border-radius: 22px 22px 0 0;
@@ -132,7 +143,7 @@ html, body {
   font-weight: 700;
   color: var(--accent-gold);
   letter-spacing: 2px;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.40);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.40);
 }
 
 .reg-tagline {
@@ -319,7 +330,8 @@ html, body {
   opacity: 0;
   width: 100%;
   height: 100%;
-  top: 0; left: 0;
+  top: 0;
+  left: 0;
   cursor: pointer;
 }
 
@@ -351,9 +363,18 @@ html, body {
   margin-bottom: 12px;
 }
 
-.terms-box::-webkit-scrollbar { width: 5px; }
-.terms-box::-webkit-scrollbar-track { background: #e8f5ee; }
-.terms-box::-webkit-scrollbar-thumb { background: var(--primary-light); border-radius: 4px; }
+.terms-box::-webkit-scrollbar {
+  width: 5px;
+}
+
+.terms-box::-webkit-scrollbar-track {
+  background: #e8f5ee;
+}
+
+.terms-box::-webkit-scrollbar-thumb {
+  background: var(--primary-light);
+  border-radius: 4px;
+}
 
 .terms-check {
   display: flex;
@@ -427,12 +448,14 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   opacity: 0;
   transition: opacity var(--transition);
 }
 
-.btn-submit:hover::after { opacity: 1; }
+.btn-submit:hover::after {
+  opacity: 1;
+}
 
 .btn-submit:hover {
   transform: translateY(-3px);
@@ -455,7 +478,7 @@ html, body {
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2.5px solid rgba(255,255,255,0.4);
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -464,7 +487,9 @@ html, body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ---------- Login Redirect Link ---------- */
@@ -498,48 +523,65 @@ html, body {
 }
 
 .leaf-1 {
-  width: 180px; height: 90px;
+  width: 180px;
+  height: 90px;
   background: #52b788;
-  top: 8%; left: -60px;
+  top: 8%;
+  left: -60px;
   transform: rotate(30deg);
   animation-delay: 0s;
 }
 
 .leaf-2 {
-  width: 260px; height: 120px;
+  width: 260px;
+  height: 120px;
   background: #40916c;
-  top: 30%; left: -80px;
+  top: 30%;
+  left: -80px;
   transform: rotate(-20deg);
   animation-delay: 1.5s;
 }
 
 .leaf-3 {
-  width: 200px; height: 95px;
+  width: 200px;
+  height: 95px;
   background: #52b788;
-  bottom: 20%; right: -70px;
+  bottom: 20%;
+  right: -70px;
   transform: rotate(150deg);
   animation-delay: 0.8s;
 }
 
 .leaf-4 {
-  width: 300px; height: 130px;
+  width: 300px;
+  height: 130px;
   background: #2d6a4f;
-  bottom: 5%; right: -100px;
+  bottom: 5%;
+  right: -100px;
   transform: rotate(130deg);
   animation-delay: 2s;
 }
 
 .leaf-5 {
-  width: 140px; height: 70px;
+  width: 140px;
+  height: 70px;
   background: #c9a84c;
-  top: 5%; right: 60px;
+  top: 5%;
+  right: 60px;
   transform: rotate(-45deg);
   animation-delay: 3s;
 }
 
 @keyframes sway {
-  0%, 100% { transform: rotate(var(--rot, 30deg)) translateY(0); }
-  50%       { transform: rotate(var(--rot, 30deg)) translateY(-12px); }
+
+  0%,
+  100% {
+    transform: rotate(var(--rot, 30deg)) translateY(0);
+  }
+
+  50% {
+    transform: rotate(var(--rot, 30deg)) translateY(-12px);
+  }
 }
 
 /* ---------- Responsive Adjustments ---------- */
