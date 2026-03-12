@@ -8,8 +8,8 @@ def send_reset_email(to_email, reset_link, reset_token=None):
     Sends a password reset email using SMTP.
     If SMTP variables are not set, it prints the reset link to the console for testing.
     """
-    sender_email = os.environ.get('support@vaidyamedx.in')
-    sender_password = os.environ.get('Devil.in@2007')
+    sender_email = 'support@vaidyamedx.in'
+    sender_password = 'Devil.in@2007'
 
     # For testing/free local use if SMTP isn't configured, print to console
     if not sender_email or not sender_password:
