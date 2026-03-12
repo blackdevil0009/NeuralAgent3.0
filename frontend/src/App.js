@@ -8,6 +8,7 @@ import { initErrorHandler } from './utils/error_handlers';
 import Home from './pages/home';
 import Login from './pages/login';
 import Registration from './pages/registration';
+import ResetPassword from './pages/ResetPassword';
 import DoctorProfile from './pages/doctor_profile';
 import VaidyaMedDashboard from './pages/vaidyamed_dashboard';
 
@@ -62,6 +63,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Patient Dashboard (nested) */}
           <Route path="/patient" element={<PatientLayout />}>

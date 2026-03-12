@@ -18,6 +18,8 @@ import time
 from ai.brain import get_brain
 from utils.otp_utils import generate_otp
 from utils.sms_utils import send_fast2sms_otp
+from utils.email_utils import send_reset_email
+import secrets
 
 app = Flask(__name__)
 CORS(app)
@@ -166,8 +168,80 @@ def home():
 def forgot_password():
     data = request.get_json()
     email = data.get('email')
-    # Mock implementation
-    return signed_json_response({"message": f"If an account exists for {email}, a reset link has been sent."}), 200
+    
+    conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database error"}, 500)
+        
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+        user = cursor.fetchone()
+        
+        if user:
+            # Generate token
+            reset_token = secrets.token_urlsafe(32)
+            
+            # Store in DB
+            cursor.execute('INSERT INTO password_resets (email, token) VALUES (%s, %s)', (email, reset_token))
+            conn.commit()
+            
+            # Send email
+            frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000') # default or from env
+            reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+            send_reset_email(email, reset_link, reset_token)
+            
+        # Always return success to prevent email enumeration
+        return signed_json_response({"message": "If an account exists for that email, a reset link has been sent."}), 200
+    except Exception as e:
+        app.logger.error(f"Forgot password error: {e}")
+        return signed_json_response({"error": "Internal server error"}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('password')
+    
+    if not token or not new_password:
+        return signed_json_response({"error": "Token and new password required"}, 400)
+        
+    conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database error"}, 500)
+        
+    try:
+        cursor = conn.cursor(dictionary=True)
+        # Verify token (must exist and be newer than 1 hour)
+        cursor.execute('''
+            SELECT email FROM password_resets 
+            WHERE token = %s AND created_at >= NOW() - INTERVAL 1 HOUR
+        ''', (token,))
+        reset_record = cursor.fetchone()
+        
+        if not reset_record:
+            return signed_json_response({"error": "Invalid or expired reset token"}, 400)
+            
+        email = reset_record['email']
+        
+        # Hash new password
+        hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        
+        # Update user password
+        cursor.execute('UPDATE users SET password = %s WHERE email = %s', (hashed_password, email))
+        
+        # Cleanup used tokens for this user
+        cursor.execute('DELETE FROM password_resets WHERE email = %s', (email,))
+        
+        conn.commit()
+        return signed_json_response({"message": "Password updated successfully"}), 200
+    except Exception as e:
+        app.logger.error(f"Reset password error: {e}")
+        return signed_json_response({"error": "Internal server error"}, 500)
+    finally:
+        conn.close()
 
 @app.errorhandler(404)
 def not_found(e):
