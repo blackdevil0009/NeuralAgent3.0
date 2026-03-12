@@ -16,8 +16,9 @@ def send_chat_message(sender_id, receiver_id, content, is_doctor):
         if not recipient or not recipient['rsaPublicKey']:
             return {"error": "Recipient RSA key not found"}, 400
         
-        # 2. Perform Hybrid Encryption
-        encrypted_bundle = hybrid_encrypt(content, recipient['rsaPublicKey'])
+        # 2. Perform Standard Encryption (AES) so both can read it
+        # Previously was hybrid: hybrid_encrypt(content, recipient['rsaPublicKey'])
+        encrypted_bundle = encrypt_data(content)
         
         # 3. Store in database
         # Set isDoctorResponded to True if the sender is a doctor
@@ -40,22 +41,8 @@ def get_chat_history(user_id, other_id):
     cursor = conn.cursor(dictionary=True)
     
     try:
-        # 1. Fetch current user's RSA Private Key (encrypted in DB)
-        cursor.execute("SELECT rsaPrivateKeyEncrypted FROM users WHERE id = %s", (user_id,))
-        user_data = cursor.fetchone()
-        
-        if not user_data or not user_data['rsaPrivateKeyEncrypted']:
-            return {"error": "User RSA key not found"}, 400
-        
-        # 2. Decrypt Private Key (In a real app, this might be decrypted by a user-provided passphrase)
-        # For this demo, we assume the system can decrypt it using the AES utility
-        from security_utils import decrypt_data
-        private_pem = decrypt_data(user_data['rsaPrivateKeyEncrypted'])
-        
-        if not private_pem:
-             return {"error": "Failed to decrypt private key"}, 500
-
-        # 3. Fetch messages
+        # 2. Fetch messages
+        # No RSA private key decryption needed for standard symmetric DB storage.
         cursor.execute('''
             SELECT * FROM messages 
             WHERE (senderId = %s AND receiverId = %s) 
@@ -67,8 +54,8 @@ def get_chat_history(user_id, other_id):
         
         messages = []
         for row in rows:
-            # Try Hybrid Decryption
-            decrypted_content = hybrid_decrypt(row['encryptedContext'], private_pem)
+            # Try Standard AES Decryption
+            decrypted_content = decrypt_data(row['encryptedContext'])
             
             messages.append({
                 "id": row['id'],

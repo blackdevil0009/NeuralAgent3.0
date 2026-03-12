@@ -167,7 +167,7 @@ export default function AIAssistant() {
         setMessages(prev => [...prev, userMsg]);
         setTyping(true);
 
-        const rawToken = localStorage.getItem('token');
+        const rawToken = localStorage.getItem('token') || sessionStorage.getItem('token');
         const token = rawToken ? rawToken.replace(/^"|"$/g, '') : '';
         const timestamp = Math.floor(Date.now() / 1000).toString();
 

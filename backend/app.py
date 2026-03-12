@@ -191,8 +191,7 @@ def forgot_password():
             reset_link = f"{frontend_url}/reset-password?token={reset_token}"
             send_reset_email(email, reset_link, reset_token)
             
-        # Always return success to prevent email enumeration
-        return signed_json_response({"message": "If an account exists for that email, a reset link has been sent."}), 200
+        return signed_json_response({"message": "If an account exists for that email, a reset link has been sent."}, 200)
     except Exception as e:
         app.logger.error(f"Forgot password error: {e}")
         return signed_json_response({"error": "Internal server error"}, 500)
@@ -236,7 +235,7 @@ def reset_password():
         cursor.execute('DELETE FROM password_resets WHERE email = %s', (email,))
         
         conn.commit()
-        return signed_json_response({"message": "Password updated successfully"}), 200
+        return signed_json_response({"message": "Password updated successfully"}, 200)
     except Exception as e:
         app.logger.error(f"Reset password error: {e}")
         return signed_json_response({"error": "Internal server error"}, 500)

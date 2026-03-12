@@ -1,0 +1,15 @@
+2026-03-12 20:35:47,043 [INFO] package: mysql.connector.plugins
+2026-03-12 20:35:47,044 [INFO] plugin_name: caching_sha2_password
+2026-03-12 20:35:47,044 [INFO] AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+2026-03-12 20:35:47,280 [INFO] Starting VaidyaMed-X Production Server (Windows) on port 5000 using Waitress...
+2026-03-12 20:35:47,285 [INFO] Serving on http://0.0.0.0:5000
+2026-03-12 21:12:39,164 [INFO] package: mysql.connector.plugins
+2026-03-12 21:12:39,168 [INFO] plugin_name: caching_sha2_password
+2026-03-12 21:12:39,168 [INFO] AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+2026-03-12 21:12:39,300 [INFO] Starting VaidyaMed-X Production Server (Windows) on port 5000 using Waitress...
+2026-03-12 21:12:39,305 [INFO] Serving on http://0.0.0.0:5000
+2026-03-12 21:24:28,788 [INFO] package: mysql.connector.plugins
+2026-03-12 21:24:28,788 [INFO] plugin_name: caching_sha2_password
+2026-03-12 21:24:28,789 [INFO] AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+2026-03-12 21:24:28,874 [INFO] Starting VaidyaMed-X Production Server (Windows) on port 5000 using Waitress...
+2026-03-12 21:24:28,877 [INFO] Serving on http://0.0.0.0:5000
