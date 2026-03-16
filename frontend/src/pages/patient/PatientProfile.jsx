@@ -45,20 +45,31 @@ export default function PatientProfile() {
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    const [isEditMode, setIsEditMode] = useState(false);
+
     useEffect(() => {
-        try {
-            const u = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
-            if (u.name || u.email) {
-                setForm(prev => ({
-                    ...prev,
-                    name: u.name || prev.name,
-                    email: u.email || prev.email,
-                    mobile: u.mobile || prev.mobile,
-                    dob: u.dob || prev.dob,
-                    gender: u.gender || prev.gender,
-                }));
-            }
-        } catch { }
+        const fetchProfile = async () => {
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                if (!token) return;
+                const res = await fetch(`${API_BASE_URL}/api/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.data) {
+                        setForm(prev => ({
+                            ...prev,
+                            ...json.data,
+                            dosha: json.data.dosha || 'Not assessed',
+                            gender: json.data.gender || 'Prefer not to say',
+                            bloodGroup: json.data.bloodGroup || 'Unknown'
+                        }));
+                    }
+                }
+            } catch (err) {}
+        };
+        fetchProfile();
     }, []);
 
     const handleChange = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
@@ -76,6 +87,7 @@ export default function PatientProfile() {
                 const json = await res.json();
                 localStorage.setItem('user', JSON.stringify(json.data || {}));
                 handleSuccess('Profile updated successfully!');
+                setIsEditMode(false);
             } else {
                 const json = await res.json();
                 handleError(json.data?.error || 'Profile update failed.');
@@ -94,9 +106,17 @@ export default function PatientProfile() {
                     <h1>👤 My Profile</h1>
                     <p>Manage your personal and health information</p>
                 </div>
-                <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
-                    {loading ? '⏳ Saving…' : '💾 Save Changes'}
-                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                    {!isEditMode ? (
+                        <button className="pd-btn pd-btn-outline" onClick={() => setIsEditMode(true)}>
+                            ✏️ Edit Profile
+                        </button>
+                    ) : (
+                        <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
+                            {loading ? '⏳ Saving…' : '💾 Save Changes'}
+                        </button>
+                    )}
+                </div>
             </div>
 
 
@@ -123,18 +143,18 @@ export default function PatientProfile() {
                             <div className="pd-form-group" key={f.key}>
                                 <label>{f.label}</label>
                                 {f.type === 'select' ? (
-                                    <select className="pd-select" value={form[f.key]} onChange={e => handleChange(f.key, e.target.value)}>
-                                        {f.options.map(o => <option key={o}>{o}</option>)}
+                                    <select className="pd-select" value={form[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)} disabled={!isEditMode}>
+                                        {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                                     </select>
                                 ) : (
                                     <input
                                         type={f.type}
                                         className="pd-input"
-                                        value={form[f.key]}
+                                        value={form[f.key] || ''}
                                         onChange={e => handleChange(f.key, e.target.value)}
                                         placeholder={f.placeholder}
-                                        readOnly={f.readOnly}
-                                        style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
+                                        readOnly={f.readOnly || !isEditMode}
+                                        style={(f.readOnly || !isEditMode) ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
                                     />
                                 )}
                             </div>
@@ -154,11 +174,13 @@ export default function PatientProfile() {
                 </div>
             </div>
 
-            <div style={{ textAlign: 'right' }}>
-                <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>
-                    {loading ? '⏳ Saving…' : '💾 Save All Changes'}
-                </button>
-            </div>
+            {isEditMode && (
+                <div style={{ textAlign: 'right' }}>
+                    <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>
+                        {loading ? '⏳ Saving…' : '💾 Save All Changes'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
