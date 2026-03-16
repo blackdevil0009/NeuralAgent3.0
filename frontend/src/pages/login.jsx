@@ -91,7 +91,7 @@ export default function Login() {
     const [role, setRole] = useState('patient'); // 'patient' | 'doctor'
 
     /* form fields */
-    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [showPass, setShowPass] = useState(false);
@@ -112,7 +112,8 @@ export default function Login() {
     /* ── Validation ── */
     const validate = () => {
         const errs = {};
-        if (!phone || phone.replace(/\D/g, '').length < 10) errs.phone = 'Enter a valid 10-digit phone number.';
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRe.test(email)) errs.email = 'Enter a valid email address.';
         if (password.length < 6) errs.password = 'Password must be at least 6 characters.';
         return errs;
     };
@@ -131,7 +132,7 @@ export default function Login() {
             const res = await fetch(`${API_BASE_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, password, role, rememberMe }),
+                body: JSON.stringify({ email, password, role, rememberMe }),
             });
 
             const json = await res.json();
@@ -155,12 +156,12 @@ export default function Login() {
         } finally {
             setLoading(false);
         }
-    }, [phone, password, role, rememberMe, navigate]);
+    }, [email, password, role, rememberMe, navigate]);
 
     /* ── Field change helpers ── */
-    const handlePhoneChange = (e) => {
-        setPhone(e.target.value);
-        if (errors.phone) setErrors(p => ({ ...p, phone: '' }));
+    const handleEmailChange = (e) => {
+        setEmail(e.target.value);
+        if (errors.email) setErrors(p => ({ ...p, email: '' }));
     };
 
     const handlePassChange = (e) => {
@@ -234,20 +235,19 @@ export default function Login() {
                             <div className="login-error-banner">⚠️ {errorMsg}</div>
                         )}
 
-                        {/* Phone */}
+                        {/* Email */}
                         <div className="form-group">
-                            <label htmlFor="login-phone">Mobile Number</label>
+                            <label htmlFor="login-email">Email Address</label>
                             <input
-                                id="login-phone"
-                                type="tel"
-                                placeholder="Enter your 10-digit mobile number"
-                                value={phone}
-                                onChange={handlePhoneChange}
-                                autoComplete="tel"
-                                maxLength={10}
-                                aria-invalid={!!errors.phone}
+                                id="login-email"
+                                type="email"
+                                placeholder={role === 'patient' ? 'patient@email.com' : 'doctor@hospital.com'}
+                                value={email}
+                                onChange={handleEmailChange}
+                                autoComplete="email"
+                                aria-invalid={!!errors.email}
                             />
-                            {errors.phone && <span className="field-error">{errors.phone}</span>}
+                            {errors.email && <span className="field-error">{errors.email}</span>}
                         </div>
 
                         {/* Password */}
