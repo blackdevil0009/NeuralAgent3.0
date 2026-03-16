@@ -25,7 +25,7 @@ const FIELD_GROUPS = [
         ]
     },
     {
-        title: '🌿 Ayurvedic Profile',
+        title: '🌿 Ayurvedic & Medical Profile',
         fields: [
             { key: 'dosha', label: 'Predominant Dosha', type: 'select', options: ['Not assessed', 'Vata', 'Pitta', 'Kapha', 'Vata-Pitta', 'Pitta-Kapha', 'Vata-Kapha', 'Tridoshic'] },
             { key: 'allergies', label: 'Allergies', type: 'text', placeholder: 'e.g. Peanuts, Penicillin' },
@@ -35,7 +35,7 @@ const FIELD_GROUPS = [
     },
 ];
 
-export default function PatientProfile() {
+export default function EditProfile() {
     const navigate = useNavigate();
     const [form, setForm] = useState({
         name: '', email: '', mobile: '', dob: '', gender: 'Prefer not to say',
@@ -43,12 +43,13 @@ export default function PatientProfile() {
         dosha: 'Not assessed', allergies: '', conditions: '', medications: '',
     });
     const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                if (!token) return;
+                if (!token) { navigate('/login'); return; }
                 const res = await fetch(`${API_BASE_URL}/api/profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -64,10 +65,14 @@ export default function PatientProfile() {
                         }));
                     }
                 }
-            } catch (err) {}
+            } catch (err) {
+                handleError(err, 'Failed to load profile.');
+            } finally {
+                setFetching(false);
+            }
         };
         fetchProfile();
-    }, []);
+    }, [navigate]);
 
     const handleChange = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -87,6 +92,7 @@ export default function PatientProfile() {
                 const json = await res.json();
                 localStorage.setItem('user', JSON.stringify(json.data || {}));
                 handleSuccess('Profile updated successfully!');
+                navigate('/patient/profile');
             } else {
                 const json = await res.json();
                 handleError(json.data?.error || 'Profile update failed.');
@@ -98,29 +104,39 @@ export default function PatientProfile() {
         }
     };
 
+    if (fetching) {
+        return (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#888' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 12 }}>⏳</div>
+                <p>Loading your profile...</p>
+            </div>
+        );
+    }
+
     return (
         <div>
+            {/* Header */}
             <div className="pd-page-header">
                 <div>
-                    <h1>👤 My Profile</h1>
-                    <p>Manage your personal and health information</p>
+                    <h1>✏️ Edit Profile</h1>
+                    <p>Update your personal and health information</p>
                 </div>
-                <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
-                    {loading ? '⏳ Saving…' : '💾 Save Changes'}
-                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/profile')}>
+                        ✖ Cancel
+                    </button>
+                    <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
+                        {loading ? '⏳ Saving…' : '💾 Save Changes'}
+                    </button>
+                </div>
             </div>
 
-            {/* Banner */}
+            {/* Profile banner */}
             <div className="pd-profile-banner" style={{ marginBottom: 24 }}>
                 <div className="pd-profile-pic">🧘</div>
                 <div>
                     <div className="pd-profile-name">{form.name || 'Your Name'}</div>
                     <div className="pd-profile-sub">{form.email || 'your@email.com'}</div>
-                    <div className="pd-profile-pills">
-                        <span className="pd-profile-pill">{form.dosha}</span>
-                        <span className="pd-profile-pill">Blood: {form.bloodGroup}</span>
-                        {form.city && <span className="pd-profile-pill">📍 {form.city}</span>}
-                    </div>
                 </div>
             </div>
 
@@ -133,7 +149,11 @@ export default function PatientProfile() {
                             <div className="pd-form-group" key={f.key}>
                                 <label>{f.label}</label>
                                 {f.type === 'select' ? (
-                                    <select className="pd-select" value={form[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)}>
+                                    <select
+                                        className="pd-select"
+                                        value={form[f.key] || ''}
+                                        onChange={e => handleChange(f.key, e.target.value)}
+                                    >
                                         {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                                     </select>
                                 ) : (
@@ -144,7 +164,7 @@ export default function PatientProfile() {
                                         onChange={e => handleChange(f.key, e.target.value)}
                                         placeholder={f.placeholder}
                                         readOnly={f.readOnly}
-                                        style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
+                                        style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed', background: '#f5f5f5' } : {}}
                                     />
                                 )}
                             </div>
@@ -153,19 +173,14 @@ export default function PatientProfile() {
                 </div>
             ))}
 
-            {/* Security card */}
-            <div className="pd-card" style={{ marginBottom: 18 }}>
-                <h3 className="pd-section-title">🔒 Account Security</h3>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/password')}>🔑 Change Password</button>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/mobile')}>📱 Update Mobile OTP</button>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/2fa')}>🔓 2-Factor Authentication</button>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/notifications')}>🔔 Manage Notifications</button>
-                </div>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-                <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>
+            {/* Bottom save button */}
+            <div style={{ textAlign: 'right', marginBottom: 20 }}>
+                <button
+                    className="pd-btn pd-btn-primary"
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    style={{ minWidth: 200, justifyContent: 'center' }}
+                >
                     {loading ? '⏳ Saving…' : '💾 Save All Changes'}
                 </button>
             </div>

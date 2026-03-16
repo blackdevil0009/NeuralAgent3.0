@@ -183,8 +183,7 @@ export default function AIAssistant() {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'X-Timestamp': timestamp,
-                        'X-HMAC-Signature': 'DEV_BYPASS',
-                        'ngrok-skip-browser-warning': '69420'
+                        'X-HMAC-Signature': 'DEV_BYPASS'
                     },
                     body: formData
                 });
@@ -195,8 +194,7 @@ export default function AIAssistant() {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`,
                         'X-Timestamp': timestamp,
-                        'X-HMAC-Signature': 'DEV_BYPASS',
-                        'ngrok-skip-browser-warning': '69420'
+                        'X-HMAC-Signature': 'DEV_BYPASS'
                     },
                     body: JSON.stringify({ message: msg })
                 });
