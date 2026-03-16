@@ -37,39 +37,63 @@ const FIELD_GROUPS = [
 
 export default function PatientProfile() {
     const navigate = useNavigate();
-    const [form, setForm] = useState({
+    const [profile, setProfile] = useState({
         name: '', email: '', mobile: '', dob: '', gender: 'Prefer not to say',
         bloodGroup: 'Unknown', address: '', city: '', state: '', pin: '',
         dosha: 'Not assessed', allergies: '', conditions: '', medications: '',
     });
+    
+    // We maintain a copy of the original profile to revert changes on "Cancel"
+    const [originalProfile, setOriginalProfile] = useState({});
+    const [isEditing, setIsEditing] = useState(false);
+    const [fetching, setFetching] = useState(true);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                if (!token) return;
+                if (!token) {
+                    navigate('/login');
+                    return;
+                }
+                
+                // Fetch user data automatically
                 const res = await fetch(`${API_BASE_URL}/api/profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                
                 if (res.ok) {
                     const json = await res.json();
                     if (json.data) {
-                        setForm(prev => ({
-                            ...prev,
+                        const data = {
                             ...json.data,
                             dosha: json.data.dosha || 'Not assessed',
                             gender: json.data.gender || 'Prefer not to say',
                             bloodGroup: json.data.bloodGroup || 'Unknown',
-                        }));
+                        };
+                        setProfile(prev => ({ ...prev, ...data }));
+                        setOriginalProfile(data);
                     }
+                } else {
+                    handleError('Failed to load profile data.');
                 }
-            } catch (err) {}
+            } catch (err) {
+                handleError(err, 'Failed to fetch profile.');
+            } finally {
+                setFetching(false);
+            }
         };
         fetchProfile();
-    }, []);
+    }, [navigate]);
 
-    const handleChange = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+    const handleChange = (k, v) => setProfile(prev => ({ ...prev, [k]: v }));
+
+    const handleCancel = () => {
+        // Revert any unsaved changes
+        setProfile(prev => ({ ...prev, ...originalProfile }));
+        setIsEditing(false);
+    };
 
     const handleSubmit = async () => {
         setLoading(true);
@@ -81,11 +105,15 @@ export default function PatientProfile() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(form),
+                body: JSON.stringify(profile),
             });
             if (res.ok) {
                 const json = await res.json();
                 localStorage.setItem('user', JSON.stringify(json.data || {}));
+                
+                // Update original profile & return to view mode
+                setOriginalProfile(profile);
+                setIsEditing(false);
                 handleSuccess('Profile updated successfully!');
             } else {
                 const json = await res.json();
@@ -98,6 +126,15 @@ export default function PatientProfile() {
         }
     };
 
+    if (fetching) {
+        return (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#888' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 12 }}>⏳</div>
+                <p>Loading your profile...</p>
+            </div>
+        );
+    }
+
     return (
         <div>
             <div className="pd-page-header">
@@ -105,21 +142,34 @@ export default function PatientProfile() {
                     <h1>👤 My Profile</h1>
                     <p>Manage your personal and health information</p>
                 </div>
-                <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
-                    {loading ? '⏳ Saving…' : '💾 Save Changes'}
-                </button>
+                <div>
+                    {!isEditing ? (
+                        <button className="pd-btn pd-btn-outline" onClick={() => setIsEditing(true)}>
+                            ✏️ Edit Profile
+                        </button>
+                    ) : (
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button className="pd-btn pd-btn-outline" onClick={handleCancel}>
+                                ✖ Cancel
+                            </button>
+                            <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
+                                {loading ? '⏳ Saving…' : '💾 Save Changes'}
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Banner */}
             <div className="pd-profile-banner" style={{ marginBottom: 24 }}>
                 <div className="pd-profile-pic">🧘</div>
                 <div>
-                    <div className="pd-profile-name">{form.name || 'Your Name'}</div>
-                    <div className="pd-profile-sub">{form.email || 'your@email.com'}</div>
+                    <div className="pd-profile-name">{profile.name || 'Not Added Yet'}</div>
+                    <div className="pd-profile-sub">{profile.email || 'Not Added Yet'}</div>
                     <div className="pd-profile-pills">
-                        <span className="pd-profile-pill">{form.dosha}</span>
-                        <span className="pd-profile-pill">Blood: {form.bloodGroup}</span>
-                        {form.city && <span className="pd-profile-pill">📍 {form.city}</span>}
+                        <span className="pd-profile-pill">{profile.dosha}</span>
+                        <span className="pd-profile-pill">Blood: {profile.bloodGroup}</span>
+                        {profile.city && <span className="pd-profile-pill">📍 {profile.city}</span>}
                     </div>
                 </div>
             </div>
@@ -129,26 +179,54 @@ export default function PatientProfile() {
                 <div key={group.title} className="pd-card" style={{ marginBottom: 18 }}>
                     <h3 className="pd-section-title">{group.title}</h3>
                     <div className="pd-grid-2">
-                        {group.fields.map(f => (
-                            <div className="pd-form-group" key={f.key}>
-                                <label>{f.label}</label>
-                                {f.type === 'select' ? (
-                                    <select className="pd-select" value={form[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)}>
-                                        {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
-                                ) : (
-                                    <input
-                                        type={f.type}
-                                        className="pd-input"
-                                        value={form[f.key] || ''}
-                                        onChange={e => handleChange(f.key, e.target.value)}
-                                        placeholder={f.placeholder}
-                                        readOnly={f.readOnly}
-                                        style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed' } : {}}
-                                    />
-                                )}
-                            </div>
-                        ))}
+                        {group.fields.map(f => {
+                            const val = profile[f.key];
+                            const displayVal = val ? val : 'Not Added Yet';
+                            return (
+                                <div className="pd-form-group" key={f.key}>
+                                    <label>{f.label}</label>
+                                    
+                                    {/* Default Mode (View Mode) -> render as static text block */}
+                                    {!isEditing ? (
+                                        <div style={{
+                                            padding: '10px 15px', 
+                                            background: '#f9f9f9', 
+                                            borderRadius: '8px', 
+                                            color: val ? '#333' : '#aaa',
+                                            minHeight: '42px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '0.95rem'
+                                        }}>
+                                            {displayVal}
+                                        </div>
+                                    ) : (
+                                        /* Edit Mode -> render as input fields */
+                                        f.type === 'select' ? (
+                                            <select 
+                                                className="pd-select" 
+                                                value={val || ''} 
+                                                onChange={e => handleChange(f.key, e.target.value)}
+                                                disabled={f.readOnly}
+                                            >
+                                                {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type={f.type}
+                                                className="pd-input"
+                                                value={val || ''}
+                                                onChange={e => handleChange(f.key, e.target.value)}
+                                                placeholder={f.placeholder}
+                                                readOnly={f.readOnly}
+                                                disabled={f.readOnly}
+                                                style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed', background: '#f0f0f0' } : {}}
+                                            />
+                                        )
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             ))}
@@ -164,11 +242,14 @@ export default function PatientProfile() {
                 </div>
             </div>
 
-            <div style={{ textAlign: 'right' }}>
-                <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>
-                    {loading ? '⏳ Saving…' : '💾 Save All Changes'}
-                </button>
-            </div>
+            {/* Bottom action row when editing */}
+            {isEditing && (
+                <div style={{ textAlign: 'right' }}>
+                    <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>
+                        {loading ? '⏳ Saving…' : '💾 Save Changes'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
