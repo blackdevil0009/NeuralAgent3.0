@@ -50,7 +50,7 @@ export default function EditProfile() {
             try {
                 const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 if (!token) { navigate('/login'); return; }
-                const res = await fetch(`${API_BASE_URL}/api/profile`, {
+                const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
@@ -80,7 +80,7 @@ export default function EditProfile() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/profile`, {
+            const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

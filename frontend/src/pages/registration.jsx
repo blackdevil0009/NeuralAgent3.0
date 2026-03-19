@@ -689,7 +689,7 @@ export default function Registration() {
         setSuccessMsg('');
         try {
             const isFormData = data instanceof FormData;
-            const res = await fetch(`${API_BASE_URL}/api/register`, {
+            const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 body: isFormData ? data : JSON.stringify(data),
                 headers: isFormData ? {} : { 'Content-Type': 'application/json' },

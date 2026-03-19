@@ -59,7 +59,7 @@ export default function PatientProfile() {
                 }
                 
                 // Fetch user data automatically
-                const res = await fetch(`${API_BASE_URL}/api/profile`, {
+                const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
@@ -99,7 +99,7 @@ export default function PatientProfile() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/profile`, {
+            const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
