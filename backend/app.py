@@ -6,8 +6,6 @@ from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 from database import get_db_connection, init_db
 from security_utils import verify_hmac, encrypt_data, decrypt_data, sign_response, generate_rsa_keypair
@@ -20,6 +18,7 @@ from utils.otp_utils import generate_otp
 from utils.sms_utils import send_fast2sms_otp
 from utils.email_utils import send_reset_email
 import secrets
+import traceback
 
 app = Flask(__name__)
 CORS(app)
@@ -31,6 +30,8 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 jwt = JWTManager(app)
 
+
+
 @jwt.invalid_token_loader
 def invalid_token_callback(error_string):
     app.logger.error(f"JWT Invalid Token Error: {error_string}")
@@ -40,19 +41,6 @@ def invalid_token_callback(error_string):
 def missing_token_callback(error_string):
     app.logger.error(f"JWT Missing Token Error: {error_string}")
     return jsonify({"error": f"Missing token: {error_string}"}), 401
-
-# Rate Limiting
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["1000 per day", "200 per hour"],
-    storage_uri="memory://",
-)
-
-# Exempt CORS preflight (OPTIONS) requests from rate limiting
-@limiter.request_filter
-def exempt_options():
-    return request.method == 'OPTIONS'
 
 # Ensure upload directory exists
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -349,7 +337,6 @@ def login():
 @app.route('/api/messages/send', methods=['POST'])
 @jwt_required()
 @require_hmac
-@limiter.limit("10 per minute")
 def send_message():
     current_user_id = int(get_jwt_identity())
     data = request.get_json()
@@ -380,7 +367,6 @@ def send_message():
 
 @app.route('/api/messages/history/<int:other_id>', methods=['GET'])
 @jwt_required()
-@limiter.limit("30 per minute")
 def get_messages(other_id):
     current_user_id = int(get_jwt_identity())
     user_id = current_user_id
@@ -416,7 +402,6 @@ def get_messages(other_id):
 @app.route('/api/v2/messages/send', methods=['POST'])
 @jwt_required()
 @require_hmac
-@limiter.limit("10 per minute")
 def send_hybrid_message():
     current_user_id = int(get_jwt_identity())
     data = request.get_json()
@@ -443,7 +428,6 @@ def send_hybrid_message():
 
 @app.route('/api/v2/messages/history/<int:other_id>', methods=['GET'])
 @jwt_required()
-@limiter.limit("30 per minute")
 def get_hybrid_messages(other_id):
     current_user_id = int(get_jwt_identity())
     result, status = chat_vcall.get_chat_history(current_user_id, other_id)
@@ -467,6 +451,61 @@ def initiate_vcall():
     if status == 201:
         create_notification(receiver_id, 'Call', f"Incoming video call request from user #{current_user_id}")
     return signed_json_response({"message": "Video call signal sent!", "detail": result}, status)
+
+@app.route('/api/profile', methods=['GET', 'PUT'])
+@jwt_required()
+def handle_profile():
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    if request.method == 'GET':
+        cursor.execute('''
+            SELECT u.fullName as name, u.email, u.mobile, u.address, u.city, u.state, u.pincode as pin, 
+                   p.dob, p.gender, p.dosha, p.allergies, p.conditions, p.medications, p.bloodGroup
+            FROM users u
+            LEFT JOIN patient_details p ON u.id = p.userId
+            WHERE u.id = %s
+        ''', (current_user_id,))
+        profile = cursor.fetchone()
+        conn.close()
+        return signed_json_response(profile or {})
+        
+    elif request.method == 'PUT':
+        data = request.get_json()
+        
+        # update users table
+        cursor.execute('''
+            UPDATE users SET fullName=%s, mobile=%s, address=%s, city=%s, state=%s, pincode=%s
+            WHERE id=%s
+        ''', (data.get('name'), data.get('mobile'), data.get('address'), data.get('city'), data.get('state'), data.get('pin'), current_user_id))
+        
+        # update or insert patient_details
+        cursor.execute("SELECT userId FROM patient_details WHERE userId=%s", (current_user_id,))
+        if cursor.fetchone():
+            cursor.execute('''
+                UPDATE patient_details SET dob=%s, gender=%s, dosha=%s, allergies=%s, conditions=%s, medications=%s, bloodGroup=%s
+                WHERE userId=%s
+            ''', (data.get('dob'), data.get('gender'), data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), data.get('bloodGroup'), current_user_id))
+        else:
+            cursor.execute('''
+                INSERT INTO patient_details (userId, dob, gender, dosha, allergies, conditions, medications, bloodGroup)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (current_user_id, data.get('dob'), data.get('gender'), data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), data.get('bloodGroup')))
+        
+        conn.commit()
+        
+        # return updated
+        cursor.execute('''
+            SELECT u.fullName as name, u.email, u.mobile, u.address, u.city, u.state, u.pincode as pin, 
+                   p.dob, p.gender, p.dosha, p.allergies, p.conditions, p.medications, p.bloodGroup
+            FROM users u
+            LEFT JOIN patient_details p ON u.id = p.userId
+            WHERE u.id = %s
+        ''', (current_user_id,))
+        profile = cursor.fetchone()
+        conn.close()
+        return signed_json_response(profile or {"message": "Profile updated!"})
 
 @app.route('/api/doctors', methods=['GET'])
 @jwt_required()
@@ -511,56 +550,6 @@ def search_doctors():
         ''', (search_term,))
         doctors = cursor.fetchall()
         return signed_json_response({"doctors": doctors})
-    except Exception as e:
-        return signed_json_response({"error": str(e)}, 500)
-    finally:
-        conn.close()
-
-@app.route('/api/profile', methods=['PUT'])
-@jwt_required()
-def update_profile():
-    current_user_id = int(get_jwt_identity())
-    data = request.get_json()
-    
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    
-    try:
-        # 1. Update basic user info
-        cursor.execute('''
-            UPDATE users 
-            SET fullName = %s, mobile = %s, address = %s, city = %s, state = %s, pincode = %s
-            WHERE id = %s
-        ''', (
-            data.get('name'), data.get('mobile'), data.get('address'), data.get('city'),
-            data.get('state'), data.get('pin'), current_user_id
-        ))
-        
-        # 2. Update role-specific details
-        cursor.execute('SELECT role FROM users WHERE id = %s', (current_user_id,))
-        role = cursor.fetchone()['role']
-        
-        if role == 'patient':
-            cursor.execute('''
-                UPDATE patient_details 
-                SET dob = %s, gender = %s, dosha = %s, allergies = %s, conditions = %s, medications = %s
-                WHERE userId = %s
-            ''', (
-                data.get('dob'), data.get('gender'), data.get('dosha'),
-                data.get('allergies'), data.get('conditions'), data.get('medications'),
-                current_user_id
-            ))
-        elif role == 'doctor':
-            # Add doctor update logic if needed
-            pass
-            
-        conn.commit()
-        
-        # Return updated user object
-        cursor.execute('SELECT id, fullName as name, email, mobile, role FROM users WHERE id = %s', (current_user_id,))
-        updated_user = cursor.fetchone()
-        
-        return signed_json_response(updated_user, 200)
     except Exception as e:
         return signed_json_response({"error": str(e)}, 500)
     finally:
@@ -700,7 +689,6 @@ def update_appointment(app_id):
         caller_name = cursor.fetchone()['fullName']
         
         content = f"Appointment {app_id} has been {status.lower()} by {caller_name}."
-        from database import create_notification
         create_notification(other_user_id, 'Appointment', content)
         
         conn.commit()
@@ -714,7 +702,6 @@ def update_appointment(app_id):
 
 @app.route('/api/ai/chat', methods=['POST'])
 @jwt_required()
-@limiter.limit("30 per minute")
 def ai_chat():
     user_query = None
     
@@ -916,4 +903,4 @@ def verify_otp():
 
 if __name__ == '__main__':
     init_db()
-    app.run(port=5000, debug=True)
+    app.run(port=8000, debug=True)

@@ -101,7 +101,7 @@ export default function PatientLayout() {
 
             {/* ── Sidebar ── */}
             <aside className={`pd-sidebar ${sidebarOpen ? 'open' : ''}`}>
-                <Link to="/" className="pd-sidebar-logo" onClick={() => setSidebarOpen(false)}>
+                <Link to="/patient/health" className="pd-sidebar-logo" onClick={() => setSidebarOpen(false)}>
                     <span className="pd-logo-icon">🌿</span>
                     <span className="pd-logo-text">VaidyaMed-X</span>
                 </Link>

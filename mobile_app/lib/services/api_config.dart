@@ -1,5 +1,5 @@
 class ApiConfig {
-  static const String baseUrl = 'https://renae-unrecaptured-noel.ngrok-free.dev';
+  static const String baseUrl = 'https://api.vaidyamedx.in';
   static const String hmacSecret = 'YOUR_HMAC_SECRET_KEY'; // In production, use a secure vault or env
   
   // Endpoints

@@ -52,7 +52,7 @@ export default function DoctorLayout() {
         <div className="dd-shell">
             {/* ── Sidebar ── */}
             <aside className="dd-sidebar">
-                <Link to="/" className="dd-sidebar-logo">
+                <Link to="/doctor/dashboard" className="dd-sidebar-logo">
                     <span className="dd-logo-icon">🌿</span>
                     <span className="dd-logo-text">VaidyaMed-X</span>
                 </Link>

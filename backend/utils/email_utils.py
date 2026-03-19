@@ -9,7 +9,9 @@ def send_reset_email(to_email, reset_link, reset_token=None):
     If SMTP variables are not set, it prints the reset link to the console for testing.
     """
     sender_email = 'vaidyamedx@gmail.com'
-    sender_password = 'Devil@2007%'
+    # IMPORTANT: Since this is a @gmail.com address, you cannot use your regular account password.
+    # You MUST generate a 16-character "App Password" from your Google Account Security settings.
+    sender_password = 'Devil@2007%' # <-- Replace this with your Google App Password
 
     # For testing/free local use if SMTP isn't configured, print to console
     if not sender_email or not sender_password:
@@ -38,8 +40,8 @@ def send_reset_email(to_email, reset_link, reset_token=None):
         """
         msg.attach(MIMEText(body, 'plain'))
 
-        # Connect to Hostinger SMTP (since email is support@vaidyamedx.in)
-        server = smtplib.SMTP('smtp.hostinger.com', 587)
+        # Connect to Gmail SMTP (since email is vaidyamedx@gmail.com)
+        server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender_email, sender_password)
         text = msg.as_string()

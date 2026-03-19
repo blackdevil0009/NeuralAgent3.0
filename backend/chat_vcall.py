@@ -1,9 +1,11 @@
 from flask import jsonify
 from database import get_db_connection
-from security_utils import hybrid_encrypt, hybrid_decrypt, encrypt_data
+from security_utils import hybrid_encrypt, hybrid_decrypt
+# from security_utils import encrypt_data, decrypt_data
 import mysql.connector
 
 def send_chat_message(sender_id, receiver_id, content, is_doctor):
+    from security_utils import encrypt_data
     """Sends a message using hybrid RSA+AES encryption."""
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -36,6 +38,7 @@ def send_chat_message(sender_id, receiver_id, content, is_doctor):
         conn.close()
 
 def get_chat_history(user_id, other_id):
+    from security_utils import decrypt_data
     """Retrieves and decrypts chat history using the user's RSA private key."""
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
