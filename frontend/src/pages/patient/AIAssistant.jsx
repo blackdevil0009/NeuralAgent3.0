@@ -201,7 +201,7 @@ export default function AIAssistant() {
             }
 
             const resData = await response.json();
-            const aiResponseText = resData.data?.response || resData.data?.error || resData.error || "I am connected but need a moment to process. 🌿";
+            const aiResponseText = resData.data?.response || resData.data?.error || resData.error || resData.msg || resData.message || "I am connected but need a moment to process. 🌿";
 
             const aiMsg = {
                 id: Date.now() + 1, from: 'ai',
