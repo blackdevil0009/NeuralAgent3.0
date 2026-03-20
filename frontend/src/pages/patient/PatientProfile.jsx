@@ -238,7 +238,6 @@ export default function PatientProfile() {
                     <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/password')}>🔑 Change Password</button>
                     <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/mobile')}>📱 Update Mobile OTP</button>
                     <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/2fa')}>🔓 2-Factor Authentication</button>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/notifications')}>🔔 Manage Notifications</button>
                 </div>
             </div>
 

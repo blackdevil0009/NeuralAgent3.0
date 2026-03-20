@@ -14,14 +14,12 @@ const NAV = [
     { id: 'emergency', label: 'Report Emergency', icon: '🚨', path: '/patient/emergency' },
     { id: 'doctors', label: 'Find Doctors', icon: '🔍', path: '/patient/doctors' },
     { id: 'profile', label: 'My Profile', icon: '👤', path: '/patient/profile' },
-    { id: 'notifications', label: 'Notifications', icon: '🔔', path: '/patient/notifications' },
 ];
 
 const SETTINGS_NAV = [
     { id: 'password', label: 'Change Password', icon: '🔑', path: '/patient/settings/password' },
     { id: 'mobile', label: 'Update Mobile', icon: '📱', path: '/patient/settings/mobile' },
     { id: '2fa', label: 'Two-Factor Auth', icon: '🔐', path: '/patient/settings/2fa' },
-    { id: 'notif-settings', label: 'Notification Settings', icon: '⚙️', path: '/patient/settings/notifications' },
 ];
 
 const PAGE_TITLES = {
@@ -34,11 +32,7 @@ const PAGE_TITLES = {
     emergency: '🚨 Emergency Case Report',
     doctors: 'Find Doctors',
     profile: 'My Profile',
-    notifications: 'Notifications',
-    password: 'Change Password',
-    mobile: 'Update Mobile',
     '2fa': 'Two-Factor Authentication',
-    'notif-settings': 'Notification Settings',
 };
 
 export default function PatientLayout() {
@@ -46,7 +40,7 @@ export default function PatientLayout() {
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState({ name: 'Patient', avatar: '🧘' });
-    const [counts, setCounts] = useState({ notifications: 0, messages: 0 });
+    const [counts, setCounts] = useState({ messages: 0 });
 
     const fetchCounts = useCallback(async () => {
         try {
@@ -57,9 +51,8 @@ export default function PatientLayout() {
             const json = await res.json();
             if (res.ok) {
                 const notifs = json.notifications || [];
-                const unreadNotifs = notifs.filter(n => !n.read && n.sourceType !== 'Message').length;
                 const unreadMsgs = notifs.filter(n => !n.read && n.sourceType === 'Message').length;
-                setCounts({ notifications: unreadNotifs, messages: unreadMsgs });
+                setCounts({ messages: unreadMsgs });
             }
         } catch (err) {
             handleError(err, 'Failed to fetch notification counts');
@@ -126,7 +119,6 @@ export default function PatientLayout() {
                             <span className="pd-nav-icon">{n.icon}</span>
                             {n.label}
                             {n.id === 'inbox' && counts.messages > 0 && <span className="pd-nav-badge">{counts.messages}</span>}
-                            {n.id === 'notifications' && counts.notifications > 0 && <span className="pd-nav-badge">{counts.notifications}</span>}
                         </Link>
                     ))}
 
@@ -169,10 +161,6 @@ export default function PatientLayout() {
                     </div>
 
                     <div className="pd-topbar-right">
-                        <button className="pd-icon-btn" title="Notifications" onClick={() => navigate('/patient/notifications')}>
-                            🔔
-                            {counts.notifications > 0 && <span className="pd-badge">{counts.notifications}</span>}
-                        </button>
                         <button className="pd-icon-btn" title="Messages" onClick={() => navigate('/patient/inbox')}>
                             💬
                             {counts.messages > 0 && <span className="pd-badge">{counts.messages}</span>}

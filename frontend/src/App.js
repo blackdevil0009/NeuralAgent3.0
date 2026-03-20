@@ -23,11 +23,9 @@ import DoctorSearch from './pages/patient/DoctorSearch';
 import PatientProfile from './pages/patient/PatientProfile';
 import Inbox from './pages/patient/Inbox';
 import VideoCall from './pages/patient/VideoCall';
-import Notifications from './pages/patient/Notifications';
 import ChangePassword from './pages/patient/ChangePassword';
 import UpdateMobile from './pages/patient/UpdateMobile';
 import TwoFactorAuth from './pages/patient/TwoFactorAuth';
-import NotificationSettings from './pages/patient/NotificationSettings';
 
 // Doctor Dashboard
 import DoctorLayout from './pages/doctor/DoctorLayout';
@@ -36,7 +34,6 @@ import DoctorSchedule from './pages/doctor/DoctorSchedule';
 import DoctorInbox from './pages/doctor/DoctorInbox';
 import DoctorAIAssistant from './pages/doctor/DoctorAIAssistant';
 import DoctorChangePassword from './pages/doctor/DoctorChangePassword';
-import DoctorNotifications from './pages/doctor/DoctorNotifications';
 import DoctorUpdateMobile from './pages/doctor/DoctorUpdateMobile';
 import Doctor2FA from './pages/doctor/Doctor2FA';
 import EmergencyDashboard from './pages/doctor/EmergencyDashboard';
@@ -77,12 +74,7 @@ function App() {
             <Route path="appointments" element={<Appointments />} />
             <Route path="doctors" element={<DoctorSearch />} />
             <Route path="profile" element={<PatientProfile />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="emergency" element={<EmergencyCase />} />
-            <Route path="settings/password" element={<ChangePassword />} />
-            <Route path="settings/mobile" element={<UpdateMobile />} />
             <Route path="settings/2fa" element={<TwoFactorAuth />} />
-            <Route path="settings/notifications" element={<NotificationSettings />} />
           </Route>
 
           {/* Doctor Portal (nested) */}
@@ -94,7 +86,6 @@ function App() {
             <Route path="ai" element={<DoctorAIAssistant />} />
             <Route path="profile" element={<DoctorProfile />} />
             <Route path="settings/password" element={<DoctorChangePassword />} />
-            <Route path="settings/notifications" element={<DoctorNotifications />} />
             <Route path="settings/mobile" element={<DoctorUpdateMobile />} />
             <Route path="settings/2fa" element={<Doctor2FA />} />
             <Route path="emergency" element={<EmergencyDashboard />} />

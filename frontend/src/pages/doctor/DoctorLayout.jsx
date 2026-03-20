@@ -13,7 +13,6 @@ const NAV = [
 
 const SETTINGS_NAV = [
     { id: 'password', label: 'Security Settings', icon: '🔐', path: '/doctor/settings/password' },
-    { id: 'notifications', label: 'Manage Alerts', icon: '⚙️', path: '/doctor/settings/notifications' },
 ];
 
 const PAGE_TITLES = {
@@ -23,7 +22,6 @@ const PAGE_TITLES = {
     ai: 'AI Health Analyzer',
     profile: 'Medical Professional Profile',
     password: 'Security & Access',
-    notifications: 'Notification Preferences',
 };
 
 export default function DoctorLayout() {
@@ -116,9 +114,6 @@ export default function DoctorLayout() {
                     </div>
 
                     <div className="dd-topbar-right">
-                        <button className="dd-icon-btn" title="System Alerts" onClick={() => navigate('/doctor/settings/notifications')}>
-                            🔔 <span className="dd-badge">4</span>
-                        </button>
                         <button className="dd-icon-btn" title="Clinical Inbox" onClick={() => navigate('/doctor/inbox')}>
                             💬 <span className="dd-badge">2</span>
                         </button>
