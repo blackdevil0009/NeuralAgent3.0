@@ -8,10 +8,10 @@ const VALUES = [
 ];
 
 const TEAM = [
-    { emoji: '👨‍⚕️', name: 'Dr. Arjun Menon', role: 'Chief Medical Officer', bg: '#e8f5ee' },
-    { emoji: '👩‍💻', name: 'Priya Sharma', role: 'AI Research Lead', bg: '#fff8e7' },
-    { emoji: '🧑‍🌾', name: 'Vaidya R. Tripathi', role: 'Ayurveda Specialist', bg: '#f0eaff' },
-    { emoji: '👨‍💼', name: 'Kiran Patel', role: 'Product & Strategy', bg: '#fde8e8' },
+    { emoji: '👨‍⚕️', name: 'Govind Sharma', role: 'Founder & CEO', bg: '#e8f5ee' },
+    { emoji: '👩‍💻', name: 'Mohammad Ayan Husain', role: 'AI Research Lead', bg: '#fff8e7' },
+    { emoji: '👩‍💻', name: 'Mohd Azad and Abhishek Kumar', role: 'Frontend Developer', bg: '#f0eaff' },
+    { emoji: '👩‍💼', name: 'Vanshika Yadav', role: 'Product & Strategy', bg: '#fde8e8' },
 ];
 
 export default function About() {
