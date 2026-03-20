@@ -12,7 +12,7 @@ const NAV = [
 ];
 
 const SETTINGS_NAV = [
-    { id: 'password', label: 'Security Settings', icon: '🔐', path: '/doctor/settings/password' },
+    { id: 'security', label: 'Security Settings', icon: '🛡️', path: '/doctor/settings/security' },
 ];
 
 const PAGE_TITLES = {
@@ -21,7 +21,7 @@ const PAGE_TITLES = {
     inbox: 'Clinical Message Center',
     ai: 'AI Health Analyzer',
     profile: 'Medical Professional Profile',
-    password: 'Security & Access',
+    security: 'Security Settings',
 };
 
 export default function DoctorLayout() {

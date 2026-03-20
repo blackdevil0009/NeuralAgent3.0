@@ -235,9 +235,7 @@ export default function PatientProfile() {
             <div className="pd-card" style={{ marginBottom: 18 }}>
                 <h3 className="pd-section-title">🔒 Account Security</h3>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/password')}>🔑 Change Password</button>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/mobile')}>📱 Update Mobile OTP</button>
-                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/2fa')}>🔓 2-Factor Authentication</button>
+                    <button className="pd-btn pd-btn-outline" onClick={() => navigate('/patient/settings/security')}>🛡️ Security Settings</button>
                 </div>
             </div>
 

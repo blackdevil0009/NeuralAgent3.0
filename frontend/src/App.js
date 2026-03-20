@@ -23,9 +23,7 @@ import DoctorSearch from './pages/patient/DoctorSearch';
 import PatientProfile from './pages/patient/PatientProfile';
 import Inbox from './pages/patient/Inbox';
 import VideoCall from './pages/patient/VideoCall';
-import ChangePassword from './pages/patient/ChangePassword';
-import UpdateMobile from './pages/patient/UpdateMobile';
-import TwoFactorAuth from './pages/patient/TwoFactorAuth';
+import SecuritySettings from './pages/patient/SecuritySettings';
 
 // Doctor Dashboard
 import DoctorLayout from './pages/doctor/DoctorLayout';
@@ -33,9 +31,7 @@ import PatientManagement from './pages/doctor/PatientManagement';
 import DoctorSchedule from './pages/doctor/DoctorSchedule';
 import DoctorInbox from './pages/doctor/DoctorInbox';
 import DoctorAIAssistant from './pages/doctor/DoctorAIAssistant';
-import DoctorChangePassword from './pages/doctor/DoctorChangePassword';
-import DoctorUpdateMobile from './pages/doctor/DoctorUpdateMobile';
-import Doctor2FA from './pages/doctor/Doctor2FA';
+import DoctorSecuritySettings from './pages/doctor/DoctorSecuritySettings';
 import EmergencyDashboard from './pages/doctor/EmergencyDashboard';
 
 // Emergency (Patient)
@@ -74,7 +70,8 @@ function App() {
             <Route path="appointments" element={<Appointments />} />
             <Route path="doctors" element={<DoctorSearch />} />
             <Route path="profile" element={<PatientProfile />} />
-            <Route path="settings/2fa" element={<TwoFactorAuth />} />
+            <Route path="settings/security" element={<SecuritySettings />} />
+            <Route path="emergency" element={<EmergencyCase />} />
           </Route>
 
           {/* Doctor Portal (nested) */}
@@ -85,9 +82,7 @@ function App() {
             <Route path="inbox" element={<DoctorInbox />} />
             <Route path="ai" element={<DoctorAIAssistant />} />
             <Route path="profile" element={<DoctorProfile />} />
-            <Route path="settings/password" element={<DoctorChangePassword />} />
-            <Route path="settings/mobile" element={<DoctorUpdateMobile />} />
-            <Route path="settings/2fa" element={<Doctor2FA />} />
+            <Route path="settings/security" element={<DoctorSecuritySettings />} />
             <Route path="emergency" element={<EmergencyDashboard />} />
           </Route>
           <Route path="/dashboard" element={<VaidyaMedDashboard />} />

@@ -17,9 +17,7 @@ const NAV = [
 ];
 
 const SETTINGS_NAV = [
-    { id: 'password', label: 'Change Password', icon: '🔑', path: '/patient/settings/password' },
-    { id: 'mobile', label: 'Update Mobile', icon: '📱', path: '/patient/settings/mobile' },
-    { id: '2fa', label: 'Two-Factor Auth', icon: '🔐', path: '/patient/settings/2fa' },
+    { id: 'security', label: 'Security Settings', icon: '🛡️', path: '/patient/settings/security' },
 ];
 
 const PAGE_TITLES = {
@@ -32,7 +30,7 @@ const PAGE_TITLES = {
     emergency: '🚨 Emergency Case Report',
     doctors: 'Find Doctors',
     profile: 'My Profile',
-    '2fa': 'Two-Factor Authentication',
+    'security': 'Security Settings',
 };
 
 export default function PatientLayout() {
