@@ -18,14 +18,18 @@ const LINKS = {
         { label: 'Help Center', href: '#' },
         { label: 'Privacy Policy', href: '#' },
         { label: 'Terms of Use', href: '#' },
-        { label: 'Contact Us', href: '#contact' },
     ],
+    Contact: [
+        { label: 'Email: vaidyamedx@gmail.com', href: 'mailto:vaidyamedx@gmail.com' },
+        { label: 'WhatsApp: 8604611867', href: 'https://wa.me/918604611867' },
+        { label: 'WhatsApp: 70526008972', href: 'https://wa.me/9170526008972' },
+    ]
 };
 
 const SOCIALS = [
     { label: 'Twitter', icon: '🐦', href: 'https://twitter.com' },
-    { label: 'LinkedIn', icon: '💼', href: 'https://linkedin.com' },
-    { label: 'Instagram', icon: '📷', href: 'https://instagram.com' },
+    { label: 'LinkedIn', icon: '💼', href: 'https://www.linkedin.com/in/govind-sharma-b95976277?utm_source=share_via&utm_content=profile&utm_medium=member_android' },
+    { label: 'Instagram', icon: '📷', href: 'https://www.instagram.com/vaidyamedx?igsh=MTJoMjgydHY2emo3dA==' },
     { label: 'YouTube', icon: '▶️', href: 'https://youtube.com' },
 ];
 
