@@ -26,7 +26,7 @@ bcrypt = Bcrypt(app)
 
 # Configuration
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'neural-agent-secret-2026')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 jwt = JWTManager(app)
 
@@ -149,7 +149,7 @@ def home():
     return signed_json_response({
         "status": "online",
         "message": "NeuralAgent API Server is running",
-        "endpoints": ["/api/login", "/api/register", "/api/forgot-password", "/api/messages/send", "/api/messages/history"]
+        "endpoints": ["/api/auth/login", "/api/auth/register", "/api/forgot-password", "/api/messages/send", "/api/messages/history"]
     })
 
 @app.route('/api/forgot-password', methods=['POST'])
@@ -235,7 +235,8 @@ def not_found(e):
     app.logger.error(f"404 Error: {request.path} [{request.method}]")
     return signed_json_response({"error": "Path not found", "path": request.path}, 404)
 
-@app.route('/api/register', methods=['POST'])
+@app.route('/api/auth/register', methods=['POST'])
+@app.route('/api/register', methods=['POST'])  # backward compat
 def register():
     try:
         # Handle both JSON and FormData
@@ -263,11 +264,12 @@ def register():
 
         try:
             cursor.execute('''
-                INSERT INTO users (fullName, email, password, role, mobile, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 data.get('fullName'), data.get('email'), hashed_password, role,
-                data.get('mobile'), data.get('address'), data.get('city'), data.get('state'), data.get('pincode'),
+                data.get('mobile'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), 
+                data.get('address'), data.get('city'), data.get('state'), data.get('pincode'),
                 public_pem, private_key_encrypted
             ))
             user_id = cursor.lastrowid
@@ -280,11 +282,11 @@ def register():
                     user_id, data.get('degree'), data.get('position'), data.get('specialization'),
                     data.get('experience'), data.get('hospital'), data.get('regNumber'), doc_path
                 ))
-            else:
+            if role == 'patient':
                 cursor.execute('''
-                    INSERT INTO patient_details (userId, dob, gender)
-                    VALUES (%s, %s, %s)
-                ''', (user_id, data.get('dob'), data.get('gender')))
+                    INSERT INTO patient_details (userId)
+                    VALUES (%s)
+                ''', (user_id,))
 
             conn.commit()
             return signed_json_response({"message": f"{role.capitalize()} registered successfully!"}, 201)
@@ -297,7 +299,8 @@ def register():
     except Exception as e:
         return signed_json_response({"message": str(e)}, 500)
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])  # backward compat
 def login():
     data = request.get_json()
     email = data.get('email')
@@ -323,6 +326,7 @@ def login():
 
     return signed_json_response({
         "token": access_token,
+        "user_id": user['id'],
         "role": user['role'],
         "user": {
             "id": user['id'],
@@ -452,7 +456,8 @@ def initiate_vcall():
         create_notification(receiver_id, 'Call', f"Incoming video call request from user #{current_user_id}")
     return signed_json_response({"message": "Video call signal sent!", "detail": result}, status)
 
-@app.route('/api/profile', methods=['GET', 'PUT'])
+@app.route('/api/user/profile', methods=['GET', 'PUT'])
+@app.route('/api/profile', methods=['GET', 'PUT'])  # backward compat
 @jwt_required()
 def handle_profile():
     current_user_id = int(get_jwt_identity())
@@ -461,10 +466,8 @@ def handle_profile():
     
     if request.method == 'GET':
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.address, u.city, u.state, u.pincode as pin, 
-                   p.dob, p.gender, p.dosha, p.allergies, p.conditions, p.medications, p.bloodGroup
+            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin
             FROM users u
-            LEFT JOIN patient_details p ON u.id = p.userId
             WHERE u.id = %s
         ''', (current_user_id,))
         profile = cursor.fetchone()
@@ -476,31 +479,29 @@ def handle_profile():
         
         # update users table
         cursor.execute('''
-            UPDATE users SET fullName=%s, mobile=%s, address=%s, city=%s, state=%s, pincode=%s
+            UPDATE users SET fullName=%s, mobile=%s, dob=%s, gender=%s, blood_group=%s, address=%s, city=%s, state=%s, pincode=%s
             WHERE id=%s
-        ''', (data.get('name'), data.get('mobile'), data.get('address'), data.get('city'), data.get('state'), data.get('pin'), current_user_id))
+        ''', (data.get('name'), data.get('mobile'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), data.get('address'), data.get('city'), data.get('state'), data.get('pin'), current_user_id))
         
         # update or insert patient_details
         cursor.execute("SELECT userId FROM patient_details WHERE userId=%s", (current_user_id,))
         if cursor.fetchone():
             cursor.execute('''
-                UPDATE patient_details SET dob=%s, gender=%s, dosha=%s, allergies=%s, conditions=%s, medications=%s, bloodGroup=%s
+                UPDATE patient_details SET bloodGroup=%s
                 WHERE userId=%s
-            ''', (data.get('dob'), data.get('gender'), data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), data.get('bloodGroup'), current_user_id))
+            ''', (data.get('bloodGroup'), current_user_id))
         else:
             cursor.execute('''
-                INSERT INTO patient_details (userId, dob, gender, dosha, allergies, conditions, medications, bloodGroup)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (current_user_id, data.get('dob'), data.get('gender'), data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), data.get('bloodGroup')))
+                INSERT INTO patient_details (userId, bloodGroup)
+                VALUES (%s, %s)
+            ''', (current_user_id, data.get('bloodGroup')))
         
         conn.commit()
         
         # return updated
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.address, u.city, u.state, u.pincode as pin, 
-                   p.dob, p.gender, p.dosha, p.allergies, p.conditions, p.medications, p.bloodGroup
+            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin
             FROM users u
-            LEFT JOIN patient_details p ON u.id = p.userId
             WHERE u.id = %s
         ''', (current_user_id,))
         profile = cursor.fetchone()
