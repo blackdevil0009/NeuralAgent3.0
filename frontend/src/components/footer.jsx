@@ -15,9 +15,9 @@ const LINKS = {
         { label: 'Blog', href: '#' },
     ],
     Support: [
-        { label: 'Help Center', href: '#' },
-        { label: 'Privacy Policy', href: '#' },
-        { label: 'Terms of Use', href: '#' },
+        { label: 'Help Center', href: 'mailto:vaidyamedx@gmail.com' },
+        { label: 'Privacy Policy', to: '/privacy' },
+        { label: 'Terms of Use', to: '/terms' },
     ],
     Contact: [
         { label: '📧 vaidyamedx@gmail.com', href: 'mailto:vaidyamedx@gmail.com' },

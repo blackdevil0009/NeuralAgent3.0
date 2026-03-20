@@ -11,6 +11,8 @@ import Registration from './pages/registration';
 import ResetPassword from './pages/ResetPassword';
 import DoctorProfile from './pages/doctor_profile';
 import VaidyaMedDashboard from './pages/vaidyamed_dashboard';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsCondition from './pages/TermsCondition';
 
 // Patient Dashboard
 import PatientLayout from './pages/patient/PatientLayout';
@@ -57,6 +59,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsCondition />} />
 
           {/* Patient Dashboard (nested) */}
           <Route path="/patient" element={<PatientLayout />}>
