@@ -12,7 +12,7 @@ const QUICK_PROMPTS = [
 const INITIAL_MESSAGES = [
     {
         id: 1, from: 'ai',
-        text: `🏥 Namaste! I'm **VaidyaMed-X**, your evidence-based clinical assistant.\n\n• 🩺 Describe symptoms for structured analysis\n• 💊 Get Allopathic + Ayurvedic management options\n• ⚠️ Identify red flags and emergency warnings\n• 🔬 Know what investigations may be needed\n\nHow can I help you today?`,
+        text: `Hello! 👋 I'm VaidyaMed-X, your friendly AI doctor. Kaise ho aap? Tell me, how can I help you today?`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
 ];
