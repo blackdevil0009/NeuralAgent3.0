@@ -20,9 +20,9 @@ const LINKS = {
         { label: 'Terms of Use', href: '#' },
     ],
     Contact: [
-        { label: 'Email: vaidyamedx@gmail.com', href: 'mailto:vaidyamedx@gmail.com' },
-        { label: 'WhatsApp: 8604611867', href: 'https://wa.me/918604611867' },
-        { label: 'WhatsApp: 70526008972', href: 'https://wa.me/9170526008972' },
+        { label: '📧 vaidyamedx@gmail.com', href: 'mailto:vaidyamedx@gmail.com' },
+        { label: '💬 8604611867', href: 'https://wa.me/918604611867' },
+        { label: '💬 7052608972', href: 'https://wa.me/917052608972' },
     ]
 };
 
