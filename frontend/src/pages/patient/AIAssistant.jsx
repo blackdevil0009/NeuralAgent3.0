@@ -201,6 +201,16 @@ export default function AIAssistant() {
             }
 
             const resData = await response.json();
+            
+            // Handle token expiration
+            if (resData.msg === "Token has expired" || resData.msg === "Missing Authorization Header" || resData.error === "Missing Authorization Header") {
+                alert("Your secure session has expired. Please log in again.");
+                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
+                window.location.href = '/login';
+                return;
+            }
+
             const aiResponseText = resData.data?.response || resData.data?.error || resData.error || resData.msg || resData.message || "I am connected but need a moment to process. 🌿";
 
             const aiMsg = {
