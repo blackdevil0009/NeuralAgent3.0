@@ -95,15 +95,13 @@ export default function DoctorLayout() {
                                 <span>{n.label}</span>
                             </Link>
                         ))}
+
+                        <button className="dd-nav-item" onClick={handleLogout} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', marginTop: 10, color: '#ff4d4d' }}>
+                            <span className="dd-nav-icon">🚪</span>
+                            <span>Clinical Logout</span>
+                        </button>
                     </div>
                 </nav>
-
-                <div style={{ padding: 20 }}>
-                    <button className="dd-nav-item" onClick={handleLogout} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer' }}>
-                        <span className="dd-nav-icon">🚪</span>
-                        <span>Clinical Logout</span>
-                    </button>
-                </div>
             </aside>
 
             {/* ── Main ── */}

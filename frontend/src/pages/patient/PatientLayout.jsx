@@ -132,13 +132,13 @@ export default function PatientLayout() {
                             {n.label}
                         </Link>
                     ))}
-                </nav>
 
-                <div className="pd-sidebar-footer">
-                    <button className="pd-logout-btn" onClick={handleLogout}>
-                        🚪 Logout
-                    </button>
-                </div>
+                    <div className="pd-sidebar-footer" style={{ borderTop: 'none', padding: '20px 20px 0' }}>
+                        <button className="pd-logout-btn" onClick={handleLogout}>
+                            🚪 Logout
+                        </button>
+                    </div>
+                </nav>
             </aside>
 
             {/* ── Main ── */}
