@@ -20,7 +20,9 @@ export default function ReportUpload() {
             });
             const json = await res.json();
             if (res.ok) {
-                setReports(json.reports || []);
+                // Backend wraps in "data" due to signed_json_response
+                const reportsData = json.data?.reports || json.reports || [];
+                setReports(reportsData);
             }
         } catch (err) {
             handleError(err, 'Failed to fetch reports');
@@ -80,7 +82,8 @@ export default function ReportUpload() {
             });
             const json = await res.json();
             if (res.ok) {
-                setSelected({ ...report, ...json.data });
+                const analysisData = json.data || json;
+                setSelected({ ...report, ...analysisData });
                 fetchReports(); // Update status in list
             } else {
                 alert(json.error || 'Analysis failed');

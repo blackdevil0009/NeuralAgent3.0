@@ -50,15 +50,21 @@ export default function PatientManagement() {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (res.ok) {
-                        const data = await res.json();
-                        setMedicalData(data);
-                        setPatientContact(data.mobile || '');
+                        const json = await res.json();
+                        if (res.ok) {
+                            const historyData = json.data?.history || json.history || [];
+                            setMedicalHistory(historyData);
+                            // Assuming other medical data might still be needed for patient contact or other displays
+                            setMedicalData(json.data || json); // Keep medicalData for other properties if needed
+                            setPatientContact(json.data?.mobile || json.mobile || '');
+                        }
                     }
                 } catch { }
             };
             fetchMedical();
         } else {
             setMedicalData(null);
+            setMedicalHistory([]); // Clear medical history when no patient is selected
             setPatientContact('');
         }
     }, [selectedPatient]);

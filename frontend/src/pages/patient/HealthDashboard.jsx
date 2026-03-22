@@ -51,9 +51,10 @@ export default function HealthDashboard() {
                 });
                 const json = await res.json();
                 if (res.ok) {
-                    setVitals(json.vitals || []);
-                    setSymptoms(json.symptoms || []);
-                    setActivity(json.activity || []);
+                    const dashData = json.data || {};
+                    setVitals(dashData.vitals || []);
+                    setSymptoms(dashData.symptoms || []);
+                    setActivity(dashData.activity || []);
                 }
             } catch (err) {
                 console.error("Failed to fetch dashboard metrics", err);

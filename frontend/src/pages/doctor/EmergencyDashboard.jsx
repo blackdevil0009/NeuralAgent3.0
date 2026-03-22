@@ -32,8 +32,10 @@ export default function EmergencyDashboard() {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const json = await res.json();
-                const list = json.data?.emergencies || json.emergencies || [];
-                setEmergencies(list.map(formatEmergency));
+                if (res.ok) {
+                    const data = json.data?.emergencies || json.emergencies || [];
+                    setEmergencies(data.map(formatEmergency));
+                }
             } catch (err) {
                 console.error("Failed to fetch emergencies", err);
             } finally {
