@@ -579,12 +579,19 @@ def book_appointment():
     
     doctor_id = data.get('doctorId')
     date = data.get('date')
-    time = data.get('time')
+    time_raw = data.get('time')
     app_type = data.get('type')
     notes = data.get('notes', '')
     
-    if not all([doctor_id, date, time, app_type]):
+    if not all([doctor_id, date, time_raw, app_type]):
         return signed_json_response({"error": "Missing booking details"}, 400)
+    
+    # Convert 12-hour AM/PM format (e.g. "09:00 AM") to 24-hour format for MySQL
+    try:
+        from datetime import datetime as dt
+        time = dt.strptime(time_raw.strip(), '%I:%M %p').strftime('%H:%M:%S')
+    except ValueError:
+        time = time_raw  # Already in 24h format or other valid format
     
     conn = get_db_connection()
     cursor = conn.cursor()
