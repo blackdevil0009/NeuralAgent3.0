@@ -135,8 +135,8 @@ export default function DoctorVideoCall() {
                 body: JSON.stringify({ status: 'Live' })
             });
 
-            // Initialize Signaling
-            const socket = io(API_BASE_URL);
+            // Initialize Signaling (Polling only)
+            const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
             socketRef.current = socket;
 
             // Initialize WebRTC Peer

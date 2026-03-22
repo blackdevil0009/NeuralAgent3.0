@@ -149,7 +149,7 @@ export default function VideoCall() {
     const connectWebRTC = () => {
         setPhase('live');
         try {
-            const socket = io(API_BASE_URL);
+            const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
             socketRef.current = socket;
 
             const pc = new RTCPeerConnection(iceServers);
