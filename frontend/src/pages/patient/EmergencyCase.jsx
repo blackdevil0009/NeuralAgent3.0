@@ -62,7 +62,7 @@ export default function EmergencyCase() {
                     <p style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>Estimated Response Time: &lt; 5 minutes</p>
                 </div>
                 <button
-                    onClick={() => navigate('/patient/dashboard')}
+                    onClick={() => navigate('/patient/health')}
                     style={{ padding: '12px 30px', borderRadius: 50, background: '#c0392b', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
                 >
                     Back to Dashboard
