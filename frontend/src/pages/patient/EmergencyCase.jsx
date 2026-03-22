@@ -11,7 +11,9 @@ export default function EmergencyCase() {
     const navigate = useNavigate();
     const [explanation, setExplanation] = useState('');
     const [caseType, setCaseType] = useState('');
+    const [contact, setContact] = useState('');
     const [submitted, setSubmitted] = useState(false);
+    const [refId, setRefId] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
@@ -19,27 +21,22 @@ export default function EmergencyCase() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const data = {
-                explanation,
-                caseType,
-                contact: '+919876543210' // Normally from state, but using placeholder or real input
-            };
-            // Note: The original form didn't capture contact in state, but I'll add a generic one
-            // if we need it, or we can just send explanation and caseType.
-            
             const response = await fetch('https://api.vaidyamedx.in/api/emergencies', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify({ explanation, caseType, contact })
             });
             const result = await response.json();
             if (response.ok) {
+                const em = result?.data?.emergency || result?.emergency || {};
+                setRefId(em.id || 'EM-' + Date.now());
                 setSubmitted(true);
             } else {
-                alert(result.error || 'Failed to report emergency');
+                const errMsg = result?.data?.error || result?.error || 'Failed to report emergency';
+                alert(errMsg);
             }
         } catch (err) {
             alert('Network error. Please try again.');
@@ -58,7 +55,7 @@ export default function EmergencyCase() {
                     Please stay calm. A doctor will contact you via video call or chat within minutes.
                 </p>
                 <div style={{ margin: '30px 0', padding: 20, background: '#f9f9f9', borderRadius: 12, borderLeft: '4px solid #c0392b' }}>
-                    <p style={{ fontWeight: 600, margin: 0 }}>Reference ID: EM-99283</p>
+                    <p style={{ fontWeight: 600, margin: 0 }}>Reference ID: {refId}</p>
                     <p style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>Estimated Response Time: &lt; 5 minutes</p>
                 </div>
                 <button
@@ -124,11 +121,14 @@ export default function EmergencyCase() {
                 <div style={{ display: 'flex', gap: 15, marginBottom: 25 }}>
                     <div style={{ flex: 1 }}>
                         <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.9rem' }}>Contact Number</label>
-                        <input type="tel" placeholder="+91 9876543210" style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.9rem' }}>Patient Name</label>
-                        <input type="text" placeholder="Full Name" style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }} />
+                        <input
+                            type="tel"
+                            required
+                            placeholder="+91 9876543210"
+                            value={contact}
+                            onChange={(e) => setContact(e.target.value)}
+                            style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }}
+                        />
                     </div>
                 </div>
 

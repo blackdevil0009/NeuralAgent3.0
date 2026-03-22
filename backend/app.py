@@ -32,6 +32,10 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 jwt = JWTManager(app)
 
+# Auto-create all database tables on startup
+init_db()
+
+
 
 
 @jwt.invalid_token_loader
