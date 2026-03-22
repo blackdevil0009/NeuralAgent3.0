@@ -7,10 +7,10 @@ def test_email(sender_email, sender_password, to_email):
     print(f"Testing SMTP with {sender_email} to {to_email}...")
     try:
         msg = MIMEMultipart()
-        msg['From'] = sender_email
+        msg['From'] = f"VaidyaMed-X Test <{sender_email}>"
         msg['To'] = to_email
         msg['Subject'] = "VaidyaMed-X SMTP Test"
-        msg.attach(MIMEText("This is a test email to verify SMTP configuration.", 'plain'))
+        msg.attach(MIMEText("This is a test email to verify SMTP configuration with the App Password.", 'plain'))
 
         # Try Port 587 (TLS)
         print("Connecting to smtp.gmail.com:587 (TLS)...")
@@ -21,11 +21,11 @@ def test_email(sender_email, sender_password, to_email):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, to_email, msg.as_string())
         server.quit()
-        print("SUCCESS: Email sent via Port 587!")
+        print("\nSUCCESS: Email sent via Port 587!")
         return True
 
     except Exception as e:
-        print(f"FAILED on Port 587: {str(e)}")
+        print(f"\nFAILED on Port 587: {str(e)}")
         
         # Try Port 465 (SSL) as fallback
         try:
@@ -36,16 +36,16 @@ def test_email(sender_email, sender_password, to_email):
             server_ssl.login(sender_email, sender_password)
             server_ssl.sendmail(sender_email, to_email, msg.as_string())
             server_ssl.quit()
-            print("SUCCESS: Email sent via Port 465!")
+            print("\nSUCCESS: Email sent via Port 465!")
             return True
         except Exception as e2:
-            print(f"FAILED on Port 465: {str(e2)}")
+            print(f"\nFAILED on Port 465: {str(e2)}")
             return False
 
 if __name__ == "__main__":
     email = "vaidyamedx@gmail.com"
-    # Use the password provided by the user
-    password = "Devil@2007%" 
+    # UPDATED with the new App Password
+    password = "ibes vhks akgu mcyi" 
     target = sys.argv[1] if len(sys.argv) > 1 else email
     
     test_email(email, password, target)

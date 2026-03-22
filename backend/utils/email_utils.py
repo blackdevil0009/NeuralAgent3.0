@@ -8,7 +8,7 @@ def send_verification_email(to_email, verification_link):
     Sends an account verification email using SMTP with fallback.
     """
     sender_email = 'vaidyamedx@gmail.com'
-    sender_password = 'Devil@2007%'
+    sender_password = 'ibes vhks akgu mcyi'
 
     try:
         msg = MIMEMultipart()
@@ -56,7 +56,7 @@ def send_reset_email(to_email, reset_link, reset_token=None):
     Sends a password reset email using SMTP with fallback.
     """
     sender_email = 'vaidyamedx@gmail.com'
-    sender_password = 'Devil@2007%'
+    sender_password = 'ibes vhks akgu mcyi'
 
     try:
         msg = MIMEMultipart()
