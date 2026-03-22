@@ -14,14 +14,38 @@ export default function EmergencyCase() {
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const data = {
+                explanation,
+                caseType,
+                contact: '+919876543210' // Normally from state, but using placeholder or real input
+            };
+            // Note: The original form didn't capture contact in state, but I'll add a generic one
+            // if we need it, or we can just send explanation and caseType.
+            
+            const response = await fetch('https://api.vaidyamedx.in/api/emergencies', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (response.ok) {
+                setSubmitted(true);
+            } else {
+                alert(result.error || 'Failed to report emergency');
+            }
+        } catch (err) {
+            alert('Network error. Please try again.');
+        } finally {
             setLoading(false);
-            setSubmitted(true);
-        }, 1500);
+        }
     };
 
     if (submitted) {

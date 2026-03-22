@@ -714,6 +714,97 @@ def update_appointment(app_id):
     finally:
         conn.close()
 
+# --- Emergency Endpoints ---
+
+@app.route('/api/emergencies', methods=['POST'])
+@jwt_required()
+def create_emergency():
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT fullName FROM users WHERE id = %s", (current_user_id,))
+        patient = cursor.fetchone()
+        patient_name = patient['fullName'] if patient else "Unknown"
+        
+        cursor.execute('''
+            INSERT INTO emergencies (patientId, patientName, contact, caseType, description)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (current_user_id, patient_name, data.get('contact'), data.get('caseType'), data.get('explanation')))
+        
+        emergency_id = cursor.lastrowid
+        conn.commit()
+        
+        emergency_data = {
+            "id": f"EM-{emergency_id}",
+            "dbId": emergency_id,
+            "patient": patient_name,
+            "patientId": current_user_id,
+            "contact": data.get('contact'),
+            "type": data.get('caseType'),
+            "desc": data.get('explanation'),
+            "time": "Just now",
+            "location": "Registered Address",
+            "emergency_contact": "On File"
+        }
+        
+        socketio.emit('new_emergency', emergency_data)
+        return signed_json_response({"message": "Emergency broadcasted", "emergency": emergency_data}, 201)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/emergencies', methods=['GET'])
+@jwt_required()
+def get_emergencies():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM emergencies WHERE status = 'Active' ORDER BY createdAt DESC")
+        rows = cursor.fetchall()
+        
+        emergencies = []
+        for r in rows:
+            emergencies.append({
+                "id": f"EM-{r['id']}",
+                "dbId": r['id'],
+                "patient": r['patientName'],
+                "patientId": r['patientId'],
+                "contact": r['contact'],
+                "type": r['caseType'],
+                "desc": r['description'],
+                "time": r['createdAt'].strftime('%H:%M') if r['createdAt'] else "N/A",
+                "location": "Stored Location",
+                "emergency_contact": "On File"
+            })
+        return signed_json_response({"emergencies": emergencies})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/emergencies/<int:em_id>/handle', methods=['PUT'])
+@jwt_required()
+def handle_emergency(em_id):
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE emergencies SET status = 'Handled', handledById = %s WHERE id = %s AND status = 'Active'", (current_user_id, em_id))
+        if cursor.rowcount == 0:
+             return signed_json_response({"error": "Emergency already handled or not found"}, 400)
+             
+        conn.commit()
+        socketio.emit('emergency_handled', {"id": f"EM-{em_id}"})
+        return signed_json_response({"message": "Emergency marked as handled"})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
 # --- MedAssist-X AI Endpoints ---
 
 @app.route('/api/ai/chat', methods=['POST'])

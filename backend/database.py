@@ -157,6 +157,23 @@ def init_db():
         )
     ''')
 
+    # Emergencies table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS emergencies (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patientId INT NOT NULL,
+            patientName VARCHAR(255),
+            contact VARCHAR(20),
+            caseType VARCHAR(50),
+            description TEXT,
+            status VARCHAR(50) DEFAULT 'Active',
+            handledById INT NULL,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(patientId) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(handledById) REFERENCES users(id) ON DELETE SET NULL
+        )
+    ''')
+
     conn.commit()
     conn.close()
 

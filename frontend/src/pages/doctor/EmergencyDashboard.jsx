@@ -1,18 +1,71 @@
-import React, { useState } from 'react';
-
-const MOCK_EMERGENCIES = [
-    { id: 'EM-99283', patient: 'Rohit Sharma', age: 34, type: 'critical', desc: 'Severe chest pain, difficulty breathing. Started 10 mins ago.', time: '2m ago', location: 'Mumbai, MH', contact: '+91 98765-43210', emergency_contact: 'Sita Sharma (Wife) - +91 98765-43211' },
-    { id: 'EM-99284', patient: 'Anjali Gupta', age: 28, type: 'urgent', desc: 'High fever (103°F) with rash. Not responding to paracetamol.', time: '8m ago', location: 'Delhi, NCR', contact: '+91 91234-56789', emergency_contact: 'Vikram Gupta (Father) - +91 91234-56780' },
-];
+import React, { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
+import { API_BASE_URL } from '../../utils/config';
 
 export default function EmergencyDashboard() {
-    const [emergencies, setEmergencies] = useState(MOCK_EMERGENCIES);
+    const [emergencies, setEmergencies] = useState([]);
     const [activeOverlay, setActiveOverlay] = useState(null); // 'video', 'history', 'family'
     const [activeEmergency, setActiveEmergency] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const socketRef = useRef(null);
 
-    const handleResolve = (id) => {
-        setEmergencies(emergencies.filter(e => e.id !== id));
-        setActiveOverlay(null);
+    // Initial fetch
+    useEffect(() => {
+        const fetchEmergencies = async () => {
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/emergencies`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok && json.data?.emergencies) {
+                    setEmergencies(json.data.emergencies);
+                } else if (res.ok && json.emergencies) {
+                    setEmergencies(json.emergencies);
+                }
+            } catch (err) {
+                console.error("Failed to fetch emergencies");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchEmergencies();
+
+        // Connect Socket.IO for real-time alerts
+        const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
+        socketRef.current = socket;
+
+        socket.on('new_emergency', (newEm) => {
+            // Flash or play sound here if you want
+            setEmergencies(prev => [newEm, ...prev]);
+        });
+
+        socket.on('emergency_handled', (data) => {
+            // Remove from array or mark handled
+            setEmergencies(prev => prev.filter(e => e.id !== data.id));
+        });
+
+        return () => socket.disconnect();
+    }, []);
+
+    const handleResolve = async (id, dbId) => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/emergencies/${dbId}/handle`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                // Optimistically remove
+                setEmergencies(emergencies.filter(e => e.id !== id));
+                setActiveOverlay(null);
+            } else {
+                alert("Failed to assign or claim emergency. It might already be handled.");
+            }
+        } catch (err) {
+            alert("Network error.");
+        }
     };
 
     const openOverlay = (type, emergency) => {
@@ -32,7 +85,9 @@ export default function EmergencyDashboard() {
                 </div>
             </div>
 
-            {emergencies.length === 0 ? (
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '60px 0' }}>⏳ Loading active telemetries...</div>
+            ) : emergencies.length === 0 ? (
                 <div className="dd-card" style={{ textAlign: 'center', padding: '60px 0' }}>
                     <div style={{ fontSize: '4rem', marginBottom: 20 }}>✅</div>
                     <h3>No Active Emergencies</h3>
@@ -56,7 +111,7 @@ export default function EmergencyDashboard() {
                                             }}>{e.type}</span>
                                             <span style={{ fontSize: '0.85rem', color: '#666' }}>ID: {e.id} • {e.time}</span>
                                         </div>
-                                        <h2 style={{ margin: '15px 0 5px', color: 'var(--doc-green-deep)' }}>{e.patient} ({e.age}y)</h2>
+                                        <h2 style={{ margin: '15px 0 5px', color: 'var(--doc-green-deep)' }}>{e.patient}</h2>
                                         <div style={{ fontSize: '0.9rem', color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
                                             📍 Reported Location: <strong>{e.location}</strong>
                                         </div>
@@ -88,7 +143,7 @@ export default function EmergencyDashboard() {
                                 <button
                                     className="dd-btn dd-btn-outline"
                                     style={{ color: 'var(--doc-green-light)', borderColor: 'var(--doc-green-light)', fontSize: '0.8rem' }}
-                                    onClick={() => handleResolve(e.id)}
+                                    onClick={() => handleResolve(e.id, e.dbId)}
                                 >
                                     Mark as Handled
                                 </button>
@@ -130,7 +185,6 @@ export default function EmergencyDashboard() {
                                         <h4 style={{ margin: '0 0 10px' }}>Current Medications</h4>
                                         <ul style={{ margin: 0, paddingLeft: 20, fontSize: '0.95rem' }}>
                                             <li>Amlodipine 5mg (Daily)</li>
-                                            <li>Ayurvedic Triphala Churna (Nightly)</li>
                                         </ul>
                                     </div>
                                     <div style={{ background: '#fff5f5', padding: 20, borderRadius: 12, border: '1px solid #feb2b2' }}>
@@ -153,12 +207,6 @@ export default function EmergencyDashboard() {
                                     <div style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 10 }}>{activeEmergency.emergency_contact}</div>
                                     <button className="dd-btn dd-btn-primary" style={{ width: '100%', justifyContent: 'center', background: '#2d3748' }}>📞 Dial Now</button>
                                 </div>
-
-                                <div style={{ background: '#f8f9f8', padding: 25, borderRadius: 16, textAlign: 'left' }}>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--doc-text-mute)', textTransform: 'uppercase', marginBottom: 5 }}>Secondary Contact</div>
-                                    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 10 }}>Rahul Sharma (Brother)</div>
-                                    <div style={{ fontSize: '1rem', color: '#666' }}>+91 91234-99887</div>
-                                </div>
                             </div>
                         )}
                     </div>
@@ -169,7 +217,7 @@ export default function EmergencyDashboard() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                     <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#00ff00', boxShadow: '0 0 10px #00ff00' }}></div>
                     <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>Emergency Telemetry: Active</div>
-                    <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#888' }}>Last sync: 1s ago</div>
+                    <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#888' }}>Tracking live via WebSocket</div>
                 </div>
             </div>
 
@@ -183,4 +231,3 @@ export default function EmergencyDashboard() {
         </div>
     );
 }
-
