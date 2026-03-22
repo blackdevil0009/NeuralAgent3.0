@@ -8,7 +8,7 @@ def send_verification_email(to_email, verification_link):
     Sends an account verification email using SMTP.
     """
     sender_email = 'vaidyamedx@gmail.com'
-    sender_password = 'Devil@2007'
+    sender_password = 'Devil@2007%'
 
     try:
         msg = MIMEMultipart()
@@ -38,7 +38,9 @@ def send_verification_email(to_email, verification_link):
         server.quit()
         return True
     except Exception as e:
-        print(f"Error sending verification email to {to_email}: {e}")
+        print(f"Error sending verification email to {to_email}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def send_reset_email(to_email, reset_link, reset_token=None):
@@ -47,10 +49,6 @@ def send_reset_email(to_email, reset_link, reset_token=None):
     """
     sender_email = 'vaidyamedx@gmail.com'
     sender_password = 'Devil@2007'
-
-    if not sender_email or not sender_password:
-        print(f"\n{'='*50}\n[TEST MODE] SMTP not configured.\nPassword Reset Link for {to_email}:\n{reset_link}\n(Token: {reset_token})\n{'='*50}\n")
-        return True
 
     try:
         msg = MIMEMultipart()
@@ -82,6 +80,8 @@ def send_reset_email(to_email, reset_link, reset_token=None):
         return True
 
     except Exception as e:
-        print(f"Error sending reset email to {to_email}: {e}")
+        print(f"Error sending reset email to {to_email}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 

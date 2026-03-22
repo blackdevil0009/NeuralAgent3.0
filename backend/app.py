@@ -292,6 +292,26 @@ def register():
         cursor = conn.cursor(dictionary=True)
 
         try:
+            # Check if user already exists
+            cursor.execute('SELECT id, isVerified FROM users WHERE email = %s', (data.get('email'),))
+            existing_user = cursor.fetchone()
+            
+            if existing_user:
+                if existing_user.get('isVerified', 0):
+                    return signed_json_response({"message": "Email already registered and verified. Please log in."}, 400)
+                else:
+                    # User exists but not verified - Resend verification
+                    verification_token = secrets.token_urlsafe(32)
+                    cursor.execute('UPDATE users SET verificationToken = %s WHERE id = %s', (verification_token, existing_user['id']))
+                    conn.commit()
+                    
+                    frontend_url = os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')
+                    verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+                    if send_verification_email(data.get('email'), verification_link):
+                        return signed_json_response({"message": "Account already exists but is unverified. A new verification email has been sent."}, 200)
+                    else:
+                        return signed_json_response({"message": "Account exists but verification email failed to send. Please contact support."}, 500)
+
             cursor.execute('''
                 INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted, isVerified, verificationToken)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -406,6 +426,41 @@ def verify_email():
     finally:
         conn.close()
 
+@app.route('/api/auth/resend-verification', methods=['POST'])
+def resend_verification():
+    data = request.get_json()
+    email = data.get('email')
+    
+    if not email:
+        return signed_json_response({"error": "Email required"}, 400)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id, isVerified FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return signed_json_response({"error": "Email not found"}, 404)
+        
+        if user.get('isVerified', 0):
+            return signed_json_response({"message": "Email already verified. Please log in."}, 400)
+        
+        # Regenerate token
+        verification_token = secrets.token_urlsafe(32)
+        cursor.execute("UPDATE users SET verificationToken = %s WHERE id = %s", (verification_token, user['id']))
+        conn.commit()
+        
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')
+        verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+        if send_verification_email(email, verification_link):
+            return signed_json_response({"message": "A new verification link has been sent to your email."}, 200)
+        else:
+            return signed_json_response({"error": "Failed to send email. Please check SMTP settings."}, 500)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
 
 # --- Secure Messaging Endpoints ---
 

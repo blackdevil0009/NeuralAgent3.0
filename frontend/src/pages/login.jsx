@@ -81,6 +81,80 @@ function ForgotPasswordModal({ onClose }) {
 }
 
 /* ─────────────────────────────────────────────
+   Resend Verification Modal
+───────────────────────────────────────────── */
+function ResendVerificationModal({ onClose, email: initialEmail }) {
+    const [email, setEmail] = useState(initialEmail || '');
+    const [sent, setSent] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState('');
+
+    const handleResend = async (e) => {
+        e.preventDefault();
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRe.test(email)) { setErr('Please enter a valid email address.'); return; }
+        setErr('');
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const j = await res.json();
+            if (!res.ok) throw new Error(j.data?.message || j.error || 'Could not resend verification email.');
+            setSent(true);
+        } catch (e) {
+            handleError(e);
+            setErr(e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+                <div className="modal-icon">📧</div>
+                <h2 className="modal-title">Resend Verification</h2>
+
+                {sent ? (
+                    <div className="modal-sent">
+                        <div className="modal-sent-icon">✅</div>
+                        <p>A new verification link has been sent to <strong>{email}</strong>.<br />
+                            Please check your inbox and spam folder.</p>
+                        <button className="btn-login" style={{ marginTop: 18 }} onClick={onClose}>
+                            Back to Login
+                        </button>
+                    </div>
+                ) : (
+                    <form onSubmit={handleResend} noValidate>
+                        <p className="modal-desc">
+                            Didn't receive the verification email? Enter your email address below and we'll send you a new link.
+                        </p>
+                        <div className="form-group" style={{ marginBottom: 8 }}>
+                            <label htmlFor="resend-email">Email Address</label>
+                            <input
+                                id="resend-email" type="email" placeholder="your@email.com"
+                                value={email} onChange={e => { setEmail(e.target.value); setErr(''); }}
+                                autoFocus
+                            />
+                            {err && <span className="field-error">{err}</span>}
+                        </div>
+                        <button type="submit" className="btn-login" disabled={loading}
+                            style={{ marginTop: 12 }}>
+                            {loading && <span className="spinner" />}
+                            {loading ? 'Sending…' : 'Resend Verification Link'}
+                        </button>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────
    Main Login Page
 ───────────────────────────────────────────── */
 export default function Login() {
@@ -100,6 +174,8 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [showForgot, setShowForgot] = useState(false);
+    const [showResend, setShowResend] = useState(false);
+    const [isUnverified, setIsUnverified] = useState(false);
 
     /* field-level errors */
     const [errors, setErrors] = useState({});
@@ -153,6 +229,10 @@ export default function Login() {
             }
         } catch (err) {
             handleError(err);
+            setErrorMsg(err.message);
+            if (err.message.toLowerCase().includes('verify') || err.message.toLowerCase().includes('verification')) {
+                setIsUnverified(true);
+            }
         } finally {
             setLoading(false);
         }
@@ -232,7 +312,30 @@ export default function Login() {
 
                         {/* Error banner */}
                         {errorMsg && (
-                            <div className="login-error-banner">⚠️ {errorMsg}</div>
+                            <div className="login-error-banner" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span>⚠️</span>
+                                    <span>{errorMsg}</span>
+                                </div>
+                                {isUnverified && (
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowResend(true)}
+                                        style={{ 
+                                            background: 'rgba(255,255,255,0.2)', 
+                                            border: '1px solid rgba(255,255,255,0.3)', 
+                                            color: '#fff', 
+                                            padding: '4px 12px', 
+                                            borderRadius: '4px',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer',
+                                            alignSelf: 'flex-start'
+                                        }}
+                                    >
+                                        📩 Resend Verification Link
+                                    </button>
+                                )}
+                            </div>
                         )}
 
                         {/* Email */}
@@ -325,6 +428,7 @@ export default function Login() {
 
             {/* ── Forgot Password Modal ── */}
             {showForgot && <ForgotPasswordModal onClose={() => setShowForgot(false)} />}
+            {showResend && <ResendVerificationModal onClose={() => setShowResend(false)} email={email} />}
         </div>
     );
 }
