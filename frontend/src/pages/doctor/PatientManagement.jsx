@@ -13,7 +13,7 @@ export default function PatientManagement() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });

@@ -42,7 +42,7 @@ export default function PatientLayout() {
 
     const fetchCounts = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -75,8 +75,11 @@ export default function PatientLayout() {
     const handleLogout = () => {
         sessionStorage.clear();
         localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
         localStorage.removeItem('role');
+        sessionStorage.removeItem('role');
         navigate('/login');
     };
 

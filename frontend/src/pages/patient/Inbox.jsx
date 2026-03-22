@@ -29,7 +29,7 @@ export default function Inbox() {
 
     /* Fetch Doctors and History */
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
         // 1. Fetch Doctor list
@@ -56,7 +56,7 @@ export default function Inbox() {
 
     useEffect(() => {
         if (!activeId) return;
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
         const fetchHistory = () => {
             fetch(`${API_BASE_URL}/api/v2/messages/history/${activeId}`, {
@@ -101,7 +101,7 @@ export default function Inbox() {
         const delay = setTimeout(async () => {
             setSearching(true);
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 const res = await fetch(`${API_BASE_URL}/api/doctors/search?q=${encodeURIComponent(searchQ)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -131,7 +131,7 @@ export default function Inbox() {
         const text = (overrideText || input).trim();
         if (!text || !activeId) return;
 
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const msgData = { receiverId: activeId, content: text };
         const timestamp = Math.floor(Date.now() / 1000).toString();
 

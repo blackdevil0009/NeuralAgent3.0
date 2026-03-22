@@ -27,7 +27,7 @@ export default function MedicalConsultant() {
     React.useEffect(() => {
         const fetchDocs = async () => {
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 const res = await fetch(`${API_BASE_URL}/api/doctors`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -48,7 +48,7 @@ export default function MedicalConsultant() {
         if (!aptDate || !aptTime) return alert('Please select date and time');
         setSubmitting(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/appointments`, {
                 method: 'POST',
                 headers: {

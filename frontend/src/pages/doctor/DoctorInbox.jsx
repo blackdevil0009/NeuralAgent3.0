@@ -20,7 +20,7 @@ export default function DoctorInbox() {
 
     /* Fetch Patients and History */
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
         // 1. Fetch Patient list
@@ -46,7 +46,7 @@ export default function DoctorInbox() {
 
     useEffect(() => {
         if (!selectedConvo) return;
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
         const fetchHistory = () => {
             fetch(`${API_BASE_URL}/api/v2/messages/history/${selectedConvo.id}`, {
@@ -80,7 +80,7 @@ export default function DoctorInbox() {
     const handleSendMessage = async () => {
         if (!inputText.trim()) return;
 
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!selectedConvo) return;
         const msgData = { receiverId: selectedConvo.id, content: inputText };
         const timestamp = Math.floor(Date.now() / 1000).toString();
