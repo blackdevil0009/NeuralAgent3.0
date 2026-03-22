@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
 
@@ -28,15 +28,18 @@ export default function DoctorVideoCall() {
     const patientId = searchParams.get('patient');
     const patientName = searchParams.get('name') || 'Patient';
 
-    const [phase, setPhase] = useState('connecting'); // connecting | live | ended
+    const [phase, setPhase] = useState('permission'); // permission | connecting | live | ended
     const [camOn, setCamOn] = useState(true);
     const [micOn, setMicOn] = useState(true);
     const [chatOpen, setChatOpen] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const [chatMsgs, setChatMsgs] = useState([]);
     const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
+    const [permError, setPermError] = useState('');
     const [patient, setPatient] = useState({ name: patientName, badge: '🧘' });
 
+    const localVideoRef = useRef(null);
+    const streamRef = useRef(null);
     const timer = useTimer(phase === 'live');
 
     /* Fetch patient name if we have an ID */
@@ -59,13 +62,63 @@ export default function DoctorVideoCall() {
         fetchPatient();
     }, [patientId]);
 
-    /* Auto-connect after 3s */
-    useEffect(() => {
-        const t = setTimeout(() => setPhase('live'), 3000);
-        return () => clearTimeout(t);
+    /* Request camera/mic permissions */
+    const requestPermissions = useCallback(async () => {
+        try {
+            setPermError('');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            streamRef.current = stream;
+            setPhase('connecting');
+            // Auto-connect after 3s (simulating patient accepting)
+            setTimeout(() => setPhase('live'), 3000);
+        } catch (err) {
+            if (err.name === 'NotAllowedError') {
+                setPermError('Camera & microphone access was denied. Please allow permissions in your browser settings and try again.');
+            } else if (err.name === 'NotFoundError') {
+                setPermError('No camera or microphone found. Please connect a webcam and try again.');
+            } else {
+                setPermError(`Could not access camera/mic: ${err.message}`);
+            }
+        }
     }, []);
 
-    const endCall = () => setPhase('ended');
+    /* Attach stream to video element when live */
+    useEffect(() => {
+        if (phase === 'live' && localVideoRef.current && streamRef.current) {
+            localVideoRef.current.srcObject = streamRef.current;
+        }
+    }, [phase]);
+
+    /* Toggle cam on/off */
+    useEffect(() => {
+        if (streamRef.current) {
+            streamRef.current.getVideoTracks().forEach(t => { t.enabled = camOn; });
+        }
+    }, [camOn]);
+
+    /* Toggle mic on/off */
+    useEffect(() => {
+        if (streamRef.current) {
+            streamRef.current.getAudioTracks().forEach(t => { t.enabled = micOn; });
+        }
+    }, [micOn]);
+
+    /* Cleanup stream on unmount */
+    useEffect(() => {
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(t => t.stop());
+            }
+        };
+    }, []);
+
+    const endCall = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+        }
+        setPhase('ended');
+    };
 
     const sendChat = (e) => {
         e.preventDefault();
@@ -77,10 +130,41 @@ export default function DoctorVideoCall() {
             setChatMsgs(prev => [...prev, {
                 from: 'them', text: 'Thank you, Doctor. I understand.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }]);
-        }, 1000);
+        }, 1200);
     };
 
-    /* ─── CONNECTING SCREEN ─── */
+    /* ─── PERMISSION SCREEN ─── */
+    if (phase === 'permission') return (
+        <div className="vcall-shell vcall-centered">
+            <div className="vcall-connecting-card">
+                <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>📹</div>
+                <h2 className="vcall-conn-name">Clinical Video Session</h2>
+                <p className="vcall-conn-spec">with {patient.name}</p>
+                <p style={{ color: '#6b8f71', fontSize: '0.85rem', marginTop: 8, lineHeight: 1.7, textAlign: 'center' }}>
+                    To start the clinical video session, access to your <strong>camera</strong> and <strong>microphone</strong> is required.
+                    Please allow permissions when prompted.
+                </p>
+                {permError && (
+                    <div style={{ background: '#fef2f2', color: '#991b1b', padding: '12px 16px', borderRadius: 12, fontSize: '0.82rem', marginTop: 12, lineHeight: 1.6 }}>
+                        ⚠️ {permError}
+                    </div>
+                )}
+                <div className="vcall-tip" style={{ marginTop: 16 }}>💡 {tip}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 22, width: '100%' }}>
+                    <button className="pd-btn pd-btn-primary" style={{ justifyContent: 'center', fontSize: '0.95rem' }}
+                        onClick={requestPermissions}>
+                        📹 Allow Camera & Mic — Start Session
+                    </button>
+                    <button className="pd-btn pd-btn-outline" style={{ justifyContent: 'center' }}
+                        onClick={() => navigate(-1)}>
+                        ✕ Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    /* ─── CONNECTING SCREEN (waiting for patient) ─── */
     if (phase === 'connecting') return (
         <div className="vcall-shell vcall-centered">
             <div className="vcall-connecting-card">
@@ -90,9 +174,10 @@ export default function DoctorVideoCall() {
                 <div className="vcall-pulse-ring">
                     <div className="vcall-pulse-dot" />
                 </div>
-                <p className="vcall-conn-status">Connecting to your patient…</p>
+                <p className="vcall-conn-status">Waiting for patient to join…</p>
+                <p style={{ color: '#6b8f71', fontSize: '0.78rem' }}>✅ Camera & microphone ready</p>
                 <div className="vcall-tip">💡 {tip}</div>
-                <button className="pd-btn pd-btn-danger" style={{ marginTop: 20 }} onClick={() => navigate(-1)}>
+                <button className="pd-btn pd-btn-danger" style={{ marginTop: 20 }} onClick={() => { endCall(); navigate(-1); }}>
                     ✕ Cancel
                 </button>
             </div>
@@ -130,17 +215,17 @@ export default function DoctorVideoCall() {
     /* ─── LIVE CALL SCREEN ─── */
     return (
         <div className="vcall-shell">
-            {/* Remote video panel */}
+            {/* Remote video panel (patient side — simulated) */}
             <div className="vcall-remote">
                 <div className="vcall-remote-avatar">{patient.badge}</div>
                 <div className="vcall-remote-label">{patient.name}</div>
                 <div className="vcall-remote-pulse" />
             </div>
 
-            {/* Local self-view */}
+            {/* Local self-view (real webcam) */}
             <div className="vcall-self">
                 {camOn
-                    ? <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg,#1a3a28,#0d2410)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>👨‍⚕️</div>
+                    ? <video ref={localVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit', transform: 'scaleX(-1)' }} />
                     : <div style={{ width: '100%', height: '100%', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '0.80rem' }}>Camera off</div>
                 }
                 <div className="vcall-self-label">You</div>

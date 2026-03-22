@@ -142,8 +142,12 @@ export default function DoctorSearch() {
                                         📅 Book Appointment
                                     </button>
                                     <button className="pd-btn pd-btn-outline pd-btn-sm"
+                                        onClick={() => navigate(`/patient/vcall?doctor=${d.id}`)}>
+                                        📹 Video Call
+                                    </button>
+                                    <button className="pd-btn pd-btn-outline pd-btn-sm"
                                         onClick={() => navigate(`/patient/inbox?doctor=${d.id}`)}>
-                                        💬 Send Message
+                                        💬 Message
                                     </button>
                                 </div>
                             </div>
