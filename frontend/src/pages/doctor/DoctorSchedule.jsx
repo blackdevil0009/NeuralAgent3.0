@@ -120,7 +120,7 @@ export default function DoctorSchedule() {
                                 {appt.status === 'Scheduled' && (
                                     <button onClick={() => handleConfirm(appt.id)} style={{ background: colors.text, border: 'none', color: '#fff', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', padding: '4px 10px', borderRadius: 4 }}>Confirm</button>
                                 )}
-                                <button onClick={() => navigate(`/doctor/vcall?patient=${appt.patientId}&name=${encodeURIComponent(appt.patientName)}`)} style={{ background: 'none', border: 'none', color: colors.text, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}>📹 Join Call</button>
+                                <button onClick={() => navigate(`/doctor/vcall?patient=${appt.patientId}&name=${encodeURIComponent(appt.patientName)}&appt=${appt.id}`)} style={{ background: 'none', border: 'none', color: colors.text, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}>📹 Join Call</button>
                                 <button onClick={() => setActiveIntervention({ type: 'file', patient: appt.patientName })} style={{ background: 'none', border: 'none', color: colors.text, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Patient File</button>
                             </div>
                         </div>

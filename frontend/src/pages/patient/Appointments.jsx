@@ -280,7 +280,7 @@ export default function Appointments() {
                                     <>
                                         {a.type === 'Video Call' ? (
                                             <button className="pd-btn pd-btn-primary pd-btn-sm"
-                                                onClick={() => navigate(`/patient/vcall?doctor=${a.doctorId}`)}>
+                                                onClick={() => navigate(`/patient/vcall?doctor=${a.doctorId}&appt=${a.id}`)}>
                                                 📹 Join Video Call
                                             </button>
                                         ) : a.type === 'Chat' || a.type === 'Chat Consultation' ? (
