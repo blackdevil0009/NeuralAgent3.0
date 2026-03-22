@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()  # Load .env before any other config reads
 import mysql.connector
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, send_from_directory
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -917,6 +917,32 @@ def verify_otp():
         cursor.close()
         conn.close()
 
+# --- FILE UPLOADS ---
+@app.route('/api/upload', methods=['POST'])
+@jwt_required()
+def upload_file():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file parameter found"}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+        if file:
+            filename = secure_filename(f"{int(time.time())}_{file.filename}")
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            return jsonify({
+                "success": True, 
+                "url": f"/uploads/{filename}", 
+                "filename": file.filename
+            }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/uploads/<filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 # --- WEBRTC SIGNALING ENDPOINTS ---
 @socketio.on('join_video_room')
 def on_join_video_room(data):
@@ -939,6 +965,16 @@ def on_video_answer(data):
 def on_new_ice_candidate(data):
     if 'room' in data and 'candidate' in data:
         emit('new_ice_candidate', data['candidate'], to=str(data['room']), include_self=False)
+
+@socketio.on('doctor_ready')
+def on_doctor_ready(data):
+    if 'room' in data:
+        emit('doctor_ready', {'message': 'Doctor is ready'}, to=str(data['room']), include_self=False)
+
+@socketio.on('call_chat_msg')
+def on_call_chat_msg(data):
+    if 'room' in data and 'message' in data:
+        emit('call_chat_msg', data['message'], to=str(data['room']), include_self=False)
 
 @socketio.on('leave_video_room')
 def on_leave_video_room(data):
