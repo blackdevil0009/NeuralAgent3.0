@@ -790,6 +790,58 @@ def get_emergencies():
     finally:
         conn.close()
 
+@app.route('/api/emergencies/my', methods=['GET'])
+@jwt_required()
+def get_my_emergencies():
+    """Patient's own emergency history."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM emergencies WHERE patientId = %s ORDER BY createdAt DESC", (current_user_id,))
+        rows = cursor.fetchall()
+        emergencies = []
+        for r in rows:
+            emergencies.append({
+                "id": f"EM-{r['id']}",
+                "dbId": r['id'],
+                "type": r['caseType'],
+                "desc": r['description'],
+                "status": r['status'],
+                "time": r['createdAt'].strftime('%d %b %Y, %H:%M') if r['createdAt'] else "N/A"
+            })
+        return signed_json_response({"emergencies": emergencies})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/emergencies/<int:em_id>/notify_patient', methods=['POST'])
+@jwt_required()
+def notify_patient_emergency_call(em_id):
+    """Doctor initiates a call – notifies patient via their socket room."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT e.patientId, u.fullName FROM emergencies e JOIN users u ON u.id = %s WHERE e.id = %s", (current_user_id, em_id))
+        row = cursor.fetchone()
+        if not row:
+            return signed_json_response({"error": "Emergency not found"}, 404)
+        patient_id = row['patientId']
+        doctor_name = row['fullName']
+        # Emit to the patient's own socket room (patientId channel)
+        socketio.emit('emergency_call_incoming', {
+            "doctorName": doctor_name,
+            "doctorId": current_user_id,
+            "emergencyId": em_id
+        }, room=f"user_{patient_id}")
+        return signed_json_response({"message": "Patient notified"})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
 @app.route('/api/emergencies/<int:em_id>/handle', methods=['PUT'])
 @jwt_required()
 def handle_emergency(em_id):
@@ -1012,6 +1064,30 @@ def verify_otp():
         cursor.close()
         conn.close()
 
+# --- Patient Medical Data (for Doctor access during emergency) ---
+@app.route('/api/patients/<int:patient_id>/medical', methods=['GET'])
+@jwt_required()
+def get_patient_medical(patient_id):
+    """Allows a doctor to read a patient's medical profile during emergencies."""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute('''
+            SELECT pd.allergies, pd.conditions, pd.medications, pd.dosha,
+                   u.fullName, u.mobile
+            FROM patient_details pd
+            JOIN users u ON u.id = pd.userId
+            WHERE pd.userId = %s
+        ''', (patient_id,))
+        row = cursor.fetchone()
+        if not row:
+            return signed_json_response({"error": "Patient not found"}, 404)
+        return signed_json_response(row)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
 # --- FILE UPLOADS ---
 @app.route('/api/upload', methods=['POST'])
 @jwt_required()
@@ -1037,6 +1113,13 @@ def upload_file():
 @app.route('/uploads/<filename>')
 def serve_upload(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@socketio.on('join_user_room')
+def on_join_user_room(data):
+    """Patient joins their personal notification room."""
+    if 'userId' in data:
+        room = f"user_{data['userId']}"
+        join_room(room)
 
 # --- WEBRTC SIGNALING ENDPOINTS ---
 @socketio.on('join_video_room')

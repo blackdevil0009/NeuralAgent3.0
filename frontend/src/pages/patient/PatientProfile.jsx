@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
 
+const URGENT_COLORS = { critical: '#c0392b', urgent: '#d35400', 'non-urgent': '#f1c40f' };
+
 const FIELD_GROUPS = [
     {
         title: '👤 Personal Information',
@@ -42,27 +44,21 @@ export default function PatientProfile() {
         bloodGroup: 'Unknown', address: '', city: '', state: '', pin: '',
         dosha: 'Not assessed', allergies: '', conditions: '', medications: '',
     });
-    
-    // We maintain a copy of the original profile to revert changes on "Cancel"
     const [originalProfile, setOriginalProfile] = useState({});
     const [isEditing, setIsEditing] = useState(false);
     const [fetching, setFetching] = useState(true);
     const [loading, setLoading] = useState(false);
+    const [emergencyHistory, setEmergencyHistory] = useState([]);
 
     useEffect(() => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) { navigate('/login'); return; }
+
         const fetchProfile = async () => {
             try {
-                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                if (!token) {
-                    navigate('/login');
-                    return;
-                }
-                
-                // Fetch user data automatically
                 const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                
                 if (res.ok) {
                     const json = await res.json();
                     if (json.data) {
@@ -84,13 +80,26 @@ export default function PatientProfile() {
                 setFetching(false);
             }
         };
+
+        const fetchEmergencyHistory = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/emergencies/my`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    setEmergencyHistory(json.data?.emergencies || json.emergencies || []);
+                }
+            } catch (e) { /* silently ignore */ }
+        };
+
         fetchProfile();
+        fetchEmergencyHistory();
     }, [navigate]);
 
     const handleChange = (k, v) => setProfile(prev => ({ ...prev, [k]: v }));
 
     const handleCancel = () => {
-        // Revert any unsaved changes
         setProfile(prev => ({ ...prev, ...originalProfile }));
         setIsEditing(false);
     };
@@ -101,17 +110,12 @@ export default function PatientProfile() {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(profile),
             });
             if (res.ok) {
                 const json = await res.json();
                 localStorage.setItem('user', JSON.stringify(json.data || {}));
-                
-                // Update original profile & return to view mode
                 setOriginalProfile(profile);
                 setIsEditing(false);
                 handleSuccess('Profile updated successfully!');
@@ -144,14 +148,10 @@ export default function PatientProfile() {
                 </div>
                 <div>
                     {!isEditing ? (
-                        <button className="pd-btn pd-btn-outline" onClick={() => setIsEditing(true)}>
-                            ✏️ Edit Profile
-                        </button>
+                        <button className="pd-btn pd-btn-outline" onClick={() => setIsEditing(true)}>✏️ Edit Profile</button>
                     ) : (
                         <div style={{ display: 'flex', gap: 10 }}>
-                            <button className="pd-btn pd-btn-outline" onClick={handleCancel}>
-                                ✖ Cancel
-                            </button>
+                            <button className="pd-btn pd-btn-outline" onClick={handleCancel}>✖ Cancel</button>
                             <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading}>
                                 {loading ? '⏳ Saving…' : '💾 Save Changes'}
                             </button>
@@ -160,7 +160,6 @@ export default function PatientProfile() {
                 </div>
             </div>
 
-            {/* Banner */}
             <div className="pd-profile-banner" style={{ marginBottom: 24 }}>
                 <div className="pd-profile-pic">🧘</div>
                 <div>
@@ -174,54 +173,26 @@ export default function PatientProfile() {
                 </div>
             </div>
 
-            {/* Form sections */}
             {FIELD_GROUPS.map(group => (
                 <div key={group.title} className="pd-card" style={{ marginBottom: 18 }}>
                     <h3 className="pd-section-title">{group.title}</h3>
                     <div className="pd-grid-2">
                         {group.fields.map(f => {
                             const val = profile[f.key];
-                            const displayVal = val ? val : 'Not Added Yet';
                             return (
                                 <div className="pd-form-group" key={f.key}>
                                     <label>{f.label}</label>
-                                    
-                                    {/* Default Mode (View Mode) -> render as static text block */}
                                     {!isEditing ? (
-                                        <div style={{
-                                            padding: '10px 15px', 
-                                            background: '#f9f9f9', 
-                                            borderRadius: '8px', 
-                                            color: val ? '#333' : '#aaa',
-                                            minHeight: '42px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            fontSize: '0.95rem'
-                                        }}>
-                                            {displayVal}
+                                        <div style={{ padding: '10px 15px', background: '#f9f9f9', borderRadius: '8px', color: val ? '#333' : '#aaa', minHeight: '42px', display: 'flex', alignItems: 'center', fontSize: '0.95rem' }}>
+                                            {val || 'Not Added Yet'}
                                         </div>
                                     ) : (
-                                        /* Edit Mode -> render as input fields */
                                         f.type === 'select' ? (
-                                            <select 
-                                                className="pd-select" 
-                                                value={val || ''} 
-                                                onChange={e => handleChange(f.key, e.target.value)}
-                                                disabled={f.readOnly}
-                                            >
+                                            <select className="pd-select" value={val || ''} onChange={e => handleChange(f.key, e.target.value)} disabled={f.readOnly}>
                                                 {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                                             </select>
                                         ) : (
-                                            <input
-                                                type={f.type}
-                                                className="pd-input"
-                                                value={val || ''}
-                                                onChange={e => handleChange(f.key, e.target.value)}
-                                                placeholder={f.placeholder}
-                                                readOnly={f.readOnly}
-                                                disabled={f.readOnly}
-                                                style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed', background: '#f0f0f0' } : {}}
-                                            />
+                                            <input type={f.type} className="pd-input" value={val || ''} onChange={e => handleChange(f.key, e.target.value)} placeholder={f.placeholder} readOnly={f.readOnly} disabled={f.readOnly} style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed', background: '#f0f0f0' } : {}} />
                                         )
                                     )}
                                 </div>
@@ -231,7 +202,6 @@ export default function PatientProfile() {
                 </div>
             ))}
 
-            {/* Security card */}
             <div className="pd-card" style={{ marginBottom: 18 }}>
                 <h3 className="pd-section-title">🔒 Account Security</h3>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -239,7 +209,40 @@ export default function PatientProfile() {
                 </div>
             </div>
 
-            {/* Bottom action row when editing */}
+            {/* Emergency History */}
+            <div className="pd-card" style={{ marginBottom: 18, borderLeft: '4px solid #c0392b' }}>
+                <h3 className="pd-section-title">🚨 Emergency Case History</h3>
+                {emergencyHistory.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 0', color: '#aaa' }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>✅</div>
+                        <p>No emergency cases reported yet.</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {emergencyHistory.map((em, i) => (
+                            <div key={em.id || i} style={{
+                                padding: '15px 20px', borderRadius: 12,
+                                background: em.status === 'Handled' ? '#f0fff4' : '#fff5f5',
+                                border: `1px solid ${em.status === 'Handled' ? '#b2f5ea' : '#feb2b2'}`,
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10
+                            }}>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: URGENT_COLORS[em.type] || '#888', color: '#fff', textTransform: 'uppercase' }}>{em.type}</span>
+                                        <span style={{ fontSize: '0.8rem', color: '#666' }}>ID: {em.id}</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.9rem', color: '#333', maxWidth: 480 }}>{em.desc}</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Reported: {em.time}</div>
+                                </div>
+                                <span style={{ padding: '6px 14px', borderRadius: 20, fontWeight: 700, fontSize: '0.8rem', background: em.status === 'Handled' ? '#c6f6d5' : '#fed7d7', color: em.status === 'Handled' ? '#22543d' : '#742a2a' }}>
+                                    {em.status === 'Handled' ? '✅ Handled' : '🔴 Active'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             {isEditing && (
                 <div style={{ textAlign: 'right' }}>
                     <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>

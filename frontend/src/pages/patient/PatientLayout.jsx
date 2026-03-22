@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import './patient_dashboard.css';
 import { handleError } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
@@ -39,6 +40,8 @@ export default function PatientLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState({ name: 'Patient', avatar: '🧘' });
     const [counts, setCounts] = useState({ messages: 0 });
+    const [incomingCall, setIncomingCall] = useState(null); // { doctorName, doctorId, emergencyId }
+    const socketRef = useRef(null);
 
     const fetchCounts = useCallback(async () => {
         try {
@@ -65,7 +68,23 @@ export default function PatientLayout() {
 
         fetchCounts();
         const interval = setInterval(fetchCounts, 30000); // Poll every 30s
-        return () => clearInterval(interval);
+
+        // Connect to socket and join personal room for emergency call notifications
+        const storedUser = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
+        const userId = storedUser.id;
+        if (userId) {
+            const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
+            socketRef.current = socket;
+            socket.emit('join_user_room', { userId });
+            socket.on('emergency_call_incoming', (data) => {
+                setIncomingCall(data);
+            });
+        }
+
+        return () => {
+            clearInterval(interval);
+            if (socketRef.current) socketRef.current.disconnect();
+        };
     }, [fetchCounts]);
 
     const currentPath = location.pathname;
@@ -83,8 +102,49 @@ export default function PatientLayout() {
         navigate('/login');
     };
 
+    const acceptEmergencyCall = () => {
+        if (incomingCall) {
+            navigate(`/patient/vcall?room=emergency_${incomingCall.emergencyId}&doctorId=${incomingCall.doctorId}`);
+            setIncomingCall(null);
+        }
+    };
+
     return (
         <div className="pd-shell">
+            {/* ── Incoming Emergency Call Banner ── */}
+            {incomingCall && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+                    background: 'linear-gradient(135deg, #c0392b, #e74c3c)',
+                    color: '#fff', padding: '16px 24px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                    boxShadow: '0 4px 20px rgba(192,57,43,0.5)', animation: 'slideDown 0.4s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{ fontSize: '2rem', animation: 'pulse 1s infinite' }}>📞</div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>Incoming Emergency Call</div>
+                            <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Dr. {incomingCall.doctorName} is calling regarding your emergency</div>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            onClick={acceptEmergencyCall}
+                            style={{
+                                padding: '10px 22px', borderRadius: 24, background: '#27ae60',
+                                color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem'
+                            }}
+                        >✅ Accept</button>
+                        <button
+                            onClick={() => setIncomingCall(null)}
+                            style={{
+                                padding: '10px 22px', borderRadius: 24, background: 'rgba(255,255,255,0.2)',
+                                color: '#fff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem'
+                            }}
+                        >❌ Decline</button>
+                    </div>
+                </div>
+            )}
             {/* Sidebar overlay on mobile */}
             {sidebarOpen && (
                 <div
