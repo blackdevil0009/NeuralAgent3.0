@@ -299,7 +299,7 @@ export default function VideoCall() {
                 <h2 className="vcall-conn-name">Consultation Ended</h2>
                 <p className="vcall-conn-spec">Duration: {timer}</p>
                 <p style={{ color: '#6b8f71', fontSize: '0.85rem', marginTop: 8 }}>Your secure P2P session was completed.</p>
-                <button className="pd-btn pd-btn-primary" style={{ width: '100%', marginTop: 20, justifyContent: 'center' }} onClick={() => navigate('/patient/dashboard')}>
+                <button className="pd-btn pd-btn-primary" style={{ width: '100%', marginTop: 20, justifyContent: 'center' }} onClick={() => navigate('/patient/appointments')}>
                     Return to Dashboard
                 </button>
             </div>
