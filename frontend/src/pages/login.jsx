@@ -289,7 +289,7 @@ export default function Login() {
                 body: JSON.stringify({ email, otp, role }),
             });
             const json = await res.json();
-            if (!res.ok) throw new Error(json.error || 'Invalid verification code.');
+            if (!res.ok) throw new Error(json.data?.error || json.message || 'Invalid verification code.');
 
             const responseData = json.data || {};
             if (verificationMode === 'registry') {

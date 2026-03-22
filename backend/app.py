@@ -490,16 +490,26 @@ def verify_2fa_otp():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        app.logger.info(f"VERIFY_2FA: Checking OTP for {email}")
         cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
         user = cursor.fetchone()
 
         if not user:
+            app.logger.warning(f"VERIFY_2FA: User {email} not found")
             return signed_json_response({"error": "User not found"}, 404)
 
-        if not user.get('otpCode') or user.get('otpCode') != otp:
+        stored_otp = user.get('otpCode')
+        expiry = user.get('otpExpiry')
+        current_time = datetime.datetime.now()
+
+        app.logger.info(f"VERIFY_2FA: User found. Input: {otp}, Stored: {stored_otp}, Expiry: {expiry}, Now: {current_time}")
+
+        if not stored_otp or stored_otp != otp:
+             app.logger.warning(f"VERIFY_2FA: Invalid OTP match attempt for {email}")
              return signed_json_response({"error": "Invalid OTP code"}, 401)
         
-        if user.get('otpExpiry') and user['otpExpiry'] < datetime.datetime.now():
+        if expiry and expiry < current_time:
+            app.logger.warning(f"VERIFY_2FA: OTP expired for {email}")
             return signed_json_response({"error": "OTP code has expired"}, 401)
 
         # Clear OTP after successful use
