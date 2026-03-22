@@ -278,10 +278,15 @@ export default function Appointments() {
                                 <span className={`pd-pill ${STATUS_PILL[a.status] || 'pd-pill-blue'}`}>{a.status}</span>
                                 {isUpcoming && (
                                     <>
-                                        {a.type === 'Video Call' || a.type === 'Chat' ? (
+                                        {a.type === 'Video Call' ? (
+                                            <button className="pd-btn pd-btn-primary pd-btn-sm"
+                                                onClick={() => navigate(`/patient/vcall?doctor=${a.doctorId}`)}>
+                                                📹 Join Video Call
+                                            </button>
+                                        ) : a.type === 'Chat' || a.type === 'Chat Consultation' ? (
                                             <button className="pd-btn pd-btn-primary pd-btn-sm"
                                                 onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>
-                                                ▶ Join
+                                                💬 Join Chat
                                             </button>
                                         ) : (
                                             <button className="pd-btn pd-btn-primary pd-btn-sm">📍 Directions</button>

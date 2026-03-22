@@ -35,6 +35,7 @@ import DoctorInbox from './pages/doctor/DoctorInbox';
 import DoctorAIAssistant from './pages/doctor/DoctorAIAssistant';
 import DoctorSecuritySettings from './pages/doctor/DoctorSecuritySettings';
 import EmergencyDashboard from './pages/doctor/EmergencyDashboard';
+import DoctorVideoCall from './pages/doctor/DoctorVideoCall';
 
 // Emergency (Patient)
 import EmergencyCase from './pages/patient/EmergencyCase';
@@ -86,6 +87,7 @@ function App() {
             <Route path="inbox" element={<DoctorInbox />} />
             <Route path="ai" element={<DoctorAIAssistant />} />
             <Route path="profile" element={<DoctorProfile />} />
+            <Route path="vcall" element={<DoctorVideoCall />} />
             <Route path="settings/security" element={<DoctorSecuritySettings />} />
             <Route path="emergency" element={<EmergencyDashboard />} />
           </Route>
