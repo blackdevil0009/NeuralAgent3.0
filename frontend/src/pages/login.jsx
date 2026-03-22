@@ -244,7 +244,8 @@ export default function Login() {
                 throw new Error(json.message || 'Login failed. Please check your credentials.');
             }
 
-            if (json.status === '2fa_required') {
+            const responseData = json.data || {};
+            if (responseData.status === '2fa_required') {
                 setVerificationMode('2fa');
                 setErrorMsg('');
                 return;
@@ -252,12 +253,12 @@ export default function Login() {
 
             /* Persist token */
             const store = rememberMe ? localStorage : sessionStorage;
-            store.setItem('token', json.token);
-            store.setItem('role', json.role || role);
-            if (json.user) store.setItem('user', JSON.stringify(json.user));
+            store.setItem('token', responseData.token);
+            store.setItem('role', responseData.role || role);
+            if (responseData.user) store.setItem('user', JSON.stringify(responseData.user));
 
             /* Route based on role */
-            if (json.role === 'doctor' || role === 'doctor') {
+            if (responseData.role === 'doctor' || role === 'doctor') {
                 navigate('/doctor');
             } else {
                 navigate('/patient');
@@ -290,6 +291,7 @@ export default function Login() {
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Invalid verification code.');
 
+            const responseData = json.data || {};
             if (verificationMode === 'registry') {
                 handleSuccess('Email verified! You can now log in.');
                 setVerificationMode('none');
@@ -299,9 +301,9 @@ export default function Login() {
 
             /* 2FA Success - Persist token */
             const store = rememberMe ? localStorage : sessionStorage;
-            store.setItem('token', json.token);
+            store.setItem('token', responseData.token);
             store.setItem('role', role);
-            if (json.user) store.setItem('user', JSON.stringify(json.user));
+            if (responseData.user) store.setItem('user', JSON.stringify(responseData.user));
 
             if (role === 'doctor') navigate('/doctor');
             else navigate('/patient');

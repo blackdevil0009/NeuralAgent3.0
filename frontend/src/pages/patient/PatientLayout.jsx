@@ -46,46 +46,54 @@ export default function PatientLayout() {
     const fetchCounts = useCallback(async () => {
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            if (!token) return;
+
             const res = await fetch(`${API_BASE_URL}/api/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
             if (res.ok) {
-                const notifs = json.notifications || [];
+                const responseData = json.data || {};
+                const notifs = responseData.notifications || [];
                 const unreadMsgs = notifs.filter(n => !n.read && n.sourceType === 'Message').length;
                 setCounts({ messages: unreadMsgs });
             }
         } catch (err) {
-            handleError(err, 'Failed to fetch notification counts');
+            console.error('Failed to fetch notification counts', err);
         }
     }, []);
 
     useEffect(() => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const role = localStorage.getItem('role') || sessionStorage.getItem('role');
+        
+        if (!token || role !== 'patient') {
+            navigate('/login');
+            return;
+        }
+
         try {
             const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
             if (stored.name) setUser({ name: stored.name, avatar: '🧘' });
-        } catch { }
+            
+            if (stored.id) {
+                const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
+                socketRef.current = socket;
+                socket.emit('join_user_room', { userId: stored.id });
+                socket.on('emergency_call_incoming', (data) => {
+                    setIncomingCall(data);
+                });
+            }
+        } catch (e) { }
 
         fetchCounts();
         const interval = setInterval(fetchCounts, 30000); // Poll every 30s
-
-        // Connect to socket and join personal room for emergency call notifications
-        const storedUser = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
-        const userId = storedUser.id;
-        if (userId) {
-            const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
-            socketRef.current = socket;
-            socket.emit('join_user_room', { userId });
-            socket.on('emergency_call_incoming', (data) => {
-                setIncomingCall(data);
-            });
-        }
 
         return () => {
             clearInterval(interval);
             if (socketRef.current) socketRef.current.disconnect();
         };
-    }, [fetchCounts]);
+    }, [navigate, fetchCounts]);
 
     const currentPath = location.pathname;
     const allNav = [...NAV, ...SETTINGS_NAV];
@@ -93,12 +101,7 @@ export default function PatientLayout() {
 
     const handleLogout = () => {
         sessionStorage.clear();
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('role');
-        sessionStorage.removeItem('role');
+        localStorage.clear();
         navigate('/login');
     };
 

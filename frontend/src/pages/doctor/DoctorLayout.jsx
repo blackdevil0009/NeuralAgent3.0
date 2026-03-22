@@ -33,6 +33,19 @@ export default function DoctorLayout() {
     const [globalAlert, setGlobalAlert] = useState(null); // { id, patient, type }
 
     useEffect(() => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const role = localStorage.getItem('role') || sessionStorage.getItem('role');
+        
+        if (!token || role !== 'doctor') {
+            navigate('/login');
+            return;
+        }
+
+        try {
+            const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
+            if (stored.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (stored.name.split(' ')[0]) }));
+        } catch { }
+
         // Socket for real-time critical alerts
         const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
         socket.on('new_emergency', (data) => {
@@ -42,14 +55,7 @@ export default function DoctorLayout() {
             }
         });
         return () => socket.disconnect();
-    }, []);
-
-    useEffect(() => {
-        try {
-            const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
-            if (stored.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (stored.name.split(' ')[0]) }));
-        } catch { }
-    }, []);
+    }, [navigate]);
 
     const currentPath = location.pathname;
     const allNav = [...NAV, ...SETTINGS_NAV];
