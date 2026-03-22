@@ -363,7 +363,7 @@ def register():
 @app.route('/api/login', methods=['POST'])  # backward compat
 def login():
     data = request.get_json()
-    email = data.get('email')
+    email = data.get('email', '').strip().lower()
     password = data.get('password')
     role = data.get('role')
 
@@ -454,8 +454,8 @@ def verify_email():
 @app.route('/api/auth/verify-registration-otp', methods=['POST'])
 def verify_registration_otp():
     data = request.get_json()
-    email = data.get('email')
-    otp = data.get('otp')
+    email = data.get('email', '').strip().lower()
+    otp = data.get('otp', '').strip()
     
     if not email or not otp:
         return signed_json_response({"error": "Email and OTP required"}, 400)
@@ -481,8 +481,8 @@ def verify_registration_otp():
 @app.route('/api/auth/verify-2fa-otp', methods=['POST'])
 def verify_2fa_otp():
     data = request.get_json()
-    email = data.get('email')
-    otp = data.get('otp')
+    email = data.get('email', '').strip().lower()
+    otp = data.get('otp', '').strip()
 
     if not email or not otp:
         return signed_json_response({"error": "Email and OTP are required"}, 400)
@@ -504,8 +504,8 @@ def verify_2fa_otp():
 
         app.logger.info(f"VERIFY_2FA: User found. Input: {otp}, Stored: {stored_otp}, Expiry: {expiry}, Now: {current_time}")
 
-        if not stored_otp or stored_otp != otp:
-             app.logger.warning(f"VERIFY_2FA: Invalid OTP match attempt for {email}")
+        if not stored_otp or str(stored_otp).strip() != str(otp).strip():
+             app.logger.warning(f"VERIFY_2FA: Invalid OTP match attempt for {email}. Input: {otp}, Stored: {stored_otp}")
              return signed_json_response({"error": "Invalid OTP code"}, 401)
         
         if expiry and expiry < current_time:
