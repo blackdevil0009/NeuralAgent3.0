@@ -181,6 +181,7 @@ def init_db():
             userId INT NOT NULL,
             filename VARCHAR(512) NOT NULL,
             displayName VARCHAR(255) NOT NULL,
+            fileSize VARCHAR(50),
             status VARCHAR(50) DEFAULT 'Pending',
             summary TEXT,
             ayurvedicInsights TEXT,

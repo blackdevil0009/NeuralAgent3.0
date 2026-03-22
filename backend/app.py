@@ -868,14 +868,15 @@ def upload_report():
         file.save(file_path)
         
         display_name = request.form.get('displayName', file.filename.split('.')[0])
+        file_size = f"{os.path.getsize(file_path) / 1024:.0f} KB"
         
         conn = get_db_connection()
         cursor = conn.cursor()
         try:
             cursor.execute("""
-                INSERT INTO patient_reports (userId, filename, displayName, status)
-                VALUES (%s, %s, %s, 'Pending')
-            """, (current_user_id, filename, display_name))
+                INSERT INTO patient_reports (userId, filename, displayName, fileSize, status)
+                VALUES (%s, %s, %s, %s, 'Pending')
+            """, (current_user_id, filename, display_name, file_size))
             conn.commit()
             report_id = cursor.lastrowid
             return signed_json_response({
@@ -903,6 +904,7 @@ def get_reports():
                 "id": r['id'],
                 "name": r['displayName'],
                 "date": r['createdAt'].strftime('%d %b %Y'),
+                "size": r['fileSize'],
                 "status": r['status'],
                 "summary": r['summary'],
                 "ayurvedic": r['ayurvedicInsights']
