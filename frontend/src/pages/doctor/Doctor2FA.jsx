@@ -1,86 +1,136 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../utils/config';
+import { handleError, handleSuccess } from '../../utils/error_handlers';
 
 export default function Doctor2FA() {
     const [enabled, setEnabled] = useState(false);
-    const [step, setStep] = useState('idle'); // idle, setup, done
+    const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [password, setPassword] = useState('');
+
+    useEffect(() => {
+        fetchStatus();
+    }, []);
+
+    const fetchStatus = async () => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setEnabled(json.data?.twoFactorEnabled || false);
+            }
+        } catch (err) {
+            console.error('Failed to fetch 2FA status');
+        } finally {
+            setFetching(false);
+        }
+    };
+
+    const handleToggle = async (e) => {
+        e.preventDefault();
+        if (!password) return;
+
+        setLoading(true);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/2fa/toggle`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ enabled: !enabled, password })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to update 2FA status');
+
+            handleSuccess(json.message);
+            setEnabled(!enabled);
+            setShowConfirm(false);
+            setPassword('');
+        } catch (err) {
+            handleError(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (fetching) return <div style={{ padding: 20, textAlign: 'center' }}>Loading security settings...</div>;
 
     return (
-        <div style={{ maxWidth: 800, margin: '0 auto' }}>
-            <div className="dd-header">
+        <div className="security-card">
+            <div className="dd-header" style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1>🔐 Two-Factor Authentication</h1>
-                    <p style={{ color: 'var(--doc-text-mute)' }}>Add an extra layer of clinical data protection</p>
+                    <h2 style={{ fontSize: '1.25rem', marginBottom: 4 }}>📧 Email Two-Factor Authentication</h2>
+                    <p style={{ fontSize: '0.85rem', color: '#666' }}>Protect patient data by requiring an OTP sent to your email during login.</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: enabled ? '#0f5132' : '#667c6b' }}>
-                        {enabled ? '● Active' : '○ Inactive'}
-                    </span>
-                    <button className={`dd-btn ${enabled ? 'dd-btn-outline' : 'dd-btn-primary'}`}
-                        onClick={() => enabled ? setEnabled(false) : setStep('setup')}>
-                        {enabled ? 'Disable 2FA' : 'Enable Setup'}
-                    </button>
+                <div style={{ padding: '4px 12px', borderRadius: 20, background: enabled ? '#e6fffa' : '#fff5f5', color: enabled ? '#2c7a7b' : '#c53030', border: '1px solid currentColor', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                    {enabled ? '🛡️ 2FA Active' : '🔓 2FA Disabled'}
                 </div>
             </div>
 
-            {step === 'idle' && !enabled && (
-                <div className="dd-card">
-                    <p style={{ lineHeight: 1.6 }}>Two-factor authentication adds an extra layer of security to your clinical portal by requiring a code from your mobile device whenever you log in.</p>
-                    <div className="dd-grid" style={{ marginTop: 20 }}>
-                        <div style={{ background: '#f8f9f8', padding: 20, borderRadius: 12, border: '1px solid var(--doc-border)' }}>
-                            <div style={{ fontSize: '1.5rem', marginBottom: 10 }}>📱</div>
-                            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Authenticator App</div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--doc-text-mute)', marginTop: 4 }}>Use Google Authenticator or Microsoft Authenticator to generate secure TOTP codes.</p>
-                        </div>
-                        <div style={{ background: '#f8f9f8', padding: 20, borderRadius: 12, border: '1px solid var(--doc-border)' }}>
-                            <div style={{ fontSize: '1.5rem', marginBottom: 10 }}>📄</div>
-                            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Backup Codes</div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--doc-text-mute)', marginTop: 4 }}>Access your workspace even if you lose your mobile device with one-time recovery codes.</p>
-                        </div>
+            <div style={{ background: enabled ? '#f0fff4' : '#fff5f5', border: `1px solid ${enabled ? '#c6f6d5' : '#fed7d7'}`, padding: 20, borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                    <div style={{ fontSize: '2.5rem' }}>{enabled ? '🛡️' : '⚠️'}</div>
+                    <div style={{ flex: 1 }}>
+                        <h4 style={{ margin: '0 0 5px 0' }}>{enabled ? 'Portal Protected' : 'Security Check Recommended'}</h4>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#555', lineHeight: 1.5 }}>
+                            {enabled 
+                                ? 'A 6-digit OTP will be sent to your official email for every new login session.' 
+                                : 'Enable 2FA to ensure only you can access your clinical dashboard and patient records.'}
+                        </p>
                     </div>
                 </div>
-            )}
 
-            {step === 'setup' && (
-                <div className="dd-card" style={{ textAlign: 'center' }}>
-                    <h3>Scan QR Code</h3>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--doc-text-mute)', marginBottom: 20 }}>Open your authenticator app and scan the code below.</p>
-                    <div style={{ width: 200, height: 200, background: '#eee', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ccc', borderRadius: 12 }}>
-                        {/* Mock QR */}
-                        <svg width="150" height="150" viewBox="0 0 100 100">
-                            <rect width="100" height="100" fill="white" />
-                            <path d="M10 10h30v30h-30z m5 5h20v20h-20z" fill="black" />
-                            <path d="M60 10h30v30h-30z m5 5h20v20h-20z" fill="black" />
-                            <path d="M10 60h30v30h-30z m5 5h20v20h-20z" fill="black" />
-                            <path d="M50 50h10v10h10v10h10v10h10v10" fill="black" stroke="black" strokeWidth="2" />
-                            <rect x="70" y="70" width="10" height="10" fill="black" />
-                        </svg>
-                    </div>
-                    <div style={{ marginTop: 24, maxWidth: 400, margin: '24px auto' }}>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 8 }}>Enter 6-digit App Code</label>
-                        <input type="text" maxLength="6" placeholder="000 000" style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--doc-border)', textAlign: 'center', letterSpacing: 4, fontWeight: 700 }} />
-                        <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                            <button className="dd-btn dd-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setStep('idle')}>Cancel</button>
-                            <button className="dd-btn dd-btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setEnabled(true); setStep('idle'); }}>Finish Setup</button>
+                {!showConfirm ? (
+                    <button 
+                        className={`dd-btn ${enabled ? 'dd-btn-outline' : 'dd-btn-primary'}`}
+                        style={{ marginTop: 20, width: '100%', justifyContent: 'center' }}
+                        onClick={() => setShowConfirm(true)}
+                    >
+                        {enabled ? 'Disable 2FA' : 'Enable 2FA via Email'}
+                    </button>
+                ) : (
+                    <form onSubmit={handleToggle} style={{ marginTop: 20, padding: 15, background: '#fff', borderRadius: 8, border: '1px solid #ddd' }}>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: 8 }}>
+                            Confirm your clinical password to {enabled ? 'disable' : 'enable'} 2FA
+                        </label>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <input 
+                                type="password" 
+                                className="dd-input" 
+                                style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #ccc' }}
+                                value={password} 
+                                onChange={e => setPassword(e.target.value)} 
+                                placeholder="Enter password"
+                                required
+                                autoFocus
+                            />
+                            <button type="submit" className="dd-btn dd-btn-primary" disabled={loading}>
+                                {loading ? 'Wait...' : 'Confirm'}
+                            </button>
+                            <button type="button" className="dd-btn dd-btn-outline" onClick={() => { setShowConfirm(false); setPassword(''); }}>
+                                Cancel
+                            </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </form>
+                )}
+            </div>
 
-            {enabled && step === 'idle' && (
-                <div style={{ background: '#f0f7f2', border: '1px solid var(--doc-green-light)', padding: 24, borderRadius: 16, marginTop: 20 }}>
-                    <div style={{ display: 'flex', gap: 16 }}>
-                        <div style={{ fontSize: '2rem' }}>🛡️</div>
-                        <div>
-                            <h3 style={{ margin: 0, color: 'var(--doc-green-deep)' }}>Your session is protected</h3>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--doc-text-dark)', marginTop: 8 }}>Two-factor authentication is active. Last verified on 22 Feb 2026.</p>
-                            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                                <button className="dd-btn dd-btn-primary" style={{ padding: '8px 16px' }}>View Backup Codes</button>
-                                <button className="dd-btn dd-btn-outline" style={{ padding: '8px 16px' }} onClick={() => setEnabled(false)}>Disable</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <div style={{ marginTop: 20, background: '#f8f9fa', padding: 20, borderRadius: 12 }}>
+                <h4 style={{ margin: '0 0 12px 0' }}>📂 Security Protocol</h4>
+                <ul style={{ margin: 0, paddingLeft: 20, fontSize: '0.85rem', color: '#666', lineHeight: 1.8 }}>
+                    <li>Authentication requires both your password and a unique email OTP.</li>
+                    <li>OTP delivery is typically instantaneous via SMTP.</li>
+                    <li>Ensure your registered clinic email is accessible.</li>
+                    <li>Toggle this setting anytime by verifying your credentials.</li>
+                </ul>
+            </div>
         </div>
     );
 }

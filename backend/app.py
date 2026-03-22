@@ -20,7 +20,7 @@ import traceback
 from ai.brain import get_brain
 from utils.otp_utils import generate_otp
 from utils.sms_utils import send_fast2sms_otp
-from utils.email_utils import send_reset_email, send_verification_email
+from utils.email_utils import send_reset_email, send_verification_email, send_otp_email
 import datetime
 import secrets
 import traceback
@@ -302,24 +302,29 @@ def register():
                 else:
                     # User exists but not verified - Resend verification
                     verification_token = secrets.token_urlsafe(32)
-                    cursor.execute('UPDATE users SET verificationToken = %s WHERE id = %s', (verification_token, existing_user['id']))
+                    verification_otp = generate_otp()
+                    cursor.execute('UPDATE users SET verificationToken = %s, verificationOtp = %s WHERE id = %s', (verification_token, verification_otp, existing_user['id']))
                     conn.commit()
                     
                     api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
                     verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
-                    if send_verification_email(data.get('email'), verification_link):
+                    if send_verification_email(data.get('email'), verification_link, verification_otp):
                         return signed_json_response({"message": "Account already exists but is unverified. A new verification email has been sent."}, 200)
                     else:
                         return signed_json_response({"message": "Account exists but verification email failed to send. Please contact support."}, 500)
 
+            # Generate Verification Token and OTP
+            verification_token = secrets.token_urlsafe(32)
+            verification_otp = generate_otp()
+
             cursor.execute('''
-                INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted, isVerified, verificationToken)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted, isVerified, verificationToken, verificationOtp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 data.get('fullName'), data.get('email'), hashed_password, role,
                 data.get('mobile'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), 
                 data.get('address'), data.get('city'), data.get('state'), data.get('pincode'),
-                public_pem, private_key_encrypted, 0, verification_token
+                public_pem, private_key_encrypted, 0, verification_token, verification_otp
             ))
             user_id = cursor.lastrowid
 
@@ -342,7 +347,7 @@ def register():
             # Send Verification Email
             api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
             verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
-            send_verification_email(data.get('email'), verification_link)
+            send_verification_email(data.get('email'), verification_link, verification_otp)
 
             return signed_json_response({"message": f"{role.capitalize()} registered successfully! Please check your email to verify your account."}, 201)
 
@@ -379,6 +384,26 @@ def login():
 
     if not user.get('isVerified', 0):
         return signed_json_response({"message": "Please verify your email address before logging in. Check your inbox for the verification link."}, 403)
+
+    # 2FA Check
+    if user.get('twoFactorEnabled'):
+        otp_code = generate_otp()
+        otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=5)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET otpCode = %s, otpExpiry = %s WHERE id = %s", (otp_code, otp_expiry, user['id']))
+        conn.commit()
+        conn.close()
+        
+        if send_otp_email(user['email'], otp_code):
+            return signed_json_response({
+                "status": "2fa_required",
+                "message": "A 2FA code has been sent to your email.",
+                "email": user['email']
+            }, 200)
+        else:
+            return signed_json_response({"message": "Failed to send 2FA code. Please try again later."}, 500)
 
     access_token = create_access_token(identity=str(user['id']))
 
@@ -421,6 +446,108 @@ def verify_email():
             </body>
         </html>
         """
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/auth/verify-registration-otp', methods=['POST'])
+def verify_registration_otp():
+    data = request.get_json()
+    email = data.get('email')
+    otp = data.get('otp')
+    
+    if not email or not otp:
+        return signed_json_response({"error": "Email and OTP required"}, 400)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id FROM users WHERE email = %s AND verificationOtp = %s", (email, otp))
+        user = cursor.fetchone()
+        
+        if not user:
+            return signed_json_response({"error": "Invalid verification code"}, 400)
+        
+        cursor.execute("UPDATE users SET isVerified = 1, verificationToken = NULL, verificationOtp = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+        
+        return signed_json_response({"message": "Email verified successfully! You can now log in."}, 200)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def verify_otp():
+    data = request.get_json()
+    email = data.get('email')
+    otp = data.get('otp')
+
+    if not email or not otp:
+        return signed_json_response({"error": "Email and OTP are required"}, 400)
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+
+        if not user:
+            return signed_json_response({"error": "User not found"}, 404)
+
+        if not user.get('otpCode') or user.get('otpCode') != otp:
+             return signed_json_response({"error": "Invalid OTP code"}, 401)
+        
+        if user.get('otpExpiry') and user['otpExpiry'] < datetime.datetime.now():
+            return signed_json_response({"error": "OTP code has expired"}, 401)
+
+        # Clear OTP after successful use
+        cursor.execute("UPDATE users SET otpCode = NULL, otpExpiry = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+
+        access_token = create_access_token(identity=str(user['id']))
+        return signed_json_response({
+            "token": access_token,
+            "user_id": user['id'],
+            "role": user['role'],
+            "user": {
+                "id": user['id'],
+                "name": user['fullName'],
+                "email": user['email'],
+                "mobile": user['mobile']
+            }
+        })
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/auth/2fa/toggle', methods=['POST'])
+@jwt_required()
+def toggle_2fa():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    enabled = data.get('enabled')
+    password = data.get('password')
+
+    if enabled is None or not password:
+        return signed_json_response({"error": "Status and password are required"}, 400)
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT password FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user or not bcrypt.check_password_hash(user['password'], password):
+            return signed_json_response({"error": "Invalid password"}, 401)
+
+        cursor.execute("UPDATE users SET twoFactorEnabled = %s WHERE id = %s", (enabled, user_id))
+        conn.commit()
+        
+        status_msg = "enabled" if enabled else "disabled"
+        return signed_json_response({"message": f"2FA has been successfully {status_msg}."}, 200)
     except Exception as e:
         return signed_json_response({"error": str(e)}, 500)
     finally:

@@ -187,19 +187,24 @@ export default function Login() {
     const [showForgot, setShowForgot] = useState(false);
     const [showResend, setShowResend] = useState(false);
     const [isUnverified, setIsUnverified] = useState(false);
+    const [verificationMode, setVerificationMode] = useState('none'); // 'none' | '2fa' | 'registry'
+    const [otp, setOtp] = useState('');
 
     /* field-level errors */
     const [errors, setErrors] = useState({});
 
     /* UI success message passed from registration */
     const regSuccess = location.state?.registered
-        ? location.state?.message || '🎉 Registration successful! Please log in to continue.'
+        ? location.state?.message || '🎉 Registration successful!'
         : '';
 
-    // Pre-fill email from registration state
+    // If registered from registration.jsx, we might want to show OTP screen immediately
     React.useEffect(() => {
         if (location.state?.email) {
             setEmail(location.state.email);
+            if (location.state?.showVerify) {
+                setVerificationMode('registry');
+            }
         }
     }, [location.state]);
 
@@ -208,20 +213,20 @@ export default function Login() {
         const errs = {};
         const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRe.test(email)) errs.email = 'Enter a valid email address.';
-        if (password.length < 8) errs.password = 'Password must be at least 8 characters.';
+        if (!password) errs.password = 'Password is required.';
+        else if (password.length < 8) errs.password = 'Password must be at least 8 characters.';
         return errs;
     };
 
-
-
-    /* ── Submit ── */
+    /* ── Submit Login ── */
     const handleSubmit = useCallback(async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const errs = validate();
         if (Object.keys(errs).length) { setErrors(errs); return; }
 
         setLoading(true);
         setErrorMsg('');
+        setIsUnverified(false);
         try {
             const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
@@ -231,15 +236,24 @@ export default function Login() {
 
             const json = await res.json();
             if (!res.ok) {
-                if (res.status === 403) setIsUnverified(true);
-                throw new Error(json.data?.message || 'Login failed. Please check your credentials.');
+                if (res.status === 403) {
+                    setIsUnverified(true);
+                    setVerificationMode('registry');
+                    throw new Error('Please verify your account. We sent a code to your email.');
+                }
+                throw new Error(json.message || 'Login failed. Please check your credentials.');
+            }
+
+            if (json.status === '2fa_required') {
+                setVerificationMode('2fa');
+                setErrorMsg('');
+                return;
             }
 
             /* Persist token */
             const store = rememberMe ? localStorage : sessionStorage;
-            const userData = json.data || {};
-            store.setItem('token', userData.token);
-            store.setItem('role', userData.role || role);
+            store.setItem('token', json.token);
+            store.setItem('role', role);
             store.setItem('user', JSON.stringify(userData.user || {}));
 
             /* Route based on role */
@@ -255,6 +269,50 @@ export default function Login() {
             setLoading(false);
         }
     }, [email, password, role, rememberMe, navigate]);
+
+    /* ── OTP Submit ── */
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        if (otp.length !== 6) { setErrorMsg('Enter the 6-digit code sent to your email.'); return; }
+        
+        setLoading(true);
+        setErrorMsg('');
+        try {
+            const endpoint = verificationMode === '2fa' 
+                ? '/api/auth/verify-otp' 
+                : '/api/auth/verify-registration-otp';
+
+            const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp, role }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Invalid verification code.');
+
+            if (verificationMode === 'registry') {
+                handleSuccess('Email verified! You can now log in.');
+                setVerificationMode('none');
+                setOtp('');
+                return;
+            }
+
+            /* 2FA Success - Persist token */
+            const store = rememberMe ? localStorage : sessionStorage;
+            store.setItem('token', json.token);
+            store.setItem('role', role);
+            if (json.user) store.setItem('user', JSON.stringify(json.user));
+
+            if (role === 'doctor') navigate('/doctor');
+            else navigate('/patient');
+
+        } catch (err) {
+            handleError(err);
+            setErrorMsg(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     /* ── Field change helpers ── */
     const handleEmailChange = (e) => {
@@ -276,7 +334,6 @@ export default function Login() {
     /* ───────────────────────── RENDER ───────────────────────── */
     return (
         <div className="login-page">
-            {/* Floating leaves */}
             <div className="leaf leaf-1" />
             <div className="leaf leaf-2" />
             <div className="leaf leaf-3" />
@@ -284,167 +341,115 @@ export default function Login() {
             <div className="leaf leaf-5" />
 
             <div className="login-container">
-
-                {/* ── Header ── */}
                 <div className="login-header">
                     <div className="login-logo">🌿 VaidyaMed-X</div>
                     <p className="login-tagline">Ayurvedic AI Health Companion</p>
                     <span className="login-lotus">🪷</span>
                 </div>
 
-                {/* ── Role Tabs ── */}
-                <div className="login-tabs">
-                    <button
-                        type="button"
-                        className={`login-tab-btn ${role === 'patient' ? 'active' : ''}`}
-                        onClick={() => switchRole('patient')}
-                    >
-                        🌿 Patient
-                    </button>
-                    <button
-                        type="button"
-                        className={`login-tab-btn ${role === 'doctor' ? 'active' : ''}`}
-                        onClick={() => switchRole('doctor')}
-                    >
-                        👨‍⚕️ Doctor
-                    </button>
-                </div>
+                {verificationMode === 'none' && (
+                    <div className="login-tabs">
+                        <button type="button" className={`login-tab-btn ${role === 'patient' ? 'active' : ''}`} onClick={() => switchRole('patient')}>🌿 Patient</button>
+                        <button type="button" className={`login-tab-btn ${role === 'doctor' ? 'active' : ''}`} onClick={() => switchRole('doctor')}>👨‍⚕️ Doctor</button>
+                    </div>
+                )}
 
-                {/* ── Form Body ── */}
-                <form onSubmit={handleSubmit} noValidate>
-                    <div className="login-form-body">
+                {verificationMode === 'none' ? (
+                    <form onSubmit={handleSubmit} noValidate>
+                        <div className="login-form-body">
+                            <h2 className="login-welcome">{role === 'patient' ? 'Welcome back 🌿' : 'Doctor Login 👨‍⚕️'}</h2>
+                            <p className="login-sub">{role === 'patient' ? 'Sign in to access your health dashboard.' : 'Sign in to access your clinical dashboard.'}</p>
 
-                        <h2 className="login-welcome">
-                            {role === 'patient' ? 'Welcome back 🌿' : 'Doctor Login 👨‍⚕️'}
-                        </h2>
-                        <p className="login-sub">
-                            {role === 'patient'
-                                ? 'Sign in to access your health dashboard and AI companion.'
-                                : 'Sign in to access your clinical dashboard and patient records.'}
-                        </p>
-
-                        {/* Registration success message */}
-                        {regSuccess && (
-                            <div className="login-success-banner">✅ {regSuccess}</div>
-                        )}
-
-                        {/* Error banner */}
-                        {errorMsg && (
-                            <div className="login-error-banner" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span>⚠️</span>
-                                    <span>{errorMsg}</span>
+                            {regSuccess && <div className="login-success-banner">✅ {regSuccess}</div>}
+                            {errorMsg && (
+                                <div className="login-error-banner" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>⚠️</span>
+                                        <span>{errorMsg}</span>
+                                    </div>
+                                    {isUnverified && (
+                                        <button type="button" onClick={() => setShowResend(true)} className="banner-action-btn" style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>
+                                            📩 Resend Verification Link
+                                        </button>
+                                    )}
                                 </div>
-                                {isUnverified && (
-                                    <button 
-                                        type="button"
-                                        onClick={() => setShowResend(true)}
-                                        style={{ 
-                                            background: 'rgba(255,255,255,0.2)', 
-                                            border: '1px solid rgba(255,255,255,0.3)', 
-                                            color: '#fff', 
-                                            padding: '4px 12px', 
-                                            borderRadius: '4px',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer',
-                                            alignSelf: 'flex-start'
-                                        }}
-                                    >
-                                        📩 Resend Verification Link
-                                    </button>
-                                )}
+                            )}
+
+                            <div className="form-group">
+                                <label>Email Address</label>
+                                <input type="email" value={email} onChange={handleEmailChange} placeholder="email@example.com" />
+                                {errors.email && <span className="field-error">{errors.email}</span>}
                             </div>
-                        )}
 
-                        {/* Email */}
-                        <div className="form-group">
-                            <label htmlFor="login-email">Email Address</label>
-                            <input
-                                id="login-email"
-                                type="email"
-                                placeholder={role === 'patient' ? 'patient@email.com' : 'doctor@hospital.com'}
-                                value={email}
-                                onChange={handleEmailChange}
-                                autoComplete="email"
-                                aria-invalid={!!errors.email}
-                            />
-                            {errors.email && <span className="field-error">{errors.email}</span>}
-                        </div>
-
-                        {/* Password */}
-                        <div className="form-group">
-                            <label htmlFor="login-password">Password</label>
-                            <div className="pw-wrapper">
-                                <input
-                                    id="login-password"
-                                    type={showPass ? 'text' : 'password'}
-                                    placeholder="Enter your password"
-                                    value={password}
-                                    onChange={handlePassChange}
-                                    autoComplete="current-password"
-                                    aria-invalid={!!errors.password}
-                                />
-                                <button
-                                    type="button"
-                                    className="pw-eye-btn"
-                                    onClick={() => setShowPass(p => !p)}
-                                    aria-label={showPass ? 'Hide password' : 'Show password'}
-                                >
-                                    {showPass ? '🙈' : '👁️'}
-                                </button>
+                            <div className="form-group">
+                                <label>Password</label>
+                                <div className="pw-wrapper">
+                                    <input type={showPass ? 'text' : 'password'} value={password} onChange={handlePassChange} placeholder="••••••••" />
+                                    <button type="button" className="pw-eye-btn" onClick={() => setShowPass(!showPass)}>{showPass ? '🙈' : '👁️'}</button>
+                                </div>
+                                {errors.password && <span className="field-error">{errors.password}</span>}
                             </div>
-                            {errors.password && <span className="field-error">{errors.password}</span>}
-                        </div>
 
-                        {/* Remember me + Forgot */}
-                        <div className="login-row">
-                            <label className="remember-check">
-                                <input
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={e => setRememberMe(e.target.checked)}
-                                />
-                                Remember me
-                            </label>
-                            <button
-                                type="button"
-                                className="forgot-link"
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
-                                onClick={() => setShowForgot(true)}
-                            >
-                                Forgot password?
+                            <div className="login-row">
+                                <label className="remember-check"><input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} /> Remember me</label>
+                                <button type="button" className="forgot-btn" onClick={() => setShowForgot(true)} style={{ background: 'none', border: 'none', color: '#2d6a4f', cursor: 'pointer' }}>Forgot Password?</button>
+                            </div>
+
+                            <button type="submit" className="btn-login" disabled={loading}>
+                                {loading ? 'Checking...' : role === 'patient' ? 'Login as Patient 🌿' : 'Login as Doctor 👨‍⚕️'}
                             </button>
                         </div>
-                    </div>
+                    </form>
+                ) : (
+                    <form onSubmit={handleOtpSubmit} noValidate>
+                        <div className="login-form-body">
+                            <h2 className="login-welcome">
+                                {verificationMode === '2fa' ? 'Security Check 🛡️' : 'Verify Account 📧'}
+                            </h2>
+                            <p className="login-sub">
+                                Enter the 6-digit code sent to <strong>{email}</strong>
+                            </p>
 
-                    {/* ── Submit ── */}
-                    <div className="login-footer">
-                        <button type="submit" className="btn-login" disabled={loading}>
-                            {loading && <span className="spinner" />}
-                            {loading
-                                ? 'Signing in…'
-                                : role === 'patient' ? 'Login as Patient 🌿' : 'Login as Doctor 👨‍⚕️'}
-                        </button>
+                            {errorMsg && <div className="login-error-banner">⚠️ {errorMsg}</div>}
 
-                        <p className="login-register-cta">
-                            New to VaidyaMed-X?&nbsp;
-                            <Link to="/register">Create an account</Link>
-                        </p>
-                    </div>
-                </form>
+                            <div className="form-group">
+                                <label>Verification Code</label>
+                                <input
+                                    type="text" maxLength="6" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                                    style={{ fontSize: '1.8rem', textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold' }}
+                                    autoFocus
+                                />
+                            </div>
 
-                {/* ── Shloka footer ── */}
+                            <button type="submit" className="btn-login" disabled={loading}>
+                                {loading ? 'Verifying...' : (verificationMode === '2fa' ? 'Verify & Continue' : 'Verify & Activate')}
+                            </button>
+
+                            <button type="button" className="back-btn" onClick={() => { setVerificationMode('none'); setErrorMsg(''); setIsUnverified(false); }} 
+                                style={{ background: 'none', border: 'none', color: '#666', marginTop: 15, cursor: 'pointer', textDecoration: 'underline' }}>
+                                ← Back to Login
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                <div className="login-footer">
+                    <p className="login-register-cta">
+                        New to VaidyaMed-X? <Link to="/register">Create an account</Link>
+                    </p>
+                </div>
+
                 <div className="shloka-banner">
                     <p className="shloka-text">
                         "स्वस्थस्य स्वास्थ्य रक्षणं, आतुरस्य विकार प्रशमनम्" <br />
-                        <span style={{ fontSize: '0.72rem', opacity: 0.70 }}>
+                        <span style={{ fontSize: '0.72rem', opacity: 0.7 }}>
                             — Preserve the health of the healthy; relieve the suffering of the sick.
                         </span>
                     </p>
                 </div>
             </div>
 
-            {/* ── Forgot Password Modal ── */}
+            {/* ── Modal Overlay Components ── */}
             {showForgot && <ForgotPasswordModal onClose={() => setShowForgot(false)} />}
             {showResend && <ResendVerificationModal onClose={() => setShowResend(false)} email={email} />}
         </div>

@@ -717,7 +717,9 @@ export default function Registration() {
             
             // Extract email for pre-filling login
             const email = isFormData ? data.get('email') : data.email;
-            setTimeout(() => navigate('/login', { state: { registered: true, email, message: msg } }), 5000);
+            setTimeout(() => navigate('/login', { 
+                state: { registered: true, email, message: msg, showVerify: true } 
+            }), 3000);
         } catch (err) {
             handleError(err);
         } finally {

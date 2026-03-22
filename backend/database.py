@@ -60,6 +60,9 @@ def init_db():
             rsaPrivateKeyEncrypted TEXT,
             isVerified BOOLEAN DEFAULT FALSE,
             verificationToken VARCHAR(255),
+            twoFactorEnabled BOOLEAN DEFAULT FALSE,
+            otpCode VARCHAR(10),
+            otpExpiry DATETIME,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -92,7 +95,11 @@ def init_db():
         "ALTER TABLE users ADD COLUMN gender VARCHAR(20) AFTER dob",
         "ALTER TABLE users ADD COLUMN blood_group VARCHAR(20) AFTER gender",
         "ALTER TABLE users ADD COLUMN isVerified BOOLEAN DEFAULT FALSE AFTER rsaPrivateKeyEncrypted",
-        "ALTER TABLE users ADD COLUMN verificationToken VARCHAR(255) AFTER isVerified"
+        "ALTER TABLE users ADD COLUMN verificationToken VARCHAR(255) AFTER isVerified",
+        "ALTER TABLE users ADD COLUMN verificationOtp VARCHAR(10) AFTER verificationToken",
+        "ALTER TABLE users ADD COLUMN twoFactorEnabled BOOLEAN DEFAULT FALSE AFTER verificationOtp",
+        "ALTER TABLE users ADD COLUMN otpCode VARCHAR(10) AFTER twoFactorEnabled",
+        "ALTER TABLE users ADD COLUMN otpExpiry DATETIME AFTER otpCode"
     ]
     for task in migration_tasks:
         try:
