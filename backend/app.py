@@ -660,10 +660,12 @@ def get_appointments():
             ''', (current_user_id,))
             
         appointments = cursor.fetchall()
-        # Format dates/times for JSON
+        # Format dates/times for JSON serialization
         for a in appointments:
-            a['appointmentDate'] = a['appointmentDate'].isoformat()
-            a['appointmentTime'] = str(a['appointmentTime'])
+            a['appointmentDate'] = a['appointmentDate'].isoformat() if a.get('appointmentDate') else None
+            a['appointmentTime'] = str(a['appointmentTime']) if a.get('appointmentTime') else None
+            if a.get('createdAt'):
+                a['createdAt'] = a['createdAt'].isoformat()
             
         return signed_json_response({"appointments": appointments})
     except Exception as e:
