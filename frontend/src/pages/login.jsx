@@ -88,9 +88,19 @@ function ResendVerificationModal({ onClose, email: initialEmail }) {
     const [sent, setSent] = useState(false);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
+    const [timer, setTimer] = useState(0);
+
+    React.useEffect(() => {
+        let interval;
+        if (timer > 0) {
+            interval = setInterval(() => setTimer(t => t - 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [timer]);
 
     const handleResend = async (e) => {
         e.preventDefault();
+        if (timer > 0) return;
         const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRe.test(email)) { setErr('Please enter a valid email address.'); return; }
         setErr('');
@@ -104,6 +114,7 @@ function ResendVerificationModal({ onClose, email: initialEmail }) {
             const j = await res.json();
             if (!res.ok) throw new Error(j.data?.message || j.error || 'Could not resend verification email.');
             setSent(true);
+            setTimer(60); // Start 1-minute cooldown
         } catch (e) {
             handleError(e);
             setErr(e.message);
@@ -142,10 +153,10 @@ function ResendVerificationModal({ onClose, email: initialEmail }) {
                             />
                             {err && <span className="field-error">{err}</span>}
                         </div>
-                        <button type="submit" className="btn-login" disabled={loading}
+                        <button type="submit" className="btn-login" disabled={loading || timer > 0}
                             style={{ marginTop: 12 }}>
                             {loading && <span className="spinner" />}
-                            {loading ? 'Sending…' : 'Resend Verification Link'}
+                            {timer > 0 ? `Wait ${timer}s` : (loading ? 'Sending…' : 'Resend Verification Link')}
                         </button>
                     </form>
                 )}
@@ -180,10 +191,17 @@ export default function Login() {
     /* field-level errors */
     const [errors, setErrors] = useState({});
 
-    /* success message passed from registration */
+    /* UI success message passed from registration */
     const regSuccess = location.state?.registered
-        ? '🎉 Registration successful! Please log in to continue.'
+        ? location.state?.message || '🎉 Registration successful! Please log in to continue.'
         : '';
+
+    // Pre-fill email from registration state
+    React.useEffect(() => {
+        if (location.state?.email) {
+            setEmail(location.state.email);
+        }
+    }, [location.state]);
 
     /* ── Validation ── */
     const validate = () => {

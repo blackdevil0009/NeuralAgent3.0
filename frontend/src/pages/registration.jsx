@@ -709,8 +709,15 @@ export default function Registration() {
             const json = await res.json();
             if (!res.ok) throw new Error(json.data?.message || 'Registration failed. Please try again.');
 
-            handleSuccess('🎉 Registration successful! Please check your email and verify your account to log in.');
-            setTimeout(() => navigate('/login'), 5000);
+            const msg = res.status === 200 
+                ? '📧 Account already exists but is unverified. A new verification link has been sent!'
+                : '🎉 Registration successful! Please check your email and verify your account to log in.';
+
+            handleSuccess(msg);
+            
+            // Extract email for pre-filling login
+            const email = isFormData ? data.get('email') : data.email;
+            setTimeout(() => navigate('/login', { state: { registered: true, email, message: msg } }), 5000);
         } catch (err) {
             handleError(err);
         } finally {
