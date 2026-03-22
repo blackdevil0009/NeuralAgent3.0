@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import './doctor_dashboard.css';
+import { API_BASE_URL } from '../../utils/config';
 
 const NAV = [
     { id: 'dashboard', label: 'Patient Management', icon: '📋', path: '/doctor/dashboard' },
@@ -28,6 +30,19 @@ export default function DoctorLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const [user, setUser] = useState({ name: 'Dr. Arjun Menon', avatar: '👨‍⚕️', role: 'Senior Consultant' });
+    const [globalAlert, setGlobalAlert] = useState(null); // { id, patient, type }
+
+    useEffect(() => {
+        // Socket for real-time critical alerts
+        const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
+        socket.on('new_emergency', (data) => {
+            // Only show if not already on the emergency page
+            if (!window.location.pathname.includes('/doctor/emergency')) {
+                setGlobalAlert(data);
+            }
+        });
+        return () => socket.disconnect();
+    }, []);
 
     useEffect(() => {
         try {
@@ -120,6 +135,36 @@ export default function DoctorLayout() {
                         </div>
                     </div>
                 </header>
+
+                {globalAlert && (
+                    <div style={{
+                        background: '#c0392b', color: '#fff', padding: '12px 24px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        animation: 'pulse-bg 2s infinite', zIndex: 100
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                            <span style={{ fontSize: '1.4rem' }}>🚨</span>
+                            <div>
+                                <strong style={{ textTransform: 'uppercase' }}>CRITICAL ALERT: {globalAlert.type}</strong>
+                                <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>Patient {globalAlert.patient} requires immediate medical intervention.</div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button
+                                onClick={() => { setGlobalAlert(null); navigate('/doctor/emergency'); }}
+                                style={{ background: '#fff', color: '#c0392b', border: 'none', padding: '6px 16px', borderRadius: 4, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                                VIEW & ATTEMPT CASE
+                            </button>
+                            <button
+                                onClick={() => setGlobalAlert(null)}
+                                style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer' }}
+                            >
+                                IGNORE
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <main className="dd-content">
                     <Outlet />

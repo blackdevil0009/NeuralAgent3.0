@@ -30,9 +30,12 @@ const iceServers = {
 export default function DoctorVideoCall() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const patientId = searchParams.get('patient');
+    const patientId = searchParams.get('patient') || searchParams.get('patientId');
     const patientName = searchParams.get('name') || 'Patient';
     const apptId = searchParams.get('appt');
+    const roomParam = searchParams.get('room');
+    // For emergency calls, room is passed directly. For appointment calls, use apptId.
+    const roomId = apptId || roomParam;
 
     const [phase, setPhase] = useState('permission'); // permission | live | ended
     const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
@@ -57,6 +60,9 @@ export default function DoctorVideoCall() {
 
     const [prescription, setPrescription] = useState('');
     const [rxSaved, setRxSaved] = useState(false);
+    const [activeOverlay, setActiveOverlay] = useState(null); // 'medical'
+    const [medicalData, setMedicalData] = useState(null);
+    const [patientContact, setPatientContact] = useState('');
 
     const fileInputRef = useRef(null);
     const chatEndRef = useRef(null);
@@ -71,23 +77,24 @@ export default function DoctorVideoCall() {
 
     useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages, chatOpen]);
 
-    /* Fetch patient info */
+    /* Fetch patient info & medical data */
     useEffect(() => {
         if (!patientId) return;
-        const fetchPatient = async () => {
+        const fetchPatientDetails = async () => {
             try {
                 const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                const res = await fetch(`${API_BASE_URL}/api/appointments`, {
+                const res = await fetch(`${API_BASE_URL}/api/patients/${patientId}/medical`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const json = await res.json();
                 if (res.ok) {
-                    const match = (json.data?.appointments || []).find(a => String(a.patientId) === String(patientId));
-                    if (match) setPatient(p => ({ ...p, name: match.patientName }));
+                    const data = await res.json();
+                    setPatient(p => ({ ...p, name: data.fullName || p.name }));
+                    setMedicalData(data);
+                    setPatientContact(data.mobile || '');
                 }
             } catch { }
         };
-        fetchPatient();
+        fetchPatientDetails();
     }, [patientId]);
 
     /* Request Camera on mount */
@@ -119,8 +126,12 @@ export default function DoctorVideoCall() {
 
     /* Setup Signaling and Connection */
     const startSession = async () => {
-        if (!apptId || !streamRef.current) {
-            setPermError("Missing appointment ID or Camera Access.");
+        if (!roomId) {
+            setPermError("Could not determine room ID. Please try again.");
+            return;
+        }
+        if (!streamRef.current) {
+            setPermError("Camera/Microphone access is required. Please allow it and refresh.");
             return;
         }
 
@@ -129,11 +140,14 @@ export default function DoctorVideoCall() {
 
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            await fetch(`${API_BASE_URL}/api/appointments/${apptId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status: 'Live' })
-            });
+            // Only update appointment status for scheduled calls, not emergencies
+            if (apptId) {
+                await fetch(`${API_BASE_URL}/api/appointments/${apptId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ status: 'Live' })
+                });
+            }
 
             // Initialize Signaling (Polling only)
             const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
@@ -158,13 +172,13 @@ export default function DoctorVideoCall() {
             // Send ICE candidates
             pc.onicecandidate = (event) => {
                 if (event.candidate) {
-                    socket.emit('new_ice_candidate', { room: apptId, candidate: event.candidate });
+                    socket.emit('new_ice_candidate', { room: roomId, candidate: event.candidate });
                 }
             };
 
             // Join WebSocket Room and announce ready
-            socket.emit('join_video_room', { room: apptId });
-            socket.emit('doctor_ready', { room: apptId });
+            socket.emit('join_video_room', { room: roomId });
+            socket.emit('doctor_ready', { room: roomId });
 
             // On incoming Offer from Patient, Doctor creates Answer
             socket.on('video_offer', async (offer) => {
@@ -172,7 +186,7 @@ export default function DoctorVideoCall() {
                     await pc.setRemoteDescription(new RTCSessionDescription(offer));
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
-                    socket.emit('video_answer', { room: apptId, answer });
+                    socket.emit('video_answer', { room: roomId, answer });
                 } catch (e) { console.error("Answer generation failed", e); }
             });
 
@@ -221,6 +235,17 @@ export default function DoctorVideoCall() {
                 });
             } catch (err) {}
         }
+        // If emergency call, mark it as handled automatically
+        if (roomParam && roomParam.startsWith('emergency_')) {
+            const emId = roomParam.replace('emergency_', '');
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                await fetch(`${API_BASE_URL}/api/emergencies/${emId}/handle`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+            } catch { }
+        }
         setPhase('ended');
     };
 
@@ -229,7 +254,7 @@ export default function DoctorVideoCall() {
         if (!chatInput.trim() || !socketRef.current) return;
         const msg = { text: chatInput, sender: 'Doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(p => [...p, { ...msg, self: true }]);
-        socketRef.current.emit('call_chat_msg', { room: apptId, message: { ...msg, self: false } });
+        socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
         setChatInput('');
     };
 
@@ -251,7 +276,7 @@ export default function DoctorVideoCall() {
             if (res.ok && data.url) {
                 const msg = { text: `Shared file:`, fileUrl: `${API_BASE_URL}${data.url}`, fileName: data.filename, sender: 'Doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
                 setMessages(p => [...p, { ...msg, self: true }]);
-                socketRef.current.emit('call_chat_msg', { room: apptId, message: { ...msg, self: false } });
+                socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
             }
         } catch (err) { } finally {
             setUploading(false);
@@ -282,9 +307,16 @@ export default function DoctorVideoCall() {
 
     const savePrescription = () => {
         setRxSaved(true);
-        // Note: A real implementation would post to /api/prescriptions, but for the scope 
-        // we'll simulate the save to fulfill the "Prescription generation" UI flow.
         setTimeout(() => setRxSaved(false), 3000);
+    };
+
+    const dialFamily = () => {
+        if (!patientContact) {
+            alert("No contact number available for this patient.");
+            return;
+        }
+        const cleaned = patientContact.replace(/[\s\-()]/g, '');
+        window.location.href = `tel:${cleaned}`;
     };
 
     /* ─── PERMISSION SCREEN ─── */
@@ -384,10 +416,53 @@ export default function DoctorVideoCall() {
                 <button className={`vcall-ctrl ${aiOpen ? 'active' : ''}`} onClick={() => { setAiOpen(p => !p); setChatOpen(false); }} style={{ background: '#e0f2fe', color: '#0369a1' }}>
                     🤖 <span>AI Assist</span>
                 </button>
+                <button className="vcall-ctrl" onClick={() => setActiveOverlay('medical')}>
+                    📋 <span>History</span>
+                </button>
+                <button className="vcall-ctrl" onClick={dialFamily}>
+                    📞 <span>Family</span>
+                </button>
                 <button className="vcall-ctrl end" onClick={endSession}>
                     📵 <span>End Call</span>
                 </button>
             </div>
+
+            {/* MEDICAL HISTORY OVERLAY */}
+            {activeOverlay === 'medical' && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 500, maxHeight: '80vh', overflow: 'auto', position: 'relative', color: '#333' }}>
+                        <button onClick={() => setActiveOverlay(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(0,0,0,0.1)', border: 'none', width: 36, height: 36, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', zIndex: 10 }}>×</button>
+                        <div style={{ padding: 36 }}>
+                            <h2 style={{ color: 'var(--doc-green-deep)', marginBottom: 20 }}>📋 Medical History: {patient.name}</h2>
+                            {!medicalData ? (
+                                <p style={{ color: '#888' }}>No medical history on file.</p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    <div style={{ background: '#f8f9f8', padding: 15, borderRadius: 10 }}>
+                                        <h4 style={{ margin: '0 0 5px' }}>🏥 Conditions</h4>
+                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.conditions || 'None reported'}</p>
+                                    </div>
+                                    <div style={{ background: '#f8f9f8', padding: 15, borderRadius: 10 }}>
+                                        <h4 style={{ margin: '0 0 5px' }}>💊 Medications</h4>
+                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.medications || 'None reported'}</p>
+                                    </div>
+                                    <div style={{ background: '#fff5f5', padding: 15, borderRadius: 10, border: '1px solid #feb2b2' }}>
+                                        <h4 style={{ margin: '0 0 5px', color: '#c53030' }}>⚠️ Allergies</h4>
+                                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#c53030', fontWeight: 600 }}>{medicalData.allergies || 'None reported'}</p>
+                                    </div>
+                                    {medicalData.dosha && (
+                                        <div style={{ background: '#f0fff4', padding: 15, borderRadius: 10 }}>
+                                            <h4 style={{ margin: '0 0 5px', color: '#22543d' }}>🌿 Dosha</h4>
+                                            <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.dosha}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <button className="pd-btn pd-btn-primary" style={{ width: '100%', marginTop: 24, justifyContent: 'center' }} onClick={() => setActiveOverlay(null)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* AI ASSISTANT PANEL */}
             {aiOpen && (

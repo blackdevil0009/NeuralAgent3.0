@@ -30,8 +30,12 @@ const iceServers = {
 export default function VideoCall() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const doctorId = searchParams.get('doctor');
+    const doctorId = searchParams.get('doctor') || searchParams.get('doctorId');
     const apptId = searchParams.get('appt');
+    const roomParam = searchParams.get('room');
+    // Emergency calls pass 'room' directly; appointment calls use 'appt'
+    const roomId = apptId || roomParam;
+    const isEmergencyCall = roomParam && roomParam.startsWith('emergency_');
 
     const [phase, setPhase] = useState('permission'); // permission | connecting | live | ended
     const [tip] = useState(TIPS[0]);
@@ -115,12 +119,17 @@ export default function VideoCall() {
             setPermError("Cannot start without Camera/Mic permissions.");
             return;
         }
-        setPhase('connecting');
+        if (isEmergencyCall) {
+            // Emergency calls: no appointment to poll, connect directly
+            connectWebRTC();
+        } else {
+            setPhase('connecting');
+        }
     };
 
     /* Poll backend for Doctor admitting the patient */
     useEffect(() => {
-        if (phase !== 'connecting' || !apptId) return;
+        if (phase !== 'connecting' || !roomId || isEmergencyCall) return;
 
         const checkStatus = async () => {
             try {
@@ -146,7 +155,7 @@ export default function VideoCall() {
     }, [phase, apptId]);
 
     /* Initialize Signaling and WebRTC */
-    const connectWebRTC = () => {
+    const connectWebRTC = async () => {
         setPhase('live');
         try {
             const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
@@ -165,7 +174,7 @@ export default function VideoCall() {
 
             pc.onicecandidate = (event) => {
                 if (event.candidate) {
-                    socket.emit('new_ice_candidate', { room: apptId, candidate: event.candidate });
+                    socket.emit('new_ice_candidate', { room: roomId, candidate: event.candidate });
                 }
             };
 
@@ -174,7 +183,7 @@ export default function VideoCall() {
                 try {
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
-                    socket.emit('video_offer', { room: apptId, offer });
+                    socket.emit('video_offer', { room: roomId, offer });
                 } catch (e) { console.error("Offer generation failed", e); }
             });
 
@@ -197,7 +206,16 @@ export default function VideoCall() {
             });
 
             socket.on('peer_left', () => endCall());
-            socket.emit('join_video_room', { room: apptId });
+            socket.emit('join_video_room', { room: roomId });
+
+            // For emergency calls, patient creates offer immediately (doctor is already waiting)
+            if (isEmergencyCall) {
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    socket.emit('video_offer', { room: roomId, offer });
+                } catch (e) { console.error("Offer failed", e); }
+            }
 
         } catch (err) {
             setPermError("Failed to establish P2P connection.");
@@ -224,7 +242,7 @@ export default function VideoCall() {
         if (!chatInput.trim() || !socketRef.current) return;
         const msg = { text: chatInput, sender: 'Patient', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(p => [...p, { ...msg, self: true }]);
-        socketRef.current.emit('call_chat_msg', { room: apptId, message: { ...msg, self: false } });
+        socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
         setChatInput('');
     };
 
@@ -246,7 +264,7 @@ export default function VideoCall() {
             if (res.ok && data.url) {
                 const msg = { text: `Shared file:`, fileUrl: `${API_BASE_URL}${data.url}`, fileName: data.filename, sender: 'Patient', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
                 setMessages(p => [...p, { ...msg, self: true }]);
-                socketRef.current.emit('call_chat_msg', { room: apptId, message: { ...msg, self: false } });
+                socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
             }
         } catch (err) {
             console.error("File upload failed", err);

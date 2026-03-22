@@ -10,6 +10,9 @@ export default function PatientManagement() {
     const [activeNote, setActiveNote] = useState('');
     const [uploadingReport, setUploadingReport] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [medicalData, setMedicalData] = useState(null);
+    const [activeOverlay, setActiveOverlay] = useState(null);
+    const [patientContact, setPatientContact] = useState('');
     const fileInputRef = useRef(null);
 
     const fetchData = async () => {
@@ -38,6 +41,25 @@ export default function PatientManagement() {
         if (selectedPatient) {
             const savedNote = localStorage.getItem(`notes_${selectedPatient.userId}`) || '';
             setActiveNote(savedNote);
+            
+            // Fetch medical details
+            const fetchMedical = async () => {
+                try {
+                    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                    const res = await fetch(`${API_BASE_URL}/api/patients/${selectedPatient.patientId}/medical`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setMedicalData(data);
+                        setPatientContact(data.mobile || '');
+                    }
+                } catch { }
+            };
+            fetchMedical();
+        } else {
+            setMedicalData(null);
+            setPatientContact('');
         }
     }, [selectedPatient]);
 
@@ -174,6 +196,14 @@ export default function PatientManagement() {
                         </button>
                     )}
 
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+                        <button className="dd-btn dd-btn-outline" style={{ flex: 1, fontSize: '0.8rem' }} onClick={() => setActiveOverlay('medical')}>📋 Medical History</button>
+                        <button className="dd-btn dd-btn-outline" style={{ flex: 1, fontSize: '0.8rem' }} onClick={() => {
+                            if (patientContact) window.location.href = `tel:${patientContact.replace(/[\s\-()]/g, '')}`;
+                            else alert('No contact available');
+                        }}>📞 Contact Patient</button>
+                    </div>
+
                     <div style={{ marginBottom: 24 }}>
                         <h4 style={{ borderBottom: '1px solid var(--doc-border)', paddingBottom: 8, marginBottom: 12 }}>Consultation Notes</h4>
                         <p style={{ fontSize: '0.9rem', color: '#555', fontStyle: 'italic' }}>"{selectedPatient.notes || 'No notes provided by patient.'}"</p>
@@ -199,6 +229,43 @@ export default function PatientManagement() {
                             onChange={(e) => setActiveNote(e.target.value)}
                         />
                         <button className="dd-btn dd-btn-primary" style={{ width: '100%', marginTop: 12, justifyContent: 'center' }} onClick={saveNote}>Save Observations</button>
+                    </div>
+                </div>
+            )}
+
+            {/* MEDICAL HISTORY OVERLAY */}
+            {activeOverlay === 'medical' && selectedPatient && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 500, maxHeight: '80vh', overflow: 'auto', position: 'relative', color: '#333' }}>
+                        <button onClick={() => setActiveOverlay(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(0,0,0,0.1)', border: 'none', width: 36, height: 36, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', zIndex: 10 }}>×</button>
+                        <div style={{ padding: 36 }}>
+                            <h2 style={{ color: 'var(--doc-green-deep)', marginBottom: 20 }}>📋 Medical History: {selectedPatient.patientName}</h2>
+                            {!medicalData ? (
+                                <p style={{ color: '#888' }}>No medical history on file for this patient.</p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    <div style={{ background: '#f8f9f8', padding: 15, borderRadius: 10 }}>
+                                        <h4 style={{ margin: '0 0 5px' }}>🏥 Conditions</h4>
+                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.conditions || 'None reported'}</p>
+                                    </div>
+                                    <div style={{ background: '#f8f9f8', padding: 15, borderRadius: 10 }}>
+                                        <h4 style={{ margin: '0 0 5px' }}>💊 Medications</h4>
+                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.medications || 'None reported'}</p>
+                                    </div>
+                                    <div style={{ background: '#fff5f5', padding: 15, borderRadius: 10, border: '1px solid #feb2b2' }}>
+                                        <h4 style={{ margin: '0 0 5px', color: '#c53030' }}>⚠️ Allergies</h4>
+                                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#c53030', fontWeight: 600 }}>{medicalData.allergies || 'None reported'}</p>
+                                    </div>
+                                    {medicalData.dosha && (
+                                        <div style={{ background: '#f0fff4', padding: 15, borderRadius: 10 }}>
+                                            <h4 style={{ margin: '0 0 5px', color: '#22543d' }}>🌿 Dosha</h4>
+                                            <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.dosha}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <button className="pd-btn pd-btn-primary" style={{ width: '100%', marginTop: 24, justifyContent: 'center' }} onClick={() => setActiveOverlay(null)}>Close</button>
+                        </div>
                     </div>
                 </div>
             )}
