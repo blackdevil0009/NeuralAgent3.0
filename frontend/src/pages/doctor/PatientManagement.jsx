@@ -11,6 +11,7 @@ export default function PatientManagement() {
     const [uploadingReport, setUploadingReport] = useState(false);
     const [loading, setLoading] = useState(true);
     const [medicalData, setMedicalData] = useState(null);
+    const [medicalHistory, setMedicalHistory] = useState([]);
     const [activeOverlay, setActiveOverlay] = useState(null);
     const [patientContact, setPatientContact] = useState('');
     const fileInputRef = useRef(null);
