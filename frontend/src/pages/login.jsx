@@ -230,7 +230,10 @@ export default function Login() {
             });
 
             const json = await res.json();
-            if (!res.ok) throw new Error(json.data?.message || 'Login failed. Please check your credentials.');
+            if (!res.ok) {
+                if (res.status === 403) setIsUnverified(true);
+                throw new Error(json.data?.message || 'Login failed. Please check your credentials.');
+            }
 
             /* Persist token */
             const store = rememberMe ? localStorage : sessionStorage;
@@ -248,9 +251,6 @@ export default function Login() {
         } catch (err) {
             handleError(err);
             setErrorMsg(err.message);
-            if (err.message.toLowerCase().includes('verify') || err.message.toLowerCase().includes('verification')) {
-                setIsUnverified(true);
-            }
         } finally {
             setLoading(false);
         }
