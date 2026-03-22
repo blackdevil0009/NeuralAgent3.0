@@ -73,6 +73,13 @@ def init_db():
             FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
+    
+    # Schema Migration: Add fileSize if missing
+    try:
+        cursor.execute("ALTER TABLE patient_reports ADD COLUMN fileSize VARCHAR(50) AFTER displayName")
+        conn.commit()
+    except:
+        pass # Already exists
 
     # Patient details table
     cursor.execute('''
