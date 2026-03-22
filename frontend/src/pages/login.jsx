@@ -253,11 +253,11 @@ export default function Login() {
             /* Persist token */
             const store = rememberMe ? localStorage : sessionStorage;
             store.setItem('token', json.token);
-            store.setItem('role', role);
-            store.setItem('user', JSON.stringify(userData.user || {}));
+            store.setItem('role', json.role || role);
+            if (json.user) store.setItem('user', JSON.stringify(json.user));
 
             /* Route based on role */
-            if (userData.role === 'doctor' || role === 'doctor') {
+            if (json.role === 'doctor' || role === 'doctor') {
                 navigate('/doctor');
             } else {
                 navigate('/patient');
@@ -279,7 +279,7 @@ export default function Login() {
         setErrorMsg('');
         try {
             const endpoint = verificationMode === '2fa' 
-                ? '/api/auth/verify-otp' 
+                ? '/api/auth/verify-2fa-otp' 
                 : '/api/auth/verify-registration-otp';
 
             const res = await fetch(`${API_BASE_URL}${endpoint}`, {

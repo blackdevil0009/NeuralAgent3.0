@@ -478,8 +478,8 @@ def verify_registration_otp():
     finally:
         conn.close()
 
-@app.route('/api/auth/verify-otp', methods=['POST'])
-def verify_otp():
+@app.route('/api/auth/verify-2fa-otp', methods=['POST'])
+def verify_2fa_otp():
     data = request.get_json()
     email = data.get('email')
     otp = data.get('otp')
