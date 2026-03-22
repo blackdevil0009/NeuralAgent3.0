@@ -136,7 +136,7 @@ export default function DoctorVideoCall() {
             });
 
             // Initialize Signaling
-            const socket = io(API_BASE_URL, { transports: ['websocket'] });
+            const socket = io(API_BASE_URL);
             socketRef.current = socket;
 
             // Initialize WebRTC Peer
