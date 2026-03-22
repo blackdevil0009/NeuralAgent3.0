@@ -305,8 +305,8 @@ def register():
                     cursor.execute('UPDATE users SET verificationToken = %s WHERE id = %s', (verification_token, existing_user['id']))
                     conn.commit()
                     
-                    frontend_url = os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')
-                    verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+                    api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
+                    verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
                     if send_verification_email(data.get('email'), verification_link):
                         return signed_json_response({"message": "Account already exists but is unverified. A new verification email has been sent."}, 200)
                     else:
@@ -340,8 +340,8 @@ def register():
             conn.commit()
 
             # Send Verification Email
-            frontend_url = os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')
-            verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+            api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
+            verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
             send_verification_email(data.get('email'), verification_link)
 
             return signed_json_response({"message": f"{role.capitalize()} registered successfully! Please check your email to verify your account."}, 201)
@@ -451,8 +451,8 @@ def resend_verification():
         cursor.execute("UPDATE users SET verificationToken = %s WHERE id = %s", (verification_token, user['id']))
         conn.commit()
         
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')
-        verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+        api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
+        verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
         if send_verification_email(email, verification_link):
             return signed_json_response({"message": "A new verification link has been sent to your email."}, 200)
         else:
