@@ -66,7 +66,7 @@ def get_chat_history(user_id, other_id):
                 "receiverId": row['receiverId'],
                 "content": decrypted_content if decrypted_content else "[DECRYPTION FAILED]",
                 "isDoctorResponded": row['isDoctorResponded'],
-                "timestamp": row['timestamp'].isoformat()
+                "timestamp": row['timestamp'].isoformat() + "Z"
             })
             
         return {"messages": messages}, 200
