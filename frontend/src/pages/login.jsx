@@ -417,7 +417,7 @@ export default function Login() {
                             <div className="form-group">
                                 <label>Verification Code</label>
                                 <input
-                                    type="text" maxLength="6" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                                    type="password" maxLength="6" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                                     style={{ fontSize: '1.8rem', textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold' }}
                                     autoFocus
                                 />
