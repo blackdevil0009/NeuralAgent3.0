@@ -53,8 +53,13 @@ def init_db():
             city VARCHAR(100),
             state VARCHAR(100),
             pincode VARCHAR(10),
+            dob VARCHAR(50),
+            gender VARCHAR(20),
+            blood_group VARCHAR(20),
             rsaPublicKey TEXT,
             rsaPrivateKeyEncrypted TEXT,
+            isVerified BOOLEAN DEFAULT FALSE,
+            verificationToken VARCHAR(255),
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -80,6 +85,21 @@ def init_db():
         conn.commit()
     except:
         pass # Already exists
+
+    # Schema Migration: Add verification columns to users if missing
+    migration_tasks = [
+        "ALTER TABLE users ADD COLUMN dob VARCHAR(50) AFTER pincode",
+        "ALTER TABLE users ADD COLUMN gender VARCHAR(20) AFTER dob",
+        "ALTER TABLE users ADD COLUMN blood_group VARCHAR(20) AFTER gender",
+        "ALTER TABLE users ADD COLUMN isVerified BOOLEAN DEFAULT FALSE AFTER rsaPrivateKeyEncrypted",
+        "ALTER TABLE users ADD COLUMN verificationToken VARCHAR(255) AFTER isVerified"
+    ]
+    for task in migration_tasks:
+        try:
+            cursor.execute(task)
+            conn.commit()
+        except:
+            pass # Already exists
 
     # Patient details table
     cursor.execute('''

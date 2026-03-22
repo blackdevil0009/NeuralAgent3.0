@@ -105,6 +105,17 @@ export default function PatientProfile() {
     };
 
     const handleSubmit = async () => {
+        // Age Validation (Min 1 year)
+        if (profile.dob) {
+            const birthDate = new Date(profile.dob);
+            const today = new Date();
+            const minAgeDate = new Date();
+            minAgeDate.setFullYear(today.getFullYear() - 1);
+            if (birthDate > minAgeDate) {
+                handleError('Patient must be at least 1 year old.');
+                return;
+            }
+        }
         setLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -169,6 +180,11 @@ export default function PatientProfile() {
                         <span className="pd-profile-pill">{profile.dosha}</span>
                         <span className="pd-profile-pill">Blood: {profile.bloodGroup}</span>
                         {profile.city && <span className="pd-profile-pill">📍 {profile.city}</span>}
+                        {profile.isVerified ? (
+                            <span className="pd-profile-pill" style={{ background: '#e6fffa', color: '#2c7a7b', border: '1px solid #b2f5ea' }}>✅ Email Verified</span>
+                        ) : (
+                            <span className="pd-profile-pill" style={{ background: '#fff5f5', color: '#c53030', border: '1px solid #feb2b2' }}>⚠️ Verification Pending</span>
+                        )}
                     </div>
                 </div>
             </div>

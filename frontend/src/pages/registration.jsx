@@ -98,6 +98,17 @@ function PatientForm({ onSubmit, loading }) {
         if (form.confirmPass !== form.password) errs.confirmPass = 'Passwords do not match.';
         if (!form.termsAgreed) errs.termsAgreed = 'You must accept the terms & conditions.';
 
+        // Age Validation (Min 1 year)
+        if (form.dob) {
+            const birthDate = new Date(form.dob);
+            const today = new Date();
+            const minAgeDate = new Date();
+            minAgeDate.setFullYear(today.getFullYear() - 1);
+            if (birthDate > minAgeDate) {
+                errs.dob = 'Patient must be at least 1 year old.';
+            }
+        }
+
         return errs;
     };
 
@@ -698,8 +709,8 @@ export default function Registration() {
             const json = await res.json();
             if (!res.ok) throw new Error(json.data?.message || 'Registration failed. Please try again.');
 
-            handleSuccess('🎉 Registration successful! Redirecting to login…');
-            setTimeout(() => navigate('/login'), 2200);
+            handleSuccess('🎉 Registration successful! Please check your email and verify your account to log in.');
+            setTimeout(() => navigate('/login'), 5000);
         } catch (err) {
             handleError(err);
         } finally {

@@ -77,6 +77,18 @@ export default function EditProfile() {
     const handleChange = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
     const handleSubmit = async () => {
+        // Age Validation (Min 1 year)
+        if (form.dob) {
+            const birthDate = new Date(form.dob);
+            const today = new Date();
+            const minAgeDate = new Date();
+            minAgeDate.setFullYear(today.getFullYear() - 1);
+            if (birthDate > minAgeDate) {
+                handleError('Patient must be at least 1 year old.');
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');

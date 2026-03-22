@@ -20,7 +20,8 @@ import traceback
 from ai.brain import get_brain
 from utils.otp_utils import generate_otp
 from utils.sms_utils import send_fast2sms_otp
-from utils.email_utils import send_reset_email
+from utils.email_utils import send_reset_email, send_verification_email
+import datetime
 import secrets
 import traceback
 
@@ -272,18 +273,33 @@ def register():
         private_pem, public_pem = generate_rsa_keypair()
         private_key_encrypted = encrypt_data(private_pem)
 
+        # Age Validation (Patient minimum 1 year)
+        if role == 'patient':
+            dob_str = data.get('dob')
+            if dob_str:
+                try:
+                    dob = datetime.datetime.strptime(dob_str, '%Y-%m-%d')
+                    one_year_ago = datetime.datetime.now() - datetime.timedelta(days=365)
+                    if dob > one_year_ago:
+                        return signed_json_response({"message": "Patient must be at least 1 year old."}, 400)
+                except ValueError:
+                    return signed_json_response({"message": "Invalid date of birth format."}, 400)
+
+        # Generate Verification Token
+        verification_token = secrets.token_urlsafe(32)
+
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
         try:
             cursor.execute('''
-                INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted, isVerified, verificationToken)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 data.get('fullName'), data.get('email'), hashed_password, role,
                 data.get('mobile'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), 
                 data.get('address'), data.get('city'), data.get('state'), data.get('pincode'),
-                public_pem, private_key_encrypted
+                public_pem, private_key_encrypted, 0, verification_token
             ))
             user_id = cursor.lastrowid
 
@@ -302,7 +318,13 @@ def register():
                 ''', (user_id,))
 
             conn.commit()
-            return signed_json_response({"message": f"{role.capitalize()} registered successfully!"}, 201)
+
+            # Send Verification Email
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')
+            verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+            send_verification_email(data.get('email'), verification_link)
+
+            return signed_json_response({"message": f"{role.capitalize()} registered successfully! Please check your email to verify your account."}, 201)
 
         except mysql.connector.IntegrityError:
             return signed_json_response({"message": "Email already registered."}, 400)
@@ -335,6 +357,9 @@ def login():
     if user['role'] != role:
         return signed_json_response({"message": f"Access denied. You are registered as a {user['role']}."}, 403)
 
+    if not user.get('isVerified', 0):
+        return signed_json_response({"message": "Please verify your email address before logging in. Check your inbox for the verification link."}, 403)
+
     access_token = create_access_token(identity=str(user['id']))
 
     return signed_json_response({
@@ -348,6 +373,39 @@ def login():
             "mobile": user['mobile']
         }
     })
+
+@app.route('/api/auth/verify-email', methods=['GET'])
+def verify_email():
+    token = request.args.get('token')
+    if not token:
+        return signed_json_response({"error": "Missing verification token"}, 400)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id FROM users WHERE verificationToken = %s", (token,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return "<h1>Invalid Link</h1><p>This verification link is invalid or has already been used.</p>"
+        
+        cursor.execute("UPDATE users SET isVerified = 1, verificationToken = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+        
+        return """
+        <html>
+            <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #2d6a4f;">Email Verified Successfully!</h1>
+                <p>Your account is now active. You will be redirected to the login page in 3 seconds...</p>
+                <script>setTimeout(() => window.location.href='https://vaidyamedx.in/login', 3000)</script>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
 
 # --- Secure Messaging Endpoints ---
 
@@ -479,8 +537,10 @@ def handle_profile():
     
     if request.method == 'GET':
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin
+            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role,
+                   pd.dosha, pd.allergies, pd.conditions, pd.medications
             FROM users u
+            LEFT JOIN patient_details pd ON u.id = pd.userId
             WHERE u.id = %s
         ''', (current_user_id,))
         profile = cursor.fetchone()
@@ -490,6 +550,24 @@ def handle_profile():
     elif request.method == 'PUT':
         data = request.get_json()
         
+        # Check if user is patient and validate age
+        conn2 = get_db_connection()
+        cursor2 = conn2.cursor(dictionary=True)
+        cursor2.execute("SELECT role FROM users WHERE id = %s", (current_user_id,))
+        user_role = cursor2.fetchone()['role']
+        conn2.close()
+
+        if user_role == 'patient':
+            dob_str = data.get('dob')
+            if dob_str:
+                try:
+                    dob = datetime.datetime.strptime(dob_str, '%Y-%m-%d')
+                    one_year_ago = datetime.datetime.now() - datetime.timedelta(days=365)
+                    if dob > one_year_ago:
+                        return signed_json_response({"message": "Patient must be at least 1 year old."}, 400)
+                except ValueError:
+                    pass # Allow existing non-standard formats for now, but block invalid new ones
+
         # update users table
         cursor.execute('''
             UPDATE users SET fullName=%s, mobile=%s, dob=%s, gender=%s, blood_group=%s, address=%s, city=%s, state=%s, pincode=%s
@@ -497,23 +575,24 @@ def handle_profile():
         ''', (data.get('name'), data.get('mobile'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), data.get('address'), data.get('city'), data.get('state'), data.get('pin'), current_user_id))
         
         # update or insert patient_details
-        cursor.execute("SELECT userId FROM patient_details WHERE userId=%s", (current_user_id,))
-        if cursor.fetchone():
-            cursor.execute('''
-                UPDATE patient_details SET bloodGroup=%s
-                WHERE userId=%s
-            ''', (data.get('bloodGroup'), current_user_id))
-        else:
-            cursor.execute('''
-                INSERT INTO patient_details (userId, bloodGroup)
-                VALUES (%s, %s)
-            ''', (current_user_id, data.get('bloodGroup')))
+        if user_role == 'patient':
+            cursor.execute("SELECT userId FROM patient_details WHERE userId=%s", (current_user_id,))
+            if cursor.fetchone():
+                cursor.execute('''
+                    UPDATE patient_details SET dosha=%s, allergies=%s, conditions=%s, medications=%s
+                    WHERE userId=%s
+                ''', (data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), current_user_id))
+            else:
+                cursor.execute('''
+                    INSERT INTO patient_details (userId, dosha, allergies, conditions, medications)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (current_user_id, data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications')))
         
         conn.commit()
         
         # return updated
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin
+            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role
             FROM users u
             WHERE u.id = %s
         ''', (current_user_id,))

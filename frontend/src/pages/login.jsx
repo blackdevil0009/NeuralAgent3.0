@@ -114,7 +114,7 @@ export default function Login() {
         const errs = {};
         const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRe.test(email)) errs.email = 'Enter a valid email address.';
-        if (password.length < 6) errs.password = 'Password must be at least 6 characters.';
+        if (password.length < 8) errs.password = 'Password must be at least 8 characters.';
         return errs;
     };
 
