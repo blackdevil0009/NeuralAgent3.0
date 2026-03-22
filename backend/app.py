@@ -5,6 +5,7 @@ import mysql.connector
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from database import get_db_connection, init_db
@@ -23,6 +24,7 @@ import traceback
 app = Flask(__name__)
 CORS(app)
 bcrypt = Bcrypt(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Configuration
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'neural-agent-secret-2026')
@@ -915,6 +917,36 @@ def verify_otp():
         cursor.close()
         conn.close()
 
+# --- WEBRTC SIGNALING ENDPOINTS ---
+@socketio.on('join_video_room')
+def on_join_video_room(data):
+    if 'room' in data:
+        room = str(data['room'])
+        join_room(room)
+        emit('peer_joined', {'message': 'A peer has joined'}, to=room, include_self=False)
+
+@socketio.on('video_offer')
+def on_video_offer(data):
+    if 'room' in data and 'offer' in data:
+        emit('video_offer', data['offer'], to=str(data['room']), include_self=False)
+
+@socketio.on('video_answer')
+def on_video_answer(data):
+    if 'room' in data and 'answer' in data:
+        emit('video_answer', data['answer'], to=str(data['room']), include_self=False)
+
+@socketio.on('new_ice_candidate')
+def on_new_ice_candidate(data):
+    if 'room' in data and 'candidate' in data:
+        emit('new_ice_candidate', data['candidate'], to=str(data['room']), include_self=False)
+
+@socketio.on('leave_video_room')
+def on_leave_video_room(data):
+    if 'room' in data:
+        room = str(data['room'])
+        leave_room(room)
+        emit('peer_left', {'message': 'A peer has left'}, to=room, include_self=False)
+
 if __name__ == '__main__':
     init_db()
-    app.run(port=8000, debug=True)
+    socketio.run(app, port=8000, debug=True, host='0.0.0.0')
