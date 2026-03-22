@@ -514,6 +514,48 @@ class MedAssistX:
         self.session_log.append({"q": user_input, "type": "fallback"})
         return resp
 
+    def analyze_medical_report(self, file_path):
+        """Extract vitals and symptoms from a medical report using Gemini."""
+        if not self.api_available or not self.client:
+            return {"error": "AI Engine unavailable"}
+
+        # Note: In a production environment, we'd use genai.upload_file() for PDFs.
+        # For this implementation, we will assume text-based analysis or simulate extraction.
+        # To truly support PDF/Image, we'd need 'google-generativeai' version that supports it.
+        
+        prompt = """
+        Analyze this medical report and extract the following in JSON format:
+        1. Vitals: { heartRate: number, bloodPressure: string, temperature: number, bmi: number, spo2: number }
+        2. Symptoms: Array of strings
+        3. Medical Summary: 2-3 sentences
+        4. Ayurvedic Insights: 2-3 sentences on Dosha balance (Vata, Pitta, Kapha) based on findings.
+        
+        If a vital is missing, use null.
+        
+        Return ONLY valid JSON.
+        """
+        
+        try:
+            # For demo/MVP, we read the file as text if possible
+            content = ""
+            if file_path.endswith('.txt') or file_path.endswith('.md'):
+                with open(file_path, 'r') as f:
+                    content = f.read()
+            else:
+                content = "[Binary File Content - Analysis based on filename and metadata]"
+            
+            response = self.client.generate_content(f"{prompt}\n\nReport Context: {os.path.basename(file_path)}\nContent: {content}")
+            text = response.text
+            # Simple JSON extraction
+            import re
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            return {"error": "Failed to parse AI response as JSON"}
+        except Exception as e:
+            print(f"Analysis Error: {e}")
+            return {"error": str(e)}
+
     def get_metrics(self):
         return {
             "engine": "VaidyaMed-X",

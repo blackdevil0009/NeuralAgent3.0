@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch()
 import os
 from dotenv import load_dotenv
 load_dotenv()  # Load .env before any other config reads
@@ -14,6 +16,7 @@ import chat_vcall
 from datetime import timedelta
 import functools
 import time
+import traceback
 from ai.brain import get_brain
 from utils.otp_utils import generate_otp
 from utils.sms_utils import send_fast2sms_otp
@@ -838,6 +841,181 @@ def notify_patient_emergency_call(em_id):
         }, room=f"user_{patient_id}")
         return signed_json_response({"message": "Patient notified"})
     except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+# ─── Medical Reports & Health Data ───
+
+@app.route('/api/reports', methods=['POST'])
+@jwt_required()
+def upload_report():
+    """Upload a medical report."""
+    current_user_id = int(get_jwt_identity())
+    if 'file' not in request.files:
+        return signed_json_response({"error": "No file part"}, 400)
+    file = request.files['file']
+    if file.filename == '':
+        return signed_json_response({"error": "No selected file"}, 400)
+    
+    if file:
+        filename = secure_filename(f"{current_user_id}_{int(time.time())}_{file.filename}")
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        
+        display_name = request.form.get('displayName', file.filename.split('.')[0])
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO patient_reports (userId, filename, displayName, status)
+                VALUES (%s, %s, %s, 'Pending')
+            """, (current_user_id, filename, display_name))
+            conn.commit()
+            report_id = cursor.lastrowid
+            return signed_json_response({
+                "message": "Report uploaded successfully",
+                "report": {"id": report_id, "name": display_name, "status": "Pending"}
+            })
+        except Exception as e:
+            return signed_json_response({"error": str(e)}, 500)
+        finally:
+            conn.close()
+
+@app.route('/api/reports', methods=['GET'])
+@jwt_required()
+def get_reports():
+    """List all reports for the current user."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM patient_reports WHERE userId = %s ORDER BY createdAt DESC", (current_user_id,))
+        rows = cursor.fetchall()
+        reports = []
+        for r in rows:
+            reports.append({
+                "id": r['id'],
+                "name": r['displayName'],
+                "date": r['createdAt'].strftime('%d %b %Y'),
+                "status": r['status'],
+                "summary": r['summary'],
+                "ayurvedic": r['ayurvedicInsights']
+            })
+        return signed_json_response({"reports": reports})
+    finally:
+        conn.close()
+
+@app.route('/api/patient/dashboard-data', methods=['GET'])
+@jwt_required()
+def get_dashboard_data():
+    """Aggregated data for the Health Dashboard."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # 1. Fetch Latest Vitals
+        cursor.execute("""
+            SELECT metricType, val, unit, changeDir, changeText, color 
+            FROM patient_health_metrics 
+            WHERE userId = %s 
+            ORDER BY analyzedAt DESC
+        """, (current_user_id,))
+        vitals_raw = cursor.fetchall()
+        # Keep only latest of each type
+        vitals = {}
+        for v in vitals_raw:
+            if v['metricType'] not in vitals:
+                vitals[v['metricType']] = {
+                    "label": v['metricType'],
+                    "value": v['val'],
+                    "unit": v['unit'],
+                    "dir": v['changeDir'],
+                    "change": v['changeText'],
+                    "color": v['color'],
+                    "icon": "❤️" if "Heart" in v['metricType'] else "🌡️" if "Temp" in v['metricType'] else "⚖️" if "BMI" in v['metricType'] else "🫁" if "SpO2" in v['metricType'] else "🩸"
+                }
+        
+        # 2. Fetch Symptoms
+        cursor.execute("SELECT symptom, severity, analyzedAt FROM patient_symptoms WHERE userId = %s ORDER BY analyzedAt DESC LIMIT 10", (current_user_id,))
+        symptoms = cursor.fetchall()
+        
+        # 3. Recent Activity (from reports & symptoms)
+        activity = []
+        cursor.execute("SELECT displayName, createdAt FROM patient_reports WHERE userId = %s ORDER BY createdAt DESC LIMIT 3", (current_user_id,))
+        for r in cursor.fetchall():
+            activity.append({"title": f"Report '{r['displayName']}' uploaded", "time": "Recently", "dot": "#c9a84c"})
+        
+        return signed_json_response({
+            "vitals": list(vitals.values()),
+            "symptoms": symptoms,
+            "activity": activity
+        })
+    finally:
+        conn.close()
+
+@app.route('/api/emergencies/%d/handle', methods=['PUT']) # Placeholder for context
+@app.route('/api/reports/<int:report_id>/analyze', methods=['POST'])
+@jwt_required()
+def analyze_report_api(report_id):
+    """Triggers AI analysis for a report and saves metrics."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM patient_reports WHERE id = %s AND userId = %s", (report_id, current_user_id))
+        report = cursor.fetchone()
+        if not report:
+            return signed_json_response({"error": "Report not found"}, 404)
+        
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], report['filename'])
+        if not os.path.exists(file_path):
+            return signed_json_response({"error": "File missing on server"}, 404)
+            
+        brain = get_brain()
+        analysis = brain.analyze_medical_report(file_path)
+        
+        if "error" in analysis:
+            return signed_json_response({"error": analysis['error']}, 500)
+            
+        # Update report status
+        cursor.execute("""
+            UPDATE patient_reports 
+            SET status = 'Analysed', summary = %s, ayurvedicInsights = %s 
+            WHERE id = %s
+        """, (analysis.get('Medical Summary'), analysis.get('Ayurvedic Insights'), report_id))
+        
+        # Save Vitals
+        v_data = analysis.get('Vitals', {})
+        metric_map = {
+            'heartRate': ('Heart Rate', 'bpm', 'red'),
+            'bloodPressure': ('Blood Pressure', 'mmHg', 'blue'),
+            'temperature': ('Temperature', '°C', 'gold'),
+            'bmi': ('BMI', '', 'green'),
+            'spo2': ('SpO2', '%', 'purple')
+        }
+        
+        for key, (label, unit, color) in metric_map.items():
+            val = v_data.get(key)
+            if val is not None:
+                cursor.execute("""
+                    INSERT INTO patient_health_metrics (userId, metricType, val, unit, color, changeText)
+                    VALUES (%s, %s, %s, %s, %s, 'Normal')
+                """, (current_user_id, label, str(val), unit, color))
+                
+        # Save Symptoms
+        symptoms = analysis.get('Symptoms', [])
+        for sym in symptoms:
+            cursor.execute("""
+                INSERT INTO patient_symptoms (userId, symptom, sourceReportId)
+                VALUES (%s, %s, %s)
+            """, (current_user_id, sym, report_id))
+            
+        conn.commit()
+        return signed_json_response({"message": "Analysis complete", "data": analysis})
+    except Exception as e:
+        traceback.print_exc()
         return signed_json_response({"error": str(e)}, 500)
     finally:
         conn.close()

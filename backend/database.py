@@ -174,6 +174,51 @@ def init_db():
         )
     ''')
 
+    # Medical Reports table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS patient_reports (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId INT NOT NULL,
+            filename VARCHAR(512) NOT NULL,
+            displayName VARCHAR(255) NOT NULL,
+            status VARCHAR(50) DEFAULT 'Pending',
+            summary TEXT,
+            ayurvedicInsights TEXT,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Health Metrics (Vitals) table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS patient_health_metrics (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId INT NOT NULL,
+            metricType VARCHAR(50) NOT NULL, -- 'Heart Rate', 'Blood Pressure', etc.
+            val VARCHAR(50) NOT NULL,
+            unit VARCHAR(20),
+            changeDir VARCHAR(10) DEFAULT 'up', -- 'up' or 'down'
+            changeText VARCHAR(50), -- e.g. '+2%' or 'Normal'
+            color VARCHAR(20) DEFAULT 'blue',
+            analyzedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Analyzed Symptoms table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS patient_symptoms (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId INT NOT NULL,
+            symptom VARCHAR(255) NOT NULL,
+            severity VARCHAR(50) DEFAULT 'Moderate',
+            sourceReportId INT NULL,
+            analyzedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(sourceReportId) REFERENCES patient_reports(id) ON DELETE SET NULL
+        )
+    ''')
+
     conn.commit()
     conn.close()
 

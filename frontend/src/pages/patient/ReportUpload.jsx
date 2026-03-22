@@ -1,47 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
-
-const SAMPLE_REPORTS = [
-    { id: 1, name: 'CBC Blood Test', date: '20 Feb 2026', size: '1.2 MB', status: 'Analysed', type: '🩸', pill: 'pd-pill-green' },
-    { id: 2, name: 'Liver Function Test', date: '15 Feb 2026', size: '856 KB', status: 'Analysed', type: '🧪', pill: 'pd-pill-green' },
-    { id: 3, name: 'Chest X-Ray', date: '10 Feb 2026', size: '4.5 MB', status: 'Pending', type: '🫁', pill: 'pd-pill-gold' },
-    { id: 4, name: 'Thyroid Panel', date: '02 Feb 2026', size: '730 KB', status: 'Analysed', type: '🔬', pill: 'pd-pill-green' },
-];
-
-const ANALYSIS_RESULT = {
-    summary: 'Your CBC report shows all parameters within normal range. Haemoglobin is 13.8 g/dL (normal). WBC count is 6,500/μL (normal). Platelets are 2.4 lakh/μL (normal).',
-    ayurvedic: 'From an Ayurvedic perspective, your blood quality (Rakta Dhatu) appears healthy. Recommended: Include pomegranate, beetroot, and Shatavari in your diet to maintain Rakta Dhatu balance.',
-    followUp: 'No critical values detected. Recommended follow-up in 3 months.',
-};
+import { API_BASE_URL } from '../../utils/config';
+import { handleError } from '../../utils/error_handlers';
 
 export default function ReportUpload() {
-    const [reports, setReports] = useState(SAMPLE_REPORTS);
+    const [reports, setReports] = useState([]);
     const [dragOver, setDragOver] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [analysing, setAnalysing] = useState(false);
     const [selected, setSelected] = useState(null);
     const [showResult, setShowResult] = useState(false);
+    const [loading, setLoading] = useState(true);
     const fileRef = useRef(null);
 
-    // Mock Patient ID for Rohit Sharma (P01) to show cross-portal functionality
-    const PATIENT_ID = 'P01';
+    const fetchReports = async () => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/reports`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setReports(json.reports || []);
+            }
+        } catch (err) {
+            handleError(err, 'Failed to fetch reports');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadSharedReports = () => {
-            const sharedReports = JSON.parse(localStorage.getItem(`patient_reports_${PATIENT_ID}`) || '[]');
-            if (sharedReports.length > 0) {
-                // Merge shared reports with initial samples, avoiding duplicates by name/date
-                setReports(prev => {
-                    const existingNames = new Set(prev.map(r => r.name + r.date));
-                    const newUnique = sharedReports.filter(r => !existingNames.has(r.name + r.date));
-                    return [...newUnique, ...prev];
-                });
-            }
-        };
-
-        loadSharedReports();
-        // Listen for storage changes in case doctor uploads while patient is on the page
-        window.addEventListener('storage', loadSharedReports);
-        return () => window.removeEventListener('storage', loadSharedReports);
+        fetchReports();
     }, []);
 
     const handleFiles = async (files) => {
@@ -52,26 +41,57 @@ export default function ReportUpload() {
         if (file.size > 20 * 1024 * 1024) { alert('File must be under 20 MB.'); return; }
 
         setUploading(true);
-        await new Promise(r => setTimeout(r, 1500));
-        const newReport = {
-            id: Date.now(), name: file.name.replace(/\.[^.]+$/, ''),
-            date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-            size: (file.size / 1024).toFixed(0) + ' KB', status: 'Processing', type: '📄', pill: 'pd-pill-blue',
-        };
-        setReports(prev => [newReport, ...prev]);
-        setUploading(false);
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('displayName', file.name.replace(/\.[^.]+$/, ''));
 
-        // Simulate AI processing
-        setTimeout(() => {
-            setReports(prev => prev.map(r => r.id === newReport.id ? { ...r, status: 'Analysed', pill: 'pd-pill-green' } : r));
-        }, 3000);
+            const res = await fetch(`${API_BASE_URL}/api/reports`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const json = await res.json();
+            if (res.ok) {
+                fetchReports(); // Refresh list
+            } else {
+                alert(json.error || 'Upload failed');
+            }
+        } catch (err) {
+            handleError(err, 'Upload failed');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleDrop = (e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); };
+    
     const handleAnalyse = async (report) => {
-        setSelected(report); setAnalysing(true);
-        await new Promise(r => setTimeout(r, 1800));
-        setAnalysing(false); setShowResult(true);
+        setAnalysing(true);
+        setSelected(report);
+        setShowResult(true); // Open modal in loading state
+        
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/reports/${report.id}/analyze`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setSelected({ ...report, ...json.data });
+                fetchReports(); // Update status in list
+            } else {
+                alert(json.error || 'Analysis failed');
+                setShowResult(false);
+            }
+        } catch (err) {
+            handleError(err, 'Analysis failed');
+            setShowResult(false);
+        } finally {
+            setAnalysing(false);
+        }
     };
 
     const handleDownload = (report) => {
@@ -165,16 +185,15 @@ export default function ReportUpload() {
                                     <tr key={r.id}>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span>{r.type}</span>
+                                                <span>📄</span>
                                                 <div>
                                                     <div style={{ fontWeight: 600 }}>{r.name}</div>
-                                                    {r.doctorGenerated && <div style={{ fontSize: '0.65rem', color: 'var(--doc-green-light)', fontWeight: 700 }}>SHARED BY DOCTOR</div>}
                                                 </div>
                                             </div>
                                         </td>
                                         <td>{r.date}</td>
-                                        <td>{r.size}</td>
-                                        <td><span className={`pd-pill ${r.pill}`}>{r.status}</span></td>
+                                        <td>{r.size || '---'}</td>
+                                        <td><span className={`pd-pill ${r.status === 'Analysed' ? 'pd-pill-green' : 'pd-pill-gold'}`}>{r.status}</span></td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 6 }}>
                                                 <button className="pd-btn pd-btn-primary pd-btn-sm"
@@ -220,15 +239,15 @@ export default function ReportUpload() {
                             <>
                                 <div style={{ background: '#f4faf6', borderRadius: 12, padding: 16, marginTop: 14 }}>
                                     <strong style={{ color: '#2d6a4f', fontSize: '0.84rem' }}>📊 Medical Summary</strong>
-                                    <p style={{ fontSize: '0.86rem', color: '#3d5c3d', marginTop: 6, lineHeight: 1.7 }}>{ANALYSIS_RESULT.summary}</p>
+                                    <p style={{ fontSize: '0.86rem', color: '#3d5c3d', marginTop: 6, lineHeight: 1.7 }}>{selected.summary || selected['Medical Summary']}</p>
                                 </div>
                                 <div style={{ background: '#fff8e7', borderRadius: 12, padding: 16, marginTop: 12 }}>
                                     <strong style={{ color: '#996b10', fontSize: '0.84rem' }}>🌿 Ayurvedic Insights</strong>
-                                    <p style={{ fontSize: '0.86rem', color: '#5c4a0a', marginTop: 6, lineHeight: 1.7 }}>{ANALYSIS_RESULT.ayurvedic}</p>
+                                    <p style={{ fontSize: '0.86rem', color: '#5c4a0a', marginTop: 6, lineHeight: 1.7 }}>{selected.ayurvedic || selected['Ayurvedic Insights']}</p>
                                 </div>
                                 <div style={{ background: '#eafaf1', borderRadius: 12, padding: 16, marginTop: 12 }}>
                                     <strong style={{ color: '#1e8449', fontSize: '0.84rem' }}>✅ Follow-Up</strong>
-                                    <p style={{ fontSize: '0.86rem', color: '#1e8449', marginTop: 6 }}>{ANALYSIS_RESULT.followUp}</p>
+                                    <p style={{ fontSize: '0.86rem', color: '#1e8449', marginTop: 6 }}>No critical values detected. Recommended follow-up in 3 months.</p>
                                 </div>
                             </>
                         )}

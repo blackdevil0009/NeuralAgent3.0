@@ -3,28 +3,15 @@ import { Link } from 'react-router-dom';
 import { handleError } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
 
-const VITALS = [
-    { icon: '❤️', label: 'Heart Rate', value: '72', unit: 'bpm', change: '+2%', dir: 'up', color: 'red' },
-    { icon: '🩸', label: 'Blood Pressure', value: '118/76', unit: 'mmHg', change: 'Normal', dir: 'up', color: 'blue' },
-    { icon: '🌡️', label: 'Temperature', value: '36.6', unit: '°C', change: 'Normal', dir: 'up', color: 'gold' },
-    { icon: '⚖️', label: 'BMI', value: '22.4', unit: '', change: 'Healthy', dir: 'up', color: 'green' },
-    { icon: '🫁', label: 'SpO2', value: '98', unit: '%', change: 'Good', dir: 'up', color: 'purple' },
-    { icon: '💤', label: 'Sleep', value: '7.2', unit: 'hrs', change: '-0.3', dir: 'down', color: 'blue' },
-];
-
-const ACTIVITY = [
-    { title: 'AI Consultation completed', time: '2h ago', dot: '#52b788' },
-    { title: 'Blood test report uploaded', time: '5h ago', dot: '#c9a84c' },
-    { title: 'Appointment with Dr. Menon', time: 'Yesterday', dot: '#74c0fc' },
-    { title: 'Dosha assessment completed', time: '2 days ago', dot: '#2d6a4f' },
-    { title: 'Prescription renewed', time: '3 days ago', dot: '#e9c46a' },
-];
-
 export default function HealthDashboard() {
     const [greeting, setGreeting] = useState('');
     const [userName, setUserName] = useState('Friend');
     const [upcoming, setUpcoming] = useState([]);
+    const [vitals, setVitals] = useState([]);
+    const [symptoms, setSymptoms] = useState([]);
+    const [activity, setActivity] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchingDash, setFetchingDash] = useState(true);
 
     useEffect(() => {
         const h = new Date().getHours();
@@ -55,7 +42,28 @@ export default function HealthDashboard() {
                 setLoading(false);
             }
         };
+
+        const fetchDashboardData = async () => {
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/patient/dashboard-data`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    setVitals(json.vitals || []);
+                    setSymptoms(json.symptoms || []);
+                    setActivity(json.activity || []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch dashboard metrics", err);
+            } finally {
+                setFetchingDash(false);
+            }
+        };
+
         fetchUpcoming();
+        fetchDashboardData();
     }, []);
 
     // Helper to format date
@@ -103,26 +111,48 @@ export default function HealthDashboard() {
 
             {/* Vitals Grid */}
             <h3 className="pd-section-title">📊 Today's Vitals</h3>
-            <div className="pd-grid-3" style={{ marginBottom: 24 }}>
-                {VITALS.map(v => (
-                    <div className="pd-stat-card" key={v.label}>
-                        <div className={`pd-stat-icon ${v.color}`}>{v.icon}</div>
-                        <div>
-                            <div className="pd-stat-value">{v.value}<small style={{ fontSize: '0.70rem', fontWeight: 400, marginLeft: 3 }}>{v.unit}</small></div>
-                            <div className="pd-stat-label">{v.label}</div>
-                            <div className={`pd-stat-change ${v.dir}`}>{v.dir === 'up' ? '▲' : '▼'} {v.change}</div>
+            {fetchingDash ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>⚡ Synchronizing health metrics…</div>
+            ) : vitals.length === 0 ? (
+                <div className="pd-card" style={{ padding: 40, textAlign: 'center', color: '#888', marginBottom: 24 }}>
+                    <div style={{ fontSize: '2rem', marginBottom: 10 }}>📡</div>
+                    <p>No health metrics detected. Upload a medical report to sync your vitals.</p>
+                </div>
+            ) : (
+                <div className="pd-grid-3" style={{ marginBottom: 24 }}>
+                    {vitals.map(v => (
+                        <div className="pd-stat-card" key={v.label}>
+                            <div className={`pd-stat-icon ${v.color}`}>{v.icon}</div>
+                            <div>
+                                <div className="pd-stat-value">{v.value}<small style={{ fontSize: '0.70rem', fontWeight: 400, marginLeft: 3 }}>{v.unit}</small></div>
+                                <div className="pd-stat-label">{v.label}</div>
+                                <div className={`pd-stat-change ${v.dir}`}>{v.dir === 'up' ? '▲' : '▼'} {v.change}</div>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {/* Lower 2 cols */}
             <div className="pd-grid-2">
-                {/* Recent activity */}
+                {/* Analyzed Symptoms */}
                 <div className="pd-card">
-                    <h3 className="pd-section-title">🕐 Recent Activity</h3>
+                    <h3 className="pd-section-title">🩺 Analyzed Symptoms</h3>
+                    {symptoms.length === 0 ? (
+                        <div style={{ padding: '20px 0', textAlign: 'center', color: '#999' }}>No symptoms analyzed from reports.</div>
+                    ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {symptoms.map((s, i) => (
+                                <span key={i} className={`pd-pill ${s.severity === 'Critical' ? 'pd-pill-red' : s.severity === 'Moderate' ? 'pd-pill-gold' : 'pd-pill-green'}`}>
+                                    {s.symptom}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    <h3 className="pd-section-title" style={{ marginTop: 30 }}>🕐 Recent Activity</h3>
                     <ul className="pd-timeline">
-                        {ACTIVITY.map((a, i) => (
+                        {activity.concat([{ title: 'Dashboard synced with AI', time: 'Just now', dot: '#52b788' }]).map((a, i) => (
                             <li key={i}>
                                 <div className="pd-tl-dot" style={{ background: a.dot }} />
                                 <div>
