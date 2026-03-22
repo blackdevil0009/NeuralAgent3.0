@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { handleError, handleSuccess } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
 
 export default function PatientManagement() {
+    const navigate = useNavigate();
     const [appointments, setAppointments] = useState([]);
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [activeNote, setActiveNote] = useState('');
@@ -163,6 +165,14 @@ export default function PatientManagement() {
                         <h3 style={{ margin: '0' }}>{selectedPatient.patientName}</h3>
                         <p style={{ color: 'var(--doc-text-mute)' }}>Consultation ID: {selectedPatient.id}</p>
                     </div>
+
+                    {(selectedPatient.type === 'Video Call' || selectedPatient.type === 'Video') && (
+                        <button className="dd-btn" 
+                            style={{ width: '100%', marginBottom: 24, justifyContent: 'center', background: 'var(--doc-accent)', color: '#fff', fontWeight: 600, fontSize: '0.95rem', padding: '12px' }}
+                            onClick={() => navigate(`/doctor/vcall?patient=${selectedPatient.patientId}&name=${encodeURIComponent(selectedPatient.patientName)}&appt=${selectedPatient.id}`)}>
+                            📹 Admit to Video Session
+                        </button>
+                    )}
 
                     <div style={{ marginBottom: 24 }}>
                         <h4 style={{ borderBottom: '1px solid var(--doc-border)', paddingBottom: 8, marginBottom: 12 }}>Consultation Notes</h4>
