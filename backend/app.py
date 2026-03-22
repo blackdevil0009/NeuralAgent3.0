@@ -594,6 +594,8 @@ def book_appointment():
         time = time_raw  # Already in 24h format or other valid format
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor()
     
     try:
@@ -617,6 +619,8 @@ def book_appointment():
         
         return signed_json_response({"message": "Appointment booked successfully!", "appointmentId": app_id}, 201)
     except Exception as e:
+        app.logger.error(f"Appointment booking error: {e}")
+        app.logger.error(traceback.format_exc())
         return signed_json_response({"error": str(e)}, 500)
     finally:
         conn.close()
