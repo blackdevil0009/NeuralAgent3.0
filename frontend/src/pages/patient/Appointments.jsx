@@ -230,11 +230,7 @@ export default function Appointments() {
                                     <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                                         <button className="pd-btn pd-btn-primary pd-btn-sm" style={{ flex: 1, justifyContent: 'center' }}
                                             onClick={() => navigate('/patient/doctors')}>
-                                            📅 Book
-                                        </button>
-                                        <button className="pd-btn pd-btn-outline pd-btn-sm" style={{ flex: 1, justifyContent: 'center' }}
-                                            onClick={() => navigate(`/patient/inbox?doctor=${d.id}`)}>
-                                            💬 Message
+                                            📅 Book Appointment
                                         </button>
                                     </div>
                                 </div>
