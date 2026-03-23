@@ -305,13 +305,13 @@ def register():
         if not mobile or not re.match(r'^[6-9]\d{9}$', mobile):
             return signed_json_response({"message": "Enter a valid 10-digit Indian mobile number starting with 6-9."}, 400)
 
-        # ── Address dummy-word check ─────────────────────────────────
+        # ── Address validation (relaxed – catch only obvious garbage) ────────
         address_raw = (data.get('address') or '').strip().lower()
-        if not address_raw or len(address_raw) < 10:
-            return signed_json_response({"message": "Please enter a valid full address (minimum 10 characters)."}, 400)
-        for pat in DUMMY_PATTERNS:
-            if address_raw == pat or address_raw.startswith(pat + ' ') or address_raw == pat * 2:
-                return signed_json_response({"message": "Please enter a real address. Dummy or placeholder addresses are not allowed."}, 400)
+        if not address_raw or len(address_raw) < 5:
+            return signed_json_response({"message": "Please enter a valid address."}, 400)
+        # Block only exact dummy-word matches (not startsWith to avoid false positives)
+        if address_raw in DUMMY_PATTERNS or address_raw in [p * 2 for p in DUMMY_PATTERNS]:
+            return signed_json_response({"message": "Please enter a real address. Dummy or placeholder addresses are not allowed."}, 400)
 
         # ── Doctor-specific validations ──────────────────────────────
         if role == 'doctor':

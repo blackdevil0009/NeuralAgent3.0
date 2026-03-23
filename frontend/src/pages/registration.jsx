@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/config';
 import './registration_style.css';
 import { handleSuccess, handleError } from '../utils/error_handlers';
+import LocationPicker from '../components/LocationPicker';
 
 /* ─────────────────────────────────────────────
    Utility helpers
@@ -197,12 +198,19 @@ function PatientForm({ onSubmit, loading }) {
                 <div className="reg-grid">
                     <div className="form-group full-col">
                         <label htmlFor="p-address">Street Address *</label>
-                        <textarea
-                            id="p-address" name="address"
-                            placeholder="House No., Street, Locality…"
-                            value={form.address} onChange={handleChange}
-                            aria-invalid={!!errors.address}
-                            rows={2}
+                        <LocationPicker
+                            id="p-address"
+                            placeholder="🔍 Search your address or locality…"
+                            value={form.address}
+                            error={errors.address}
+                            onChange={val => setForm(prev => ({ ...prev, address: val }))}
+                            onSelect={({ address, city, state, pincode }) => setForm(prev => ({
+                                ...prev,
+                                address: address || prev.address,
+                                city: city || prev.city,
+                                state: state || prev.state,
+                                pincode: pincode || prev.pincode,
+                            }))}
                         />
                         {errors.address && <span className="field-error">{errors.address}</span>}
                     </div>
@@ -509,12 +517,19 @@ function DoctorForm({ onSubmit, loading }) {
                 <div className="reg-grid">
                     <div className="form-group full-col">
                         <label htmlFor="d-address">Clinic / Hospital Address *</label>
-                        <textarea
-                            id="d-address" name="address"
-                            placeholder="Building, Street, Locality…"
-                            value={form.address} onChange={handleChange}
-                            aria-invalid={!!errors.address}
-                            rows={2}
+                        <LocationPicker
+                            id="d-address"
+                            placeholder="🔍 Search your hospital or clinic address…"
+                            value={form.address}
+                            error={errors.address}
+                            onChange={val => setForm(prev => ({ ...prev, address: val }))}
+                            onSelect={({ address, city, state, pincode }) => setForm(prev => ({
+                                ...prev,
+                                address: address || prev.address,
+                                city: city || prev.city,
+                                state: state || prev.state,
+                                pincode: pincode || prev.pincode,
+                            }))}
                         />
                         {errors.address && <span className="field-error">{errors.address}</span>}
                     </div>
@@ -606,10 +621,16 @@ function DoctorForm({ onSubmit, loading }) {
 
                     <div className="form-group">
                         <label htmlFor="d-clinicLocation">Clinic / Hospital Location *</label>
-                        <input id="d-clinicLocation" type="text" name="clinicLocation"
-                            placeholder="Area, Street or Locality of your clinic"
-                            value={form.clinicLocation} onChange={handleChange}
-                            aria-invalid={!!errors.clinicLocation}
+                        <LocationPicker
+                            id="d-clinicLocation"
+                            placeholder="🔍 Search area, locality or landmark…"
+                            value={form.clinicLocation}
+                            error={errors.clinicLocation}
+                            onChange={val => setForm(prev => ({ ...prev, clinicLocation: val }))}
+                            onSelect={({ formatted, address }) => setForm(prev => ({
+                                ...prev,
+                                clinicLocation: address || formatted || prev.clinicLocation,
+                            }))}
                         />
                         {errors.clinicLocation && <span className="field-error">{errors.clinicLocation}</span>}
                     </div>
