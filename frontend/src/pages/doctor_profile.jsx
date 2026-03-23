@@ -1,12 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../utils/config';
 import { handleSuccess, handleError } from '../utils/error_handlers';
 
+const VALID_DEGREES = [
+    'MBBS','MD','MS','BDS','MDS','BAMS','BHMS','BUMS','BPT','MPT',
+    'BNYS','DNB','DM','MCh','PhD','MSc','BSc Nursing','GNM','ANM',
+    'D.Pharm','B.Pharm','M.Pharm','Pharm.D','DMRT','DMRD',
+    'DA','DCH','DGO','DLO','DTCD','DDVL','DEM','DFM','DPM',
+    'DO','DOMS','FRCS','MRCP','FRCP','FRCOG','FACS','FIACS'
+];
+const VALID_POSITIONS = [
+    'Consultant','Senior Consultant','Resident Doctor','Junior Resident',
+    'Senior Resident','Professor','Associate Professor','Assistant Professor',
+    'HOD','Chief of Medicine','Vaidya','Chief Vaidya','Medical Officer',
+    'General Practitioner','Specialist','Surgeon','Physician',
+    'Intern','Fellow','Super Specialist','Director','CMO'
+];
+const VALID_SPECIALIZATIONS = [
+    'Ayurveda','Allopathy','Homeopathy','Unani','Naturopathy','Yoga & Naturopathy',
+    'General Medicine','General Surgery','Cardiology','Dermatology','Neurology',
+    'Orthopedics','Pediatrics','Gynecology','Psychiatry','Ophthalmology',
+    'ENT','Radiology','Anesthesiology','Pathology','Oncology','Nephrology',
+    'Urology','Endocrinology','Gastroenterology','Pulmonology','Rheumatology',
+    'Hematology','Infectious Disease','Emergency Medicine','Family Medicine',
+    'Community Medicine','Geriatrics','Sports Medicine','Palliative Care',
+    'Physical Medicine','Dentistry','Oral Surgery','Physiotherapy',
+    'Pharmacy','Nursing','Medical Genetics','Biomedicine','Nutrition & Dietetics',
+    'Neonatology','Hepatology','Interventional Cardiology','Plastic Surgery',
+    'Neurosurgery','Vascular Surgery','Thoracic Surgery','Transplant Medicine'
+];
+const INDIAN_STATES = [
+    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
+    'Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka',
+    'Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram',
+    'Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana',
+    'Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
+    'Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry',
+];
+
+const EMPTY_FORM = {
+    name:'', mobile:'', address:'', city:'', state:'', pin:'',
+    degree:'', position:'', specialization:'', experience:'',
+    hospital:'', clinicLocation:'', regNumber:'',
+    consultantFee:'', workingHours:'',
+};
+
 export default function DoctorProfile() {
-    const [profile, setProfile] = useState(null);
-    const [form, setForm] = useState({ consultantFee: '', workingHours: '' });
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [email, setEmail] = useState('');
+    const [verificationStatus, setVerificationStatus] = useState('pending');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -14,40 +60,72 @@ export default function DoctorProfile() {
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(r => r.json())
-            .then(data => {
-                const p = data.data || data;
-                setProfile(p);
+            .then(resp => {
+                const p = resp.data || resp;
+                setEmail(p.email || '');
+                setVerificationStatus(p.verificationStatus || 'pending');
                 setForm({
+                    name: p.name || '',
+                    mobile: p.mobile || '',
+                    address: p.address || '',
+                    city: p.city || '',
+                    state: p.state || '',
+                    pin: p.pin || '',
+                    degree: p.degree || '',
+                    position: p.position || '',
+                    specialization: p.specialization || '',
+                    experience: p.experience || '',
+                    hospital: p.hospital || '',
+                    clinicLocation: p.clinicLocation || '',
+                    regNumber: p.regNumber || '',
                     consultantFee: p.consultantFee ?? 500,
-                    workingHours: p.workingHours ?? 'Mon-Fri, 10AM-6PM',
+                    workingHours: p.workingHours || 'Mon-Fri, 10AM-6PM',
                 });
             })
-            .catch(err => handleError(err))
+            .catch(handleError)
             .finally(() => setLoading(false));
     }, []);
 
+    const handleChange = useCallback((e) => {
+        const { name, value } = e.target;
+        setForm(prev => ({ ...prev, [name]: value }));
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    }, [errors]);
+
+    const validate = () => {
+        const errs = {};
+        if (!form.name.trim()) errs.name = 'Full name is required.';
+        if (!form.mobile || !/^[6-9]\d{9}$/.test(form.mobile)) errs.mobile = 'Valid 10-digit mobile required.';
+        if (!form.address.trim() || form.address.trim().length < 10) errs.address = 'Address must be at least 10 characters.';
+        if (!form.city.trim()) errs.city = 'City is required.';
+        if (!form.state) errs.state = 'State is required.';
+        if (!form.pin || !/^\d{6}$/.test(form.pin)) errs.pin = 'Valid 6-digit PIN required.';
+        if (!form.degree) errs.degree = 'Please select your degree.';
+        if (!form.position) errs.position = 'Please select your position.';
+        if (!form.specialization) errs.specialization = 'Please select your specialization.';
+        if (!form.experience || isNaN(form.experience) || +form.experience < 0) errs.experience = 'Enter valid years of experience.';
+        if (!form.hospital.trim() || form.hospital.trim().length < 3) errs.hospital = 'Hospital / Clinic name is required.';
+        if (!form.clinicLocation.trim() || form.clinicLocation.trim().length < 5) errs.clinicLocation = 'Clinic location is required.';
+        if (!form.regNumber.trim()) errs.regNumber = 'Medical Reg. Number is required.';
+        else if (!/^[A-Z]{1,3}-?\d{5,10}$/i.test(form.regNumber.trim())) errs.regNumber = 'Format: STATE-XXXXXX (e.g. MH-123456).';
+        if (!form.consultantFee || isNaN(form.consultantFee) || +form.consultantFee < 0) errs.consultantFee = 'Enter a valid consultation fee.';
+        if (!form.workingHours.trim()) errs.workingHours = 'Working hours are required.';
+        return errs;
+    };
+
     const handleSave = async () => {
+        const errs = validate();
+        if (Object.keys(errs).length) { setErrors(errs); return; }
         setSaving(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                 method: 'PUT',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: profile.name,
-                    mobile: profile.mobile,
-                    dob: profile.dob,
-                    gender: profile.gender,
-                    address: profile.address,
-                    city: profile.city,
-                    state: profile.state,
-                    pin: profile.pin,
-                    consultantFee: Number(form.consultantFee),
-                    workingHours: form.workingHours,
-                }),
+                body: JSON.stringify({ ...form, consultantFee: Number(form.consultantFee), experience: String(form.experience) }),
             });
-            if (!res.ok) throw new Error('Save failed');
-            handleSuccess('Professional profile updated successfully!');
+            if (!res.ok) { const j = await res.json(); throw new Error(j.data?.message || j.message || 'Save failed'); }
+            handleSuccess('Profile saved successfully!');
         } catch (err) {
             handleError(err);
         } finally {
@@ -55,152 +133,136 @@ export default function DoctorProfile() {
         }
     };
 
-    if (loading) {
-        return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--doc-text-mute)' }}>⏳ Loading profile…</div>;
-    }
+    if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--doc-text-mute)' }}>⏳ Loading profile…</div>;
 
-    if (!profile) {
-        return <div style={{ textAlign: 'center', padding: '60px', color: '#e74c3c' }}>❌ Failed to load profile.</div>;
-    }
-
-    const InfoRow = ({ label, value, muted }) => (
-        <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--doc-text-mute)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-            <div style={{ fontSize: '0.95rem', color: muted ? 'var(--doc-text-mute)' : 'var(--doc-text)', fontWeight: 500 }}>{value || <span style={{ color: '#aaa', fontStyle: 'italic' }}>Not set</span>}</div>
+    const Field = ({ label, name, type = 'text', placeholder, children, required }) => (
+        <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--doc-text-mute)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                {label} {required && <span style={{ color: '#e74c3c' }}>*</span>}
+            </label>
+            {children || (
+                <input
+                    type={type} name={name} value={form[name]} onChange={handleChange}
+                    placeholder={placeholder}
+                    aria-invalid={!!errors[name]}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, fontSize: '0.92rem', background: 'var(--doc-surface)', border: `1.5px solid ${errors[name] ? '#e74c3c' : 'var(--doc-border)'}`, boxSizing: 'border-box', outline: 'none', transition: 'border 0.2s' }}
+                />
+            )}
+            {errors[name] && <div style={{ color: '#e74c3c', fontSize: '0.78rem', marginTop: 4 }}>⚠ {errors[name]}</div>}
         </div>
     );
 
+    const selectStyle = (name) => ({
+        width: '100%', padding: '10px 14px', borderRadius: 8, fontSize: '0.92rem',
+        background: 'var(--doc-surface)', border: `1.5px solid ${errors[name] ? '#e74c3c' : 'var(--doc-border)'}`,
+        outline: 'none', cursor: 'pointer'
+    });
+
     const statusColor = { pending: '#e67e22', verified: '#27ae60', rejected: '#e74c3c' };
     const statusIcon = { pending: '⏳', verified: '✅', rejected: '❌' };
-    const vs = profile.verificationStatus || 'pending';
+    const vs = verificationStatus;
 
     return (
-        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <div style={{ maxWidth: 980, margin: '0 auto' }}>
             {/* Header */}
-            <div className="dd-header" style={{ marginBottom: 24 }}>
+            <div className="dd-header" style={{ marginBottom: 20 }}>
                 <div>
-                    <h1 style={{ margin: 0 }}>🩺 Professional Profile</h1>
-                    <p style={{ color: 'var(--doc-text-mute)', margin: '4px 0 0' }}>
-                        Your credentials and public-facing information
-                    </p>
+                    <h1 style={{ margin: 0 }}>🩺 Edit Professional Profile</h1>
+                    <p style={{ color: 'var(--doc-text-mute)', margin: '4px 0 0' }}>Update all your credentials, contact info, and practice details</p>
                 </div>
-                <button className="dd-btn dd-btn-primary" onClick={handleSave} disabled={saving} style={{ minWidth: 140 }}>
-                    {saving ? '⏳ Saving…' : '💾 Save Profile'}
+                <button className="dd-btn dd-btn-primary" onClick={handleSave} disabled={saving} style={{ minWidth: 150, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {saving ? <><span className="spinner" />Saving…</> : '💾 Save All Changes'}
                 </button>
             </div>
 
-            {/* Verification Status Banner */}
-            <div style={{
-                background: statusColor[vs] + '18',
-                border: `1px solid ${statusColor[vs]}`,
-                borderRadius: 10, padding: '12px 20px', marginBottom: 24,
-                display: 'flex', alignItems: 'center', gap: 12
-            }}>
+            {/* Verification Banner */}
+            <div style={{ background: statusColor[vs] + '18', border: `1px solid ${statusColor[vs]}`, borderRadius: 10, padding: '12px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.4rem' }}>{statusIcon[vs]}</span>
                 <div>
                     <strong style={{ color: statusColor[vs] }}>Credential Status: {vs.toUpperCase()}</strong>
                     <div style={{ fontSize: '0.82rem', color: 'var(--doc-text-mute)', marginTop: 2 }}>
                         {vs === 'pending' && 'Your credentials are under review. You will be notified once verified.'}
-                        {vs === 'verified' && 'Your credentials are verified. Your profile is visible to patients.'}
-                        {vs === 'rejected' && 'Your credentials were rejected. Please contact support to re-submit valid documents.'}
+                        {vs === 'verified' && 'Your credentials are verified. Your profile is live and visible to patients.'}
+                        {vs === 'rejected' && 'Your credentials were rejected. Update details and contact support to re-submit.'}
                     </div>
                 </div>
             </div>
 
-            <div className="dd-grid">
-                {/* Left Column: Personal & Professional info (read-only) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div className="dd-card">
-                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>👤 Personal Information</h3>
-                        <InfoRow label="Full Name" value={profile.name ? `Dr. ${profile.name}` : null} />
-                        <InfoRow label="Email" value={profile.email} />
-                        <InfoRow label="Mobile" value={profile.mobile} />
-                        <InfoRow label="Address" value={[profile.address, profile.city, profile.state, profile.pin].filter(Boolean).join(', ')} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                {/* ── Personal Information ── */}
+                <div className="dd-card">
+                    <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>👤 Personal Information</h3>
+                    <Field label="Full Name" name="name" placeholder="Dr. Full Name" required />
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--doc-text-mute)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Email <span style={{ fontSize: '0.7rem', color: '#aaa' }}>(read-only)</span></label>
+                        <input value={email} readOnly style={{ width: '100%', padding: '10px 14px', borderRadius: 8, fontSize: '0.92rem', background: '#f5f5f5', border: '1.5px solid var(--doc-border)', color: '#888', boxSizing: 'border-box' }} />
                     </div>
-
-                    <div className="dd-card">
-                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>🎓 Credentials</h3>
-                        <InfoRow label="Degree" value={profile.degree} />
-                        <InfoRow label="Position" value={profile.position} />
-                        <InfoRow label="Specialization" value={profile.specialization} />
-                        <InfoRow label="Experience" value={profile.experience ? `${profile.experience} years` : null} />
-                        <InfoRow label="Medical Reg. Number" value={profile.regNumber} />
-                    </div>
-
-                    <div className="dd-card">
-                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>🏥 Practice Location</h3>
-                        <InfoRow label="Hospital / Clinic" value={profile.hospital} />
-                        <InfoRow label="Clinic Location" value={profile.clinicLocation} />
-                    </div>
+                    <Field label="Mobile Number" name="mobile" type="tel" placeholder="10-digit mobile" required />
                 </div>
 
-                {/* Right Column: Editable fields */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div className="dd-card">
-                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>💰 Availability & Fees</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', color: 'var(--doc-text-mute)' }}>
-                                    Consultation Fee (₹)
-                                </label>
-                                <input
-                                    type="number" min="0" step="50"
-                                    value={form.consultantFee}
-                                    onChange={e => setForm(prev => ({ ...prev, consultantFee: e.target.value }))}
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--doc-border)', fontSize: '1rem', fontWeight: 600, background: 'var(--doc-surface)' }}
-                                    placeholder="e.g. 500"
-                                />
-                                <div style={{ fontSize: '0.75rem', color: 'var(--doc-text-mute)', marginTop: 4 }}>
-                                    This fee will be shown to patients when booking appointments.
-                                </div>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', color: 'var(--doc-text-mute)' }}>
-                                    Working Hours
-                                </label>
-                                <input
-                                    type="text"
-                                    value={form.workingHours}
-                                    onChange={e => setForm(prev => ({ ...prev, workingHours: e.target.value }))}
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--doc-border)', fontSize: '0.95rem', background: 'var(--doc-surface)' }}
-                                    placeholder="e.g. Mon-Fri, 10AM-6PM"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                {/* ── Address ── */}
+                <div className="dd-card">
+                    <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>🏡 Address</h3>
+                    <Field label="Street Address" name="address" placeholder="House No, Street, Locality (min. 10 chars)" required />
+                    <Field label="City" name="city" placeholder="Your city" required />
+                    <Field label="State" name="state" required>
+                        <select name="state" value={form.state} onChange={handleChange} style={selectStyle('state')}>
+                            <option value="">-- Select State --</option>
+                            {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="PIN Code" name="pin" placeholder="6-digit PIN" required />
+                </div>
 
-                    {/* Appointment types supported */}
-                    <div className="dd-card">
-                        <h3 style={{ marginTop: 0, marginBottom: 16 }}>📅 Consultation Types</h3>
-                        {[
-                            { icon: '💬', label: 'Chat Consultation', desc: 'Real-time secure messaging with patients' },
-                            { icon: '🎥', label: 'Video Call', desc: 'Live video consultation via VaidyaMed-X' },
-                            { icon: '🏥', label: 'Offline / In-Clinic', desc: 'In-person consultation at your clinic' },
-                        ].map(({ icon, label, desc }) => (
-                            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--doc-border)' }}>
-                                <span style={{ fontSize: '1.5rem' }}>{icon}</span>
-                                <div>
-                                    <div style={{ fontWeight: 600 }}>{label}</div>
-                                    <div style={{ fontSize: '0.78rem', color: 'var(--doc-text-mute)' }}>{desc}</div>
-                                </div>
-                                <div style={{ marginLeft: 'auto', background: '#e8f8ee', color: '#27ae60', fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Active</div>
+                {/* ── Professional Credentials ── */}
+                <div className="dd-card">
+                    <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>🎓 Professional Credentials</h3>
+                    <Field label="Degree" name="degree" required>
+                        <select name="degree" value={form.degree} onChange={handleChange} style={selectStyle('degree')}>
+                            <option value="">-- Select Degree --</option>
+                            {VALID_DEGREES.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Position / Designation" name="position" required>
+                        <select name="position" value={form.position} onChange={handleChange} style={selectStyle('position')}>
+                            <option value="">-- Select Position --</option>
+                            {VALID_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Specialization" name="specialization" required>
+                        <select name="specialization" value={form.specialization} onChange={handleChange} style={selectStyle('specialization')}>
+                            <option value="">-- Select Specialization --</option>
+                            {VALID_SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Years of Experience" name="experience" type="number" placeholder="e.g. 5" required />
+                    <Field label="Medical Reg. Number" name="regNumber" placeholder="e.g. MH-123456" required />
+                </div>
+
+                {/* ── Practice Details ── */}
+                <div className="dd-card">
+                    <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>🏥 Practice Details</h3>
+                    <Field label="Hospital / Clinic Name" name="hospital" placeholder="Official name of your hospital or clinic" required />
+                    <Field label="Clinic / Hospital Location" name="clinicLocation" placeholder="Area, street or locality of your clinic" required />
+                    <Field label="Working Hours" name="workingHours" placeholder="e.g. Mon-Fri, 10AM-6PM" required />
+                    <Field label="Consultation Fee (₹)" name="consultantFee" type="number" placeholder="e.g. 500" required />
+                    <div style={{ background: 'var(--doc-surface)', border: '1px solid var(--doc-border)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--doc-text-mute)', fontWeight: 600, marginBottom: 8 }}>CONSULTATION TYPES (all enabled)</div>
+                        {['💬 Chat', '🎥 Video Call', '🏥 Offline / In-Clinic'].map(t => (
+                            <div key={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--doc-border)', fontSize: '0.87rem' }}>
+                                <span>{t}</span>
+                                <span style={{ background: '#e8f8ee', color: '#27ae60', fontSize: '0.72rem', fontWeight: 700, padding: '2px 10px', borderRadius: 20 }}>Active</span>
                             </div>
                         ))}
                     </div>
-
-                    <div className="dd-card" style={{ background: 'var(--doc-green-deep)', color: '#fff' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <span style={{ fontSize: '1.8rem' }}>⭐</span>
-                            <div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>Credentials Under Review</div>
-                                <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Verification makes your profile visible to patients</div>
-                            </div>
-                        </div>
-                        <p style={{ fontSize: '0.82rem', opacity: 0.8, lineHeight: 1.6, margin: 0 }}>
-                            Once verified, patients can search for you by specialization and see your consultation fee and working hours before booking.
-                        </p>
-                    </div>
                 </div>
+            </div>
+
+            {/* Save button bottom */}
+            <div style={{ textAlign: 'right', marginTop: 24 }}>
+                <button className="dd-btn dd-btn-primary" onClick={handleSave} disabled={saving} style={{ minWidth: 180 }}>
+                    {saving ? '⏳ Saving…' : '💾 Save All Changes'}
+                </button>
             </div>
         </div>
     );

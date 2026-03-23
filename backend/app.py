@@ -890,9 +890,17 @@ def handle_profile():
             cursor.execute("SELECT userId FROM doctor_details WHERE userId=%s", (current_user_id,))
             if cursor.fetchone():
                 cursor.execute('''
-                    UPDATE doctor_details SET consultantFee=%s, workingHours=%s
+                    UPDATE doctor_details
+                    SET degree=%s, position=%s, specialization=%s, experience=%s,
+                        hospital=%s, clinic_location=%s, regNumber=%s,
+                        consultantFee=%s, workingHours=%s
                     WHERE userId=%s
-                ''', (data.get('consultantFee'), data.get('workingHours'), current_user_id))
+                ''', (
+                    data.get('degree'), data.get('position'), data.get('specialization'),
+                    data.get('experience'), data.get('hospital'), data.get('clinicLocation'),
+                    data.get('regNumber'), data.get('consultantFee'), data.get('workingHours'),
+                    current_user_id
+                ))
         
         conn.commit()
         
