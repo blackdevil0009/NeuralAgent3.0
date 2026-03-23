@@ -18,31 +18,27 @@ def _send_email_common(to_email, subject, body):
         msg.attach(MIMEText(body, 'plain'))
 
         try:
+            # Try Port 587 (TLS)
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
+            server.quit()
+            return True
+        except Exception as e1:
+            # Fallback to Port 465 (SSL)
             try:
-                # Try Port 587 (TLS)
-                server = smtplib.SMTP('smtp.gmail.com', 587)
-                server.starttls()
+                server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
                 server.login(SENDER_EMAIL, SENDER_PASSWORD)
                 server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
                 server.quit()
                 return True
-            except Exception as e1:
-                # Fallback to Port 465 (SSL)
-                try:
-                    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-                    server.login(SENDER_EMAIL, SENDER_PASSWORD)
-                    server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-                    server.quit()
-                    return True
-                except Exception as e2:
-                    print(f"SMTP Critical Failure:")
-                    print(f"  - Port 587 (TLS) Error: {str(e1)}")
-                    print(f"  - Port 465 (SSL) Error: {str(e2)}")
-                    print(f"  - Check if 'Less Secure Apps' is enabled or use an App Password for {SENDER_EMAIL}")
-                    return False
-        except Exception as e:
-            print(f"Error in _send_email_common: {str(e)}")
-            return False
+            except Exception as e2:
+                print(f"SMTP Failure - P587: {e1} | P465: {e2}")
+                return False
+    except Exception as e:
+        print(f"Error in _send_email_common: {e}")
+        return False
 
 def send_verification_email(to_email, verification_link, verification_otp):
     subject = "Verify your VaidyaMed-X Account"
