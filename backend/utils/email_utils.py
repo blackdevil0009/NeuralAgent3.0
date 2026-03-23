@@ -18,13 +18,14 @@ def _send_email_common(to_email, subject, body):
         msg.attach(MIMEText(body, 'plain'))
 
         try:
-            # Try Port 587 (TLS)
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-            server.quit()
-            return True
+            try:
+                # Try Port 587 (TLS)
+                server = smtplib.SMTP('smtp.gmail.com', 587)
+                server.starttls()
+                server.login(SENDER_EMAIL, SENDER_PASSWORD)
+                server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
+                server.quit()
+                return True
             except Exception as e1:
                 # Fallback to Port 465 (SSL)
                 try:
