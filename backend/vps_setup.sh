@@ -11,6 +11,8 @@ EMAIL="blackdevil0009@gmail.com"
 echo ">>> Step 1: Installing system packages..."
 apt-get update -qq
 apt-get install -y python3-venv python3-pip mysql-server nginx certbot python3-certbot-nginx unzip -qq
+systemctl stop vaidyamed.service 2>/dev/null || true
+systemctl stop vaidyamedx.service 2>/dev/null || true
 
 # 2. Setup Python virtual environment & Extract Backend
 echo ">>> Step 2: Extracting backend and setting up venv..."
@@ -30,7 +32,7 @@ fi
 
 source venv/bin/activate
 pip install --upgrade pip -q
-pip install flask flask-cors flask-bcrypt flask-jwt-extended python-dotenv werkzeug mysql-connector-python flask-limiter cryptography pydantic requests gunicorn -q
+pip install flask flask-cors flask-bcrypt flask-jwt-extended python-dotenv werkzeug mysql-connector-python flask-limiter cryptography pydantic requests gunicorn flask-socketio eventlet -q
 echo "Packages installed OK"
 
 # 3. Configure MySQL
@@ -65,7 +67,7 @@ After=network.target mysql.service
 User=root
 WorkingDirectory=$BACKEND_DIR
 Environment="PATH=$BACKEND_DIR/venv/bin"
-ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 --timeout 120 app:app
+ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 1 --worker-class eventlet --bind 127.0.0.1:5000 --timeout 120 app:app
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -81,7 +83,7 @@ systemctl start vaidyamed
 
 # 6. Configure Nginx with SSL
 echo ">>> Step 6: Configuring Nginx & SSL..."
-cat > /etc/nginx/sites-available/vaidyamed << NGINX_EOF
+cat > /etc/nginx/sites-available/vaidyamed << 'NGINX_EOF'
 server {
     listen 80;
     server_name $DOMAIN;
@@ -90,10 +92,13 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 NGINX_EOF

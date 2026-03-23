@@ -17,6 +17,7 @@ echo ""
 # ── STEP 1: CLEANUP ──────────────────────────────────────
 echo "[1/9] Cleaning up old processes and configs..."
 systemctl stop vaidyamed.service 2>/dev/null || true
+systemctl stop vaidyamedx.service 2>/dev/null || true
 systemctl stop nginx 2>/dev/null || true
 systemctl disable vaidyamed.service 2>/dev/null || true
 pkill -9 -f gunicorn 2>/dev/null || true
@@ -53,7 +54,7 @@ cd "$BACKEND_DIR"
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip -q
-pip install flask flask-cors flask-bcrypt flask-jwt-extended python-dotenv werkzeug mysql-connector-python flask-limiter cryptography pydantic requests gunicorn -q
+pip install flask flask-cors flask-bcrypt flask-jwt-extended python-dotenv werkzeug mysql-connector-python flask-limiter cryptography pydantic requests gunicorn flask-socketio eventlet -q
 deactivate
 echo "✅ Python environment ready"
 
@@ -91,7 +92,7 @@ User=root
 WorkingDirectory=$BACKEND_DIR
 EnvironmentFile=$BACKEND_DIR/.env
 Environment=PATH=$BACKEND_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
+ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 1 --worker-class eventlet --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -123,6 +124,9 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
