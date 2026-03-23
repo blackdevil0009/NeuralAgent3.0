@@ -729,7 +729,7 @@ def handle_profile():
     
     if request.method == 'GET':
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role,
+            SELECT u.fullName as name, u.email, u.mobile, u.twoFactorEnabled, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role,
                    pd.dosha, pd.allergies, pd.conditions, pd.medications
             FROM users u
             LEFT JOIN patient_details pd ON u.id = pd.userId
@@ -784,7 +784,7 @@ def handle_profile():
         
         # return updated
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role
+            SELECT u.fullName as name, u.email, u.mobile, u.twoFactorEnabled, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role
             FROM users u
             WHERE u.id = %s
         ''', (current_user_id,))

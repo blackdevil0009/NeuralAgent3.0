@@ -1,14 +1,35 @@
-import React, { useState } from 'react';
-
-const MOCK_CURRENT = '+91 98765 43210';
+import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../utils/config';
+import { handleError, handleSuccess } from '../../utils/error_handlers';
 
 export default function UpdateMobile() {
     const [phase, setPhase] = useState('form'); // form | otp | success
+    const [currentMobile, setCurrentMobile] = useState('Loading...');
     const [mobile, setMobile] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(0);
+
+    React.useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok) {
+                setCurrentMobile(json.data?.mobile || 'Not set');
+            }
+        } catch (err) {
+            console.error('Failed to fetch profile', err);
+            setCurrentMobile('Error loading');
+        }
+    };
 
     /* Validate 10-digit Indian mobile */
     const validate = () => {
@@ -21,12 +42,35 @@ export default function UpdateMobile() {
     const requestOtp = async () => {
         const err = validate();
         if (err) { setError(err); return; }
+        
         setError('');
         setLoading(true);
-        await new Promise(r => setTimeout(r, 1200));
-        setLoading(false);
-        setPhase('otp');
-        startResendTimer();
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/send-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-HMAC-Signature': 'DEV_BYPASS',
+                    'X-Timestamp': timestamp
+                },
+                body: JSON.stringify({ mobile })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to send OTP');
+
+            handleSuccess(json.message);
+            setPhase('otp');
+            startResendTimer();
+        } catch (err) {
+            handleError(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const startResendTimer = () => {
@@ -53,12 +97,34 @@ export default function UpdateMobile() {
     const verifyOtp = async () => {
         const code = otp.join('');
         if (code.length < 6) { setError('Enter all 6 digits.'); return; }
-        // Demo: any 6 digits accepted
+        
         setError('');
         setLoading(true);
-        await new Promise(r => setTimeout(r, 1400));
-        setLoading(false);
-        setPhase('success');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/verify-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-HMAC-Signature': 'DEV_BYPASS',
+                    'X-Timestamp': timestamp
+                },
+                body: JSON.stringify({ otp: code })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Invalid or expired OTP');
+
+            handleSuccess(json.message);
+            setPhase('success');
+        } catch (err) {
+            handleError(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -96,7 +162,7 @@ export default function UpdateMobile() {
                         <>
                             <div className="pd-form-group">
                                 <label>Current Number</label>
-                                <input className="pd-input" value={MOCK_CURRENT} disabled
+                                <input className="pd-input" value={currentMobile} disabled
                                     style={{ background: '#f4f6f4', color: 'var(--text-mute)' }} />
                             </div>
                             <div className="pd-form-group">
