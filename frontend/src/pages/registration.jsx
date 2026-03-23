@@ -86,10 +86,15 @@ function PatientForm({ onSubmit, loading }) {
 
         if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
         if (!emailRe.test(form.email)) errs.email = 'Enter a valid email address.';
-        if (!phoneRe.test(form.mobile)) errs.mobile = 'Enter a valid 10-digit mobile number.';
+        if (!phoneRe.test(form.mobile)) errs.mobile = 'Enter a valid 10-digit mobile number (starts with 6-9).';
         if (!form.dob) errs.dob = 'Date of birth is required.';
         if (!form.gender) errs.gender = 'Please select a gender.';
-        if (!form.address.trim()) errs.address = 'Address is required.';
+
+        const addrLower = (form.address || '').trim().toLowerCase();
+        const dummyWords = ['test','dummy','fake','abc','xyz','asdf','qwerty','aaa','123','na','none','nil','null','temp','sample'];
+        if (!addrLower || addrLower.length < 10) errs.address = 'Address must be at least 10 characters.';
+        else if (dummyWords.some(w => addrLower === w || addrLower === w + w)) errs.address = 'Please enter a real address.';
+
         if (!form.city.trim()) errs.city = 'City is required.';
         if (!form.state) errs.state = 'Please select a state.';
         if (!/^\d{6}$/.test(form.pincode)) errs.pincode = 'Enter a valid 6-digit PIN code.';
@@ -315,6 +320,39 @@ function PatientForm({ onSubmit, loading }) {
 }
 
 /* ─────────────────────────────────────────────
+   Doctor credential constants
+───────────────────────────────────────────── */
+const VALID_DEGREES = [
+    'MBBS','MD','MS','BDS','MDS','BAMS','BHMS','BUMS','BPT','MPT',
+    'BNYS','DNB','DM','MCh','PhD','MSc','BSc Nursing','GNM','ANM',
+    'D.Pharm','B.Pharm','M.Pharm','Pharm.D','DMRT','DMRD',
+    'DA','DCH','DGO','DLO','DTCD','DDVL','DEM','DFM','DPM',
+    'DO','DOMS','FRCS','MRCP','FRCP','FRCOG','FACS','FIACS'
+];
+
+const VALID_POSITIONS = [
+    'Consultant','Senior Consultant','Resident Doctor','Junior Resident',
+    'Senior Resident','Professor','Associate Professor','Assistant Professor',
+    'HOD','Chief of Medicine','Vaidya','Chief Vaidya','Medical Officer',
+    'General Practitioner','Specialist','Surgeon','Physician',
+    'Intern','Fellow','Super Specialist','Director','CMO'
+];
+
+const VALID_SPECIALIZATIONS = [
+    'Ayurveda','Allopathy','Homeopathy','Unani','Naturopathy','Yoga & Naturopathy',
+    'General Medicine','General Surgery','Cardiology','Dermatology','Neurology',
+    'Orthopedics','Pediatrics','Gynecology','Psychiatry','Ophthalmology',
+    'ENT','Radiology','Anesthesiology','Pathology','Oncology','Nephrology',
+    'Urology','Endocrinology','Gastroenterology','Pulmonology','Rheumatology',
+    'Hematology','Infectious Disease','Emergency Medicine','Family Medicine',
+    'Community Medicine','Geriatrics','Sports Medicine','Palliative Care',
+    'Physical Medicine','Dentistry','Oral Surgery','Physiotherapy',
+    'Pharmacy','Nursing','Medical Genetics','Biomedicine','Nutrition & Dietetics',
+    'Neonatology','Hepatology','Interventional Cardiology','Plastic Surgery',
+    'Neurosurgery','Vascular Surgery','Thoracic Surgery','Transplant Medicine'
+];
+
+/* ─────────────────────────────────────────────
    Doctor Form
 ───────────────────────────────────────────── */
 function DoctorForm({ onSubmit, loading }) {
@@ -331,6 +369,7 @@ function DoctorForm({ onSubmit, loading }) {
         specialization: '',
         experience: '',
         hospital: '',
+        clinicLocation: '',
         regNumber: '',
         password: '',
         confirmPass: '',
@@ -368,24 +407,40 @@ function DoctorForm({ onSubmit, loading }) {
         }
     };
 
+    const DUMMY_WORDS = ['test','dummy','fake','abc','xyz','asdf','qwerty','aaa','123','na','none','nil','null','temp','sample'];
+
     const validate = () => {
         const errs = {};
         const phoneRe = /^[6-9]\d{9}$/;
         const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const regNumRe = /^[A-Z]{1,3}-?\d{5,10}$/i;
 
         if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
         if (!emailRe.test(form.email)) errs.email = 'Enter a valid email address.';
-        if (!phoneRe.test(form.mobile)) errs.mobile = 'Enter a valid 10-digit mobile number.';
-        if (!form.address.trim()) errs.address = 'Address is required.';
+        if (!phoneRe.test(form.mobile)) errs.mobile = 'Enter a valid 10-digit mobile number (starts with 6-9).';
+
+        // Address validation
+        const addrLower = form.address.trim().toLowerCase();
+        if (!addrLower || addrLower.length < 10) errs.address = 'Address must be at least 10 characters.';
+        else if (DUMMY_WORDS.some(w => addrLower === w || addrLower === w + w)) errs.address = 'Please enter a real address.';
+
         if (!form.city.trim()) errs.city = 'City is required.';
         if (!form.state) errs.state = 'Please select a state.';
         if (!/^\d{6}$/.test(form.pincode)) errs.pincode = 'Enter a valid 6-digit PIN code.';
-        if (!form.degree.trim()) errs.degree = 'Doctorate degree is required.';
-        if (!form.position.trim()) errs.position = 'Position/Designation is required.';
-        if (!form.specialization.trim()) errs.specialization = 'Specialization is required.';
+
+        if (!form.degree) errs.degree = 'Please select a valid degree.';
+        if (!form.position) errs.position = 'Please select a valid position.';
+        if (!form.specialization) errs.specialization = 'Please select a valid specialization.';
         if (!form.experience || isNaN(form.experience) || +form.experience < 0)
             errs.experience = 'Enter valid years of experience.';
-        if (!form.regNumber.trim()) errs.regNumber = 'Medical registration number is required.';
+
+        if (!form.hospital.trim() || form.hospital.trim().length < 3) errs.hospital = 'Hospital / Clinic name is required.';
+        if (!form.clinicLocation.trim() || form.clinicLocation.trim().length < 5)
+            errs.clinicLocation = 'Clinic location / area is required.';
+
+        if (!form.regNumber.trim()) errs.regNumber = 'Medical Registration Number is required.';
+        else if (!regNumRe.test(form.regNumber.trim())) errs.regNumber = 'Invalid format. Use STATE-XXXXXX (e.g. MH-123456 or DL12345).';
+
         if (!docFile) errs.docFile = 'Please upload your degree/marksheet document.';
         if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
         if (form.confirmPass !== form.password) errs.confirmPass = 'Passwords do not match.';
@@ -501,31 +556,31 @@ function DoctorForm({ onSubmit, loading }) {
                 <div className="reg-grid">
                     <div className="form-group">
                         <label htmlFor="d-degree">Doctorate Degree *</label>
-                        <input id="d-degree" type="text" name="degree"
-                            placeholder="e.g. MBBS, MD, BAMS, BHMS"
-                            value={form.degree} onChange={handleChange}
-                            aria-invalid={!!errors.degree}
-                        />
+                        <select id="d-degree" name="degree" value={form.degree} onChange={handleChange}
+                            aria-invalid={!!errors.degree}>
+                            <option value="">-- Select Degree --</option>
+                            {VALID_DEGREES.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
                         {errors.degree && <span className="field-error">{errors.degree}</span>}
                     </div>
 
                     <div className="form-group">
                         <label htmlFor="d-position">Position / Designation *</label>
-                        <input id="d-position" type="text" name="position"
-                            placeholder="e.g. Senior Consultant, Vaidya"
-                            value={form.position} onChange={handleChange}
-                            aria-invalid={!!errors.position}
-                        />
+                        <select id="d-position" name="position" value={form.position} onChange={handleChange}
+                            aria-invalid={!!errors.position}>
+                            <option value="">-- Select Position --</option>
+                            {VALID_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
                         {errors.position && <span className="field-error">{errors.position}</span>}
                     </div>
 
                     <div className="form-group">
                         <label htmlFor="d-specialization">Specialization *</label>
-                        <input id="d-specialization" type="text" name="specialization"
-                            placeholder="e.g. Ayurveda, Cardiology, Pediatrics"
-                            value={form.specialization} onChange={handleChange}
-                            aria-invalid={!!errors.specialization}
-                        />
+                        <select id="d-specialization" name="specialization" value={form.specialization} onChange={handleChange}
+                            aria-invalid={!!errors.specialization}>
+                            <option value="">-- Select Specialization --</option>
+                            {VALID_SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                         {errors.specialization && <span className="field-error">{errors.specialization}</span>}
                     </div>
 
@@ -540,17 +595,29 @@ function DoctorForm({ onSubmit, loading }) {
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="d-hospital">Hospital / Clinic Name</label>
+                        <label htmlFor="d-hospital">Hospital / Clinic Name *</label>
                         <input id="d-hospital" type="text" name="hospital"
-                            placeholder="Where do you practice?"
+                            placeholder="Official name of your hospital or clinic"
                             value={form.hospital} onChange={handleChange}
+                            aria-invalid={!!errors.hospital}
                         />
+                        {errors.hospital && <span className="field-error">{errors.hospital}</span>}
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="d-regNumber">Medical Reg. Number *</label>
+                        <label htmlFor="d-clinicLocation">Clinic / Hospital Location *</label>
+                        <input id="d-clinicLocation" type="text" name="clinicLocation"
+                            placeholder="Area, Street or Locality of your clinic"
+                            value={form.clinicLocation} onChange={handleChange}
+                            aria-invalid={!!errors.clinicLocation}
+                        />
+                        {errors.clinicLocation && <span className="field-error">{errors.clinicLocation}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="d-regNumber">Medical Reg. Number * <small style={{color:'#888'}}>(e.g. MH-123456)</small></label>
                         <input id="d-regNumber" type="text" name="regNumber"
-                            placeholder="e.g. MCI-XXXXXX"
+                            placeholder="STATE-XXXXXX or XXXXXXXX"
                             value={form.regNumber} onChange={handleChange}
                             aria-invalid={!!errors.regNumber}
                         />

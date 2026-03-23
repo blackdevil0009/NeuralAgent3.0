@@ -76,8 +76,10 @@ def init_db():
             specialization VARCHAR(255),
             experience VARCHAR(100),
             hospital VARCHAR(255),
+            clinic_location VARCHAR(512),
             regNumber VARCHAR(100),
             documentPath VARCHAR(512),
+            verificationStatus ENUM('pending','verified','rejected') DEFAULT 'pending',
             FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
@@ -99,7 +101,10 @@ def init_db():
         "ALTER TABLE users ADD COLUMN verificationOtp VARCHAR(10) AFTER verificationToken",
         "ALTER TABLE users ADD COLUMN twoFactorEnabled BOOLEAN DEFAULT FALSE AFTER verificationOtp",
         "ALTER TABLE users ADD COLUMN otpCode VARCHAR(10) AFTER twoFactorEnabled",
-        "ALTER TABLE users ADD COLUMN otpExpiry DATETIME AFTER otpCode"
+        "ALTER TABLE users ADD COLUMN otpExpiry DATETIME AFTER otpCode",
+        "ALTER TABLE users MODIFY COLUMN mobile VARCHAR(20) UNIQUE",
+        "ALTER TABLE doctor_details ADD COLUMN clinic_location VARCHAR(512) AFTER hospital",
+        "ALTER TABLE doctor_details ADD COLUMN verificationStatus ENUM('pending','verified','rejected') DEFAULT 'pending' AFTER documentPath"
     ]
     for task in migration_tasks:
         try:
