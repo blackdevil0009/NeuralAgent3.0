@@ -11,3 +11,5 @@ pydantic
 requests
 gunicorn
 google-generativeai
+flask-socketio
+eventlet
