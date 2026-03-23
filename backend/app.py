@@ -755,22 +755,38 @@ def get_messages(other_id):
 def send_hybrid_message():
     current_user_id = int(get_jwt_identity())
     data = request.get_json()
-    
+
     receiver_id = data.get('receiverId')
     content = data.get('content')
-    
+
     if not receiver_id or not content:
         return signed_json_response({"error": "Receiver and content required"}, 400)
-    
-    # Check if sender is a doctor
+
+    # Check sender role
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT role FROM users WHERE id = %s", (current_user_id,))
     user = cursor.fetchone()
-    conn.close()
-    
     is_doctor = user['role'] == 'doctor' if user else False
-    
+
+    # --- Appointment gating: patient must have an active appointment with this doctor ---
+    if not is_doctor:
+        cursor.execute('''
+            SELECT id FROM appointments
+            WHERE patientId = %s AND doctorId = %s
+              AND status IN ('Scheduled', 'Completed')
+            LIMIT 1
+        ''', (current_user_id, receiver_id))
+        appointment = cursor.fetchone()
+        conn.close()
+        if not appointment:
+            return signed_json_response({
+                "error": "You must book an appointment with this doctor before messaging them.",
+                "code": "NO_APPOINTMENT"
+            }, 403)
+    else:
+        conn.close()
+
     result, status = chat_vcall.send_chat_message(current_user_id, receiver_id, content, is_doctor)
     if status == 201:
         create_notification(receiver_id, 'Message', f"New secure message from user #{current_user_id}")
@@ -812,10 +828,16 @@ def handle_profile():
     
     if request.method == 'GET':
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.twoFactorEnabled, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role,
-                   pd.dosha, pd.allergies, pd.conditions, pd.medications
+            SELECT u.fullName as name, u.email, u.mobile, u.twoFactorEnabled, u.dob, u.gender,
+                   u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin,
+                   u.isVerified, u.role,
+                   pd.dosha, pd.allergies, pd.conditions, pd.medications,
+                   dd.degree, dd.position, dd.specialization, dd.experience, dd.hospital,
+                   dd.clinic_location as clinicLocation, dd.regNumber, dd.consultantFee,
+                   dd.workingHours, dd.verificationStatus
             FROM users u
             LEFT JOIN patient_details pd ON u.id = pd.userId
+            LEFT JOIN doctor_details dd ON u.id = dd.userId
             WHERE u.id = %s
         ''', (current_user_id,))
         profile = cursor.fetchone()
@@ -862,6 +884,15 @@ def handle_profile():
                     INSERT INTO patient_details (userId, dosha, allergies, conditions, medications)
                     VALUES (%s, %s, %s, %s, %s)
                 ''', (current_user_id, data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications')))
+
+        # update doctor_details if doctor
+        if user_role == 'doctor':
+            cursor.execute("SELECT userId FROM doctor_details WHERE userId=%s", (current_user_id,))
+            if cursor.fetchone():
+                cursor.execute('''
+                    UPDATE doctor_details SET consultantFee=%s, workingHours=%s
+                    WHERE userId=%s
+                ''', (data.get('consultantFee'), data.get('workingHours'), current_user_id))
         
         conn.commit()
         
@@ -882,20 +913,43 @@ def get_doctors():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute('''
-        SELECT u.id, u.fullName as name, d.specialization as spec, d.degree, d.experience, d.hospital
-        FROM users u 
-        JOIN doctor_details d ON u.id = d.userId 
-        WHERE u.role = 'doctor'
+        SELECT u.id, u.fullName as name, d.specialization as spec, d.degree, d.experience,
+               d.hospital, d.clinic_location as clinicLocation, d.consultantFee as fee,
+               d.workingHours, d.verificationStatus
+        FROM users u
+        JOIN doctor_details d ON u.id = d.userId
+        WHERE u.role = 'doctor' AND u.isVerified = 1
     ''')
     doctors = cursor.fetchall()
     conn.close()
-    
-    # Add mock rating/fee if not in DB yet for rich UI
     for d in doctors:
-        d['rating'] = 4.8
-        d['fee'] = 800
-        
+        d['rating'] = 4.8  # placeholder until rating system is built
     return signed_json_response({"doctors": doctors})
+
+@app.route('/api/appointments/check/<int:doctor_id>', methods=['GET'])
+@jwt_required()
+def check_appointment(doctor_id):
+    """Returns whether the current patient has an active appointment with this doctor."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute('''
+        SELECT id, type, appointmentDate, appointmentTime, status
+        FROM appointments
+        WHERE patientId = %s AND doctorId = %s
+          AND status IN ('Scheduled', 'Completed')
+        ORDER BY appointmentDate DESC
+        LIMIT 1
+    ''', (current_user_id, doctor_id))
+    appt = cursor.fetchone()
+    conn.close()
+    if appt:
+        if appt.get('appointmentDate'):
+            appt['appointmentDate'] = str(appt['appointmentDate'])
+        if appt.get('appointmentTime'):
+            appt['appointmentTime'] = str(appt['appointmentTime'])
+        return signed_json_response({"hasAppointment": True, "appointment": appt})
+    return signed_json_response({"hasAppointment": False})
 
 @app.route('/api/doctors/search', methods=['GET'])
 @jwt_required()

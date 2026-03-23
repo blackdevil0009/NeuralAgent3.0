@@ -75,6 +75,8 @@ def init_db():
             position VARCHAR(255),
             specialization VARCHAR(255),
             experience VARCHAR(100),
+            consultantFee INT DEFAULT 500,
+            workingHours VARCHAR(255) DEFAULT 'Mon-Fri, 10AM-6PM',
             hospital VARCHAR(255),
             clinic_location VARCHAR(512),
             regNumber VARCHAR(100),
@@ -104,7 +106,9 @@ def init_db():
         "ALTER TABLE users ADD COLUMN otpExpiry DATETIME AFTER otpCode",
         "ALTER TABLE users MODIFY COLUMN mobile VARCHAR(20) UNIQUE",
         "ALTER TABLE doctor_details ADD COLUMN clinic_location VARCHAR(512) AFTER hospital",
-        "ALTER TABLE doctor_details ADD COLUMN verificationStatus ENUM('pending','verified','rejected') DEFAULT 'pending' AFTER documentPath"
+        "ALTER TABLE doctor_details ADD COLUMN verificationStatus ENUM('pending','verified','rejected') DEFAULT 'pending' AFTER documentPath",
+        "ALTER TABLE doctor_details ADD COLUMN consultantFee INT DEFAULT 500 AFTER experience",
+        "ALTER TABLE doctor_details ADD COLUMN workingHours VARCHAR(255) DEFAULT 'Mon-Fri, 10AM-6PM' AFTER consultantFee"
     ]
     for task in migration_tasks:
         try:
