@@ -6,6 +6,11 @@ from email.mime.multipart import MIMEMultipart
 SENDER_EMAIL = 'vaidyamedx@gmail.com'
 SENDER_PASSWORD = 'ibes vhks akgu mcyi'
 
+try:
+    import gevent
+    HAS_GEVENT = True
+except ImportError:
+    HAS_GEVENT = False
 import threading
 
 def _send_email_async_worker(to_email, subject, body):
@@ -40,11 +45,14 @@ def _send_email_async_worker(to_email, subject, body):
 
 def _send_email_common(to_email, subject, body):
     """
-    Spawns a daemon thread to send the email and immediately returns True,
-    resulting in lighting-fast logins/registrations for the end user.
+    Uses gevent.spawn (if available) or threading.Thread to send emails in the background.
+    This ensures that the login/registration process is nearly instantaneous.
     """
-    thread = threading.Thread(target=_send_email_async_worker, args=(to_email, subject, body), daemon=True)
-    thread.start()
+    if HAS_GEVENT:
+        gevent.spawn(_send_email_async_worker, to_email, subject, body)
+    else:
+        thread = threading.Thread(target=_send_email_async_worker, args=(to_email, subject, body), daemon=True)
+        thread.start()
     return True
 
 def send_verification_email(to_email, verification_link, verification_otp):
