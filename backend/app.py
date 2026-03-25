@@ -1273,19 +1273,23 @@ def create_payment_order():
     import razorpay
     current_user_id = int(get_jwt_identity())
     data = request.json
-    doctor_id = data.get('doctorId')
+    purpose = data.get('purpose')
+    doctor_id = data.get('doctorId') if purpose != 'verification' else None
     
-    if not doctor_id:
+    if purpose != 'verification' and not doctor_id:
         return signed_json_response({"error": "Doctor ID required"}, 400)
         
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
-        doc = cursor.fetchone()
-        fee = doc['consultantFee'] if doc else 500
+        if purpose == 'verification':
+            order_amount = 100 # ₹1
+        else:
+            cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
+            doc = cursor.fetchone()
+            fee = doc['consultantFee'] if doc else 500
+            order_amount = fee * 100 # amount in paise
         
-        order_amount = fee * 100 # amount in paise
         order_currency = 'INR'
         
         # Initialize Razorpay client. In production, use real keys from .env.
@@ -1397,6 +1401,25 @@ def verify_payment():
     except Exception as e:
         app.logger.error(f"Error verifying payment: {e}")
         return signed_json_response({"error": str(e)}, 500)
+
+@app.route('/api/payments/verify-payout', methods=['POST'])
+@jwt_required()
+def verify_payout():
+    curr_id = int(get_jwt_identity())
+    data = request.get_json()
+    rzp_pay_id, rzp_ord_id, rzp_sig = data.get('razorpay_payment_id'), data.get('razorpay_order_id'), data.get('razorpay_signature')
+    try:
+        if RAZORPAY_KEY_ID != 'rzp_test_placeholder':
+            razorpay_client.utility.verify_payment_signature({'razorpay_order_id': rzp_ord_id, 'razorpay_payment_id': rzp_pay_id, 'razorpay_signature': rzp_sig})
+        conn = get_db_connection(); cursor = conn.cursor()
+        cursor.execute("UPDATE doctor_details SET payoutVerified = 1 WHERE userId = %s", (curr_id,))
+        conn.commit(); conn.close()
+        if RAZORPAY_KEY_ID != 'rzp_test_placeholder':
+            try: razorpay_client.payment.refund(rzp_pay_id, { "amount": 100 })
+            except Exception as re: app.logger.error(f"Refund failed for {rzp_pay_id}: {re}")
+        return signed_json_response({"message": "UPI Verified! ₹1 refund initiated."}, 200)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 400 if "Signature" in str(e) else 500)
 
 # --- Emergency Endpoints ---
 

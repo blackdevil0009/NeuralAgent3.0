@@ -200,9 +200,55 @@ export default function DoctorProfile() {
             handleError('Please provide and save your UPI ID before requesting verification.');
             return;
         }
-        handleSuccess('Verification request sent! Our team will verify your payout details via a test transaction/message.');
-        // In a real system, this would call a backend endpoint like /api/doctor/payout/verify-request
-        // For now, we simulate the UI feedback.
+        
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/payments/create-order`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ purpose: 'verification' }),
+            });
+            const orderData = await res.json();
+            if (!res.ok) throw new Error(orderData.error || 'Failed to initialize verification.');
+
+            const options = {
+                key: orderData.key_id,
+                amount: orderData.amount,
+                currency: orderData.currency,
+                name: 'VaidyaMed-X Verification',
+                description: 'UPI Account Verification (₹1 Test - Instant Refund)',
+                order_id: orderData.order_id,
+                handler: async (response) => {
+                    try {
+                        const verifyRes = await fetch(`${API_BASE_URL}/api/payments/verify-payout`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature,
+                            }),
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (verifyRes.ok) {
+                            handleSuccess('Payout Verified! ₹1 refund has been initiated to your account.');
+                            setPayoutVerified(true);
+                        } else {
+                            throw new Error(verifyData.error || 'Verification failed');
+                        }
+                    } catch (err) {
+                        handleError(err);
+                    }
+                },
+                prefill: { name: form.name, contact: form.mobile, email: email },
+                theme: { color: '#27ae60' },
+            };
+
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+        } catch (err) {
+            handleError(err);
+        }
     };
 
     if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--doc-text-mute)' }}>⏳ Loading profile…</div>;
