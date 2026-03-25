@@ -207,23 +207,36 @@ export default function DoctorVideoCall() {
             };
 
             socket.on('connect', () => {
-                // Join room and immediately announce doctor is ready
+                // Join room as doctor
                 socket.emit('join_video_room', { room: roomId, role: 'doctor' });
-                // Announce readiness immediately after joining
-                setTimeout(() => {
-                    socket.emit('doctor_ready', { room: roomId });
-                }, 200);
+                // Immediately announce readiness
+                socket.emit('doctor_ready', { room: roomId });
+            });
+
+            // When ANY peer (patient) joins the room, re-announce doctor_ready
+            // This handles the race where patient joins AFTER doctor emitted doctor_ready
+            socket.on('peer_joined', () => {
+                console.log('[WebRTC] Peer joined room, re-emitting doctor_ready');
+                socket.emit('doctor_ready', { room: roomId });
+            });
+
+            // Also handle patient explicitly announcing themselves
+            socket.on('patient_joined', () => {
+                console.log('[WebRTC] Patient announced join, sending doctor_ready');
+                socket.emit('doctor_ready', { room: roomId });
             });
 
             // Handle Offer from Patient
             socket.on('video_offer', async (data) => {
                 const sdp = data.sdp || data;
                 try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-                    await flushPendingCandidates();
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    socket.emit('video_answer', { room: roomId, sdp: answer });
+                    if (pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer') {
+                        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                        await flushPendingCandidates();
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        socket.emit('video_answer', { room: roomId, sdp: answer });
+                    }
                 } catch (e) { console.error('Answer error:', e); }
             });
 

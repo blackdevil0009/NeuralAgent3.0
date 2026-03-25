@@ -1822,6 +1822,14 @@ def on_join_video_room(data):
     emit('peer_joined', {'role': role, 'message': f'{role} has joined'}, to=room, include_self=False)
     app.logger.info(f"[WebRTC] {role} joined room {room}")
 
+# Patient explicitly announces their presence (triggers doctor to re-emit doctor_ready)
+@socketio.on('patient_joined')
+def on_patient_joined(data):
+    if 'room' in data:
+        room = str(data['room'])
+        app.logger.info(f"[WebRTC] patient_joined in room {room}")
+        emit('patient_joined', {'message': 'Patient is ready'}, to=room, include_self=False)
+
 @socketio.on('doctor_ready')
 def on_doctor_ready(data):
     if 'room' in data:

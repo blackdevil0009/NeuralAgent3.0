@@ -201,18 +201,25 @@ export default function VideoCall() {
         // ── Socket event handlers ────────────────────────────────────────────
 
         socket.on('connect', () => {
+            // Join room and explicitly announce as patient
             socket.emit('join_video_room', { room: roomId, role: 'patient' });
+            // Announce patient presence so doctor knows to send doctor_ready
+            socket.emit('patient_joined', { room: roomId });
         });
 
-        // Doctor joined → patient creates and sends offer
+        // Doctor is ready → patient creates and sends offer
         socket.on('doctor_ready', async () => {
-            if (offerSentRef.current) return;
-            offerSentRef.current = true;
+            // Only create offer if not already in middle of negotiation
+            if (pc.signalingState !== 'stable') {
+                console.log('[WebRTC] Got doctor_ready but signalingState is', pc.signalingState, '- skipping');
+                return;
+            }
             setStatusMsg('Doctor connected! Establishing secure video…');
             try {
                 const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
                 await pc.setLocalDescription(offer);
                 socket.emit('video_offer', { room: roomId, sdp: offer });
+                console.log('[WebRTC] Offer sent to doctor');
             } catch (e) {
                 console.error('Offer failed:', e);
                 offerSentRef.current = false;
