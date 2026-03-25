@@ -108,7 +108,10 @@ def init_db():
         "ALTER TABLE doctor_details ADD COLUMN clinic_location VARCHAR(512) AFTER hospital",
         "ALTER TABLE doctor_details ADD COLUMN verificationStatus ENUM('pending','verified','rejected') DEFAULT 'pending' AFTER documentPath",
         "ALTER TABLE doctor_details ADD COLUMN consultantFee INT DEFAULT 500 AFTER experience",
-        "ALTER TABLE doctor_details ADD COLUMN workingHours VARCHAR(255) DEFAULT 'Mon-Fri, 10AM-6PM' AFTER consultantFee"
+        "ALTER TABLE doctor_details ADD COLUMN workingHours VARCHAR(255) DEFAULT 'Mon-Fri, 10AM-6PM' AFTER consultantFee",
+        "ALTER TABLE appointments ADD COLUMN paymentId VARCHAR(255) AFTER id",
+        "ALTER TABLE appointments ADD COLUMN orderId VARCHAR(255) AFTER paymentId",
+        "ALTER TABLE appointments ADD COLUMN amountPaid INT AFTER orderId"
     ]
     for task in migration_tasks:
         try:

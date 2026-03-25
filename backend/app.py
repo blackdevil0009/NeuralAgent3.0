@@ -1262,6 +1262,135 @@ def update_appointment(app_id):
     finally:
         conn.close()
 
+
+@app.route('/api/payments/create-order', methods=['POST'])
+@jwt_required()
+def create_payment_order():
+    import razorpay
+    current_user_id = int(get_jwt_identity())
+    data = request.json
+    doctor_id = data.get('doctorId')
+    
+    if not doctor_id:
+        return signed_json_response({"error": "Doctor ID required"}, 400)
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
+        doc = cursor.fetchone()
+        fee = doc['consultantFee'] if doc else 500
+        
+        order_amount = fee * 100 # amount in paise
+        order_currency = 'INR'
+        
+        # Initialize Razorpay client. In production, use real keys from .env.
+        key_id = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_placeholder')
+        key_secret = os.environ.get('RAZORPAY_KEY_SECRET', 'test_secret')
+        razorpay_client = razorpay.Client(auth=(key_id, key_secret))
+        
+        payment = razorpay_client.order.create(dict(amount=order_amount, currency=order_currency, payment_capture='1'))
+        
+        return signed_json_response({
+            'order_id': payment['id'],
+            'amount': order_amount,
+            'currency': order_currency,
+            'key_id': key_id
+        })
+    except Exception as e:
+        app.logger.error(f"Error creating Razorpay order: {e}")
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/payments/verify', methods=['POST'])
+@jwt_required()
+def verify_payment():
+    import razorpay
+    current_user_id = int(get_jwt_identity())
+    data = request.json
+    
+    razorpay_payment_id = data.get('razorpay_payment_id')
+    razorpay_order_id = data.get('razorpay_order_id')
+    razorpay_signature = data.get('razorpay_signature')
+    
+    doctor_id = data.get('doctorId')
+    appt_date = data.get('date')
+    appt_time_raw = data.get('time')
+    appt_type = data.get('type')
+    notes = data.get('notes', '')
+    
+    if not all([doctor_id, appt_date, appt_time_raw, appt_type]):
+        return signed_json_response({"error": "Missing appointment details"}, 400)
+    
+    # Convert 12-hour AM/PM format to 24-hour format
+    try:
+        from datetime import datetime as dt
+        appt_time = dt.strptime(appt_time_raw.strip(), '%I:%M %p').strftime('%H:%M:%S')
+    except ValueError:
+        appt_time = appt_time_raw
+        
+    key_id = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_placeholder')
+    key_secret = os.environ.get('RAZORPAY_KEY_SECRET', 'test_secret')
+    razorpay_client = razorpay.Client(auth=(key_id, key_secret))
+    
+    try:
+        # Verify signature only if real keys are used
+        if key_id != 'rzp_test_placeholder':
+            params_dict = {
+                'razorpay_order_id': razorpay_order_id,
+                'razorpay_payment_id': razorpay_payment_id,
+                'razorpay_signature': razorpay_signature
+            }
+            razorpay_client.utility.verify_payment_signature(params_dict)
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Conflict check
+        cursor.execute('''
+            SELECT id FROM appointments 
+            WHERE doctorId = %s AND appointmentDate = %s AND appointmentTime = %s AND status != 'Cancelled'
+        ''', (doctor_id, appt_date, appt_time))
+        
+        if cursor.fetchone():
+            conn.close()
+            return signed_json_response({"error": "This time slot is already booked. Please choose another slot."}, 409)
+            
+        # Get fee to record amountPaid
+        cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
+        doc = cursor.fetchone()
+        fee = doc[0] if doc else 500
+            
+        cursor.execute('''
+            INSERT INTO appointments (patientId, doctorId, appointmentDate, appointmentTime, type, notes, status, paymentId, orderId, amountPaid)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (current_user_id, doctor_id, appt_date, appt_time, appt_type, notes, 'Scheduled', razorpay_payment_id, razorpay_order_id, fee))
+        
+        app_id = cursor.lastrowid
+        conn.commit()
+        
+        # Notify Doctor
+        cursor.execute('SELECT fullName FROM users WHERE id = %s', (current_user_id,))
+        patient_row = cursor.fetchone()
+        patient_name = patient_row[0] if patient_row else 'A patient'
+        create_notification(doctor_id, 'Appointment', f"New {appt_type} appointment paid and booked for {appt_date} at {appt_time} by {patient_name}.")
+        
+        # Notify Patient
+        cursor.execute('SELECT fullName FROM users WHERE id = %s', (doctor_id,))
+        doc_row = cursor.fetchone()
+        doc_name = doc_row[0] if doc_row else 'the Doctor'
+        create_notification(current_user_id, 'Appointment', f"Confirmed: Your appointment with {doc_name} is set for {appt_date} at {appt_time}")
+        
+        conn.close()
+        
+        return signed_json_response({"message": "Payment verified and appointment confirmed!", "appointmentId": app_id}, 201)
+    except razorpay.errors.SignatureVerificationError:
+        return signed_json_response({"error": "Payment verification failed due to invalid signature"}, 400)
+    except Exception as e:
+        app.logger.error(f"Error verifying payment: {e}")
+        return signed_json_response({"error": str(e)}, 500)
+
 # --- Emergency Endpoints ---
 
 @app.route('/api/emergencies', methods=['POST'])

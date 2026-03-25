@@ -13,3 +13,4 @@ gunicorn
 google-generativeai
 flask-socketio
 eventlet
+razorpay
