@@ -332,7 +332,7 @@ export default function Inbox() {
                             </div>
                         </li>
                     ))}
-                    {filteredConvs.length === 0 && (
+                    {displayConvs.length === 0 && (
                         <div className="pd-empty" style={{ padding: '30px 20px' }}>
                             <div className="pd-empty-icon">🔍</div>
                             <p>No conversations found</p>
