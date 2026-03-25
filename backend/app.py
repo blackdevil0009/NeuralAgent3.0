@@ -1466,6 +1466,7 @@ def handle_emergency(em_id):
 @app.route('/api/ai/chat', methods=['POST'])
 @jwt_required()
 def ai_chat():
+    current_user_id = int(get_jwt_identity())
     user_query = None
     
     if request.is_json:
