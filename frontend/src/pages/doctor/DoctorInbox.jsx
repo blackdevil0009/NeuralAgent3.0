@@ -18,13 +18,12 @@ export default function DoctorInbox() {
     const [inputText, setInputText] = useState('');
     const [activeReportOverlay, setActiveReportOverlay] = useState(null);
 
-    /* Fetch Patients and History */
+    /* Fetch only appointed patients */
     useEffect(() => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
-        // 1. Fetch Patient list
-        fetch(`${API_BASE_URL}/api/patients`, {
+        fetch(`${API_BASE_URL}/api/doctors/my-patients`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
@@ -34,9 +33,9 @@ export default function DoctorInbox() {
                         id: p.id,
                         name: p.fullName,
                         avatar: '👨',
-                        lastMsg: 'Patient waiting...',
-                        time: 'Now',
-                        online: true
+                        lastMsg: `${p.type || 'Appointment'} — ${p.appointmentDate || ''}`,
+                        time: p.appointmentDate || 'Scheduled',
+                        online: p.status === 'Scheduled'
                     }));
                     setConversations(convos);
                     if (convos.length > 0) setSelectedConvo(convos[0]);

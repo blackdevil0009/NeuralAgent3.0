@@ -917,22 +917,73 @@ def handle_profile():
 @app.route('/api/doctors', methods=['GET'])
 @jwt_required()
 def get_doctors():
-    """Lists all registered doctors with details."""
+    """Lists all registered doctors. Supports optional ?city=lucknow and ?location=city_area filtering."""
+    city = request.args.get('city', '').strip()
+    location = request.args.get('location', '').strip()
+    specialization = request.args.get('spec', '').strip()
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute('''
-        SELECT u.id, u.fullName as name, d.specialization as spec, d.degree, d.experience,
-               d.hospital, d.clinic_location as clinicLocation, d.consultantFee as fee,
-               d.workingHours, d.verificationStatus
+
+    query = '''
+        SELECT u.id, u.fullName as name, u.city, u.state, d.specialization as spec,
+               d.degree, d.experience, d.hospital, d.clinic_location as clinicLocation,
+               d.consultantFee as fee, d.workingHours, d.verificationStatus
         FROM users u
         JOIN doctor_details d ON u.id = d.userId
         WHERE u.role = 'doctor' AND u.isVerified = 1
-    ''')
+    '''
+    params = []
+
+    if city:
+        query += " AND (LOWER(u.city) LIKE %s OR LOWER(u.state) LIKE %s)"
+        params.extend([f"%{city.lower()}%", f"%{city.lower()}%"])
+
+    if location:
+        query += " AND (LOWER(d.clinic_location) LIKE %s OR LOWER(u.city) LIKE %s OR LOWER(u.address) LIKE %s)"
+        params.extend([f"%{location.lower()}%", f"%{location.lower()}%", f"%{location.lower()}%"])
+
+    if specialization:
+        query += " AND LOWER(d.specialization) LIKE %s"
+        params.append(f"%{specialization.lower()}%")
+
+    query += " ORDER BY d.experience DESC"
+
+    cursor.execute(query, params)
     doctors = cursor.fetchall()
     conn.close()
     for d in doctors:
         d['rating'] = 4.8  # placeholder until rating system is built
     return signed_json_response({"doctors": doctors})
+
+
+@app.route('/api/doctors/my-patients', methods=['GET'])
+@jwt_required()
+def get_my_patients():
+    """Returns only patients who have a Scheduled or Completed appointment with this doctor."""
+    current_user_id = int(get_jwt_identity())
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute('''
+            SELECT DISTINCT u.id, u.fullName, u.email,
+                   a.appointmentDate, a.appointmentTime, a.type, a.status
+            FROM appointments a
+            JOIN users u ON a.patientId = u.id
+            WHERE a.doctorId = %s AND a.status IN ('Scheduled', 'Completed')
+            ORDER BY a.appointmentDate DESC
+        ''', (current_user_id,))
+        patients = cursor.fetchall()
+        for p in patients:
+            if p.get('appointmentDate'):
+                p['appointmentDate'] = str(p['appointmentDate'])
+            if p.get('appointmentTime'):
+                p['appointmentTime'] = str(p['appointmentTime'])
+        return signed_json_response({"patients": patients})
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
 
 @app.route('/api/appointments/check/<int:doctor_id>', methods=['GET'])
 @jwt_required()

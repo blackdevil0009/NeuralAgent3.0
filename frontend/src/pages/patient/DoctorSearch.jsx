@@ -30,6 +30,7 @@ export default function DoctorSearch() {
     const navigate = useNavigate();
     const [doctors, setDoctors] = useState([]);
     const [query, setQuery] = useState('');
+    const [locationQuery, setLocationQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
     const [bookingDoc, setBookingDoc] = useState(null);
     const [booked, setBooked] = useState(false);
@@ -51,7 +52,8 @@ export default function DoctorSearch() {
         const token = getToken();
         const headers = { Authorization: `Bearer ${token}` };
 
-        const fetchDoctors = fetch(`${API_BASE_URL}/api/doctors`, { headers })
+        const cityParam = locationQuery ? `&city=${encodeURIComponent(locationQuery)}` : '';
+        const fetchDoctors = fetch(`${API_BASE_URL}/api/doctors?${cityParam}`, { headers })
             .then(r => r.json()).then(j => j.data?.doctors || []).catch(() => []);
 
         const fetchAppointments = fetch(`${API_BASE_URL}/api/appointments`, { headers })
@@ -71,14 +73,17 @@ export default function DoctorSearch() {
                 setAppointmentMap(map);
             })
             .finally(() => setLoading(false));
-    }, []);
+    }, [locationQuery]);
 
     const filtered = doctors.filter(d => {
         const q = query.toLowerCase();
         const spec = (d.spec || '').toLowerCase();
         const name = (d.name || '').toLowerCase();
+        const city = (d.city || '').toLowerCase();
+        const state = (d.state || '').toLowerCase();
+        const clinic = (d.clinicLocation || '').toLowerCase();
         const filt = activeFilter.toLowerCase();
-        return (!query || name.includes(q) || spec.includes(q)) &&
+        return (!query || name.includes(q) || spec.includes(q) || city.includes(q) || clinic.includes(q)) &&
                (activeFilter === 'All' || spec.includes(filt));
     });
 
@@ -124,12 +129,17 @@ export default function DoctorSearch() {
                 <span className="pd-pill pd-pill-green">{doctors.length} Doctors Available</span>
             </div>
 
-            {/* Search */}
-            <div style={{ marginBottom: 16 }}>
+            {/* Search Row */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
                 <input type="text" className="pd-input"
                     placeholder="🔍  Search by name, specialization, symptom…"
                     value={query} onChange={e => setQuery(e.target.value)}
-                    style={{ borderRadius: 50, padding: '12px 20px' }}
+                    style={{ borderRadius: 50, padding: '12px 20px', flex: 2 }}
+                />
+                <input type="text" className="pd-input"
+                    placeholder="📍  City or area (e.g. Lucknow)"
+                    value={locationQuery} onChange={e => setLocationQuery(e.target.value)}
+                    style={{ borderRadius: 50, padding: '12px 20px', flex: 1 }}
                 />
             </div>
 
@@ -186,8 +196,10 @@ export default function DoctorSearch() {
                                         <span>💰 ₹{d.fee || 500}/consult</span>
                                         {d.workingHours && <span>🕑 {d.workingHours}</span>}
                                     </div>
-                                    {d.clinicLocation && (
-                                        <div style={{ fontSize: '0.78rem', color: '#6b8f71', marginTop: 2 }}>📍 {d.clinicLocation}</div>
+                                    {(d.clinicLocation || d.city) && (
+                                        <div style={{ fontSize: '0.78rem', color: '#6b8f71', marginTop: 2 }}>
+                                            📍 {d.clinicLocation && `${d.clinicLocation}`}{d.city && ` — ${d.city}${d.state ? ', ' + d.state : ''}`}
+                                        </div>
                                     )}
 
                                     <div className="pd-doctor-actions" style={{ marginTop: 10, flexWrap: 'wrap' }}>
