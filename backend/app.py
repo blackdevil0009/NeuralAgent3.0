@@ -769,24 +769,40 @@ def send_hybrid_message():
     user = cursor.fetchone()
     is_doctor = user['role'] == 'doctor' if user else False
 
-    # --- Appointment gating: patient must have an active appointment with this doctor ---
-    if not is_doctor:
-        cursor.execute('''
-            SELECT id FROM appointments
-            WHERE patientId = %s AND doctorId = %s
-              AND status IN ('Scheduled', 'Completed')
-            LIMIT 1
-        ''', (current_user_id, receiver_id))
-        appointment = cursor.fetchone()
+    # --- Appointment gating: must have an active appointment starting soon or ongoing ---
+    cursor.execute('''
+        SELECT appointmentDate, appointmentTime, status FROM appointments
+        WHERE ((patientId = %s AND doctorId = %s) OR (patientId = %s AND doctorId = %s))
+          AND status = 'Scheduled'
+        ORDER BY ABS(TIMESTAMPDIFF(SECOND, NOW(), CONCAT(appointmentDate, ' ', appointmentTime))) ASC
+        LIMIT 1
+    ''', (current_user_id, receiver_id, receiver_id, current_user_id))
+    appt = cursor.fetchone()
+    
+    if not appt:
         conn.close()
-        if not appointment:
-            return signed_json_response({
-                "error": "You must book an appointment with this doctor before messaging them.",
-                "code": "NO_APPOINTMENT"
-            }, 403)
-    else:
-        conn.close()
+        return signed_json_response({
+            "error": "No scheduled appointment found. Please book an appointment first.",
+            "code": "NO_APPOINTMENT"
+        }, 403)
 
+    # Check time window: Allow from 10 mins before start
+    from datetime import datetime as dt
+    try:
+        appt_dt = dt.combine(appt['appointmentDate'], dt.min.time()) + appt['appointmentTime']
+        now = dt.now()
+        diff = (appt_dt - now).total_seconds()
+        
+        if diff > 600: # More than 10 minutes before
+            conn.close()
+            return signed_json_response({
+                "error": f"Communication window not open yet. Please wait until 10 minutes before your appointment at {appt['appointmentTime']}.",
+                "code": "WINDOW_NOT_OPEN"
+            }, 403)
+    except Exception as e:
+        app.logger.error(f"Time window check failed: {e}")
+
+    conn.close()
     result, status = chat_vcall.send_chat_message(current_user_id, receiver_id, content, is_doctor)
     if status == 201:
         create_notification(receiver_id, 'Message', f"New secure message from user #{current_user_id}")
@@ -1083,6 +1099,16 @@ def book_appointment():
         cursor.execute('SELECT fullName FROM users WHERE id = %s', (doctor_id,))
         doc_data = cursor.fetchone()
         doc_name = doc_data[0] if doc_data else "Doctor"
+
+        # Conflict check: Is this slot already booked for this doctor?
+        cursor.execute('''
+            SELECT id FROM appointments 
+            WHERE doctorId = %s AND appointmentDate = %s AND appointmentTime = %s 
+              AND status = 'Scheduled'
+        ''', (doctor_id, date, time))
+        if cursor.fetchone():
+            conn.close()
+            return signed_json_response({"error": "This slot is already booked. Please choose another time or slot."}, 409)
 
         cursor.execute('''
             INSERT INTO appointments (patientId, doctorId, appointmentDate, appointmentTime, type, notes)
@@ -1815,6 +1841,50 @@ def on_leave_video_room(data):
         leave_room(room)
         emit('peer_left', {'message': 'A peer has left'}, to=room, include_self=False)
 
+# --- Background Task for Appointment Reminders ---
+def check_upcoming_appointments():
+    """Checks for appointments starting in ~5 minutes and sends notifications."""
+    while True:
+        try:
+            with app.app_context():
+                conn = get_db_connection()
+                if conn:
+                    cursor = conn.cursor(dictionary=True)
+                    # Find appointments starting in the next 5 minutes that haven't been reminded
+                    # Using +/- 1 minute buffer to ensure we catch them in 1-min poll
+                    cursor.execute('''
+                        SELECT a.id, a.patientId, a.doctorId, a.appointmentTime, a.type,
+                               p.fullName as patientName, d.fullName as doctorName
+                        FROM appointments a
+                        JOIN users p ON a.patientId = p.id
+                        JOIN users d ON a.doctorId = d.id
+                        WHERE a.status = 'Scheduled' AND a.reminderSent = FALSE
+                          AND a.appointmentDate = CURRENT_DATE
+                          AND TIMESTAMPDIFF(MINUTE, NOW(), CONCAT(a.appointmentDate, ' ', a.appointmentTime)) BETWEEN 0 AND 6
+                    ''')
+                    upcoming = cursor.fetchall()
+                    
+                    for appt in upcoming:
+                        # Create notifications
+                        msg = f"Reminder: Your {appt['type']} appointment starts in 5 minutes!"
+                        create_notification(appt['patientId'], 'Appointment', msg)
+                        create_notification(appt['doctorId'], 'Appointment', f"Reminder: Appointment with {appt['patientName']} starts in 5 minutes.")
+                        
+                        # Emit socket events if users are online
+                        socketio.emit('notification', {'type': 'Appointment', 'content': msg}, room=f"user_{appt['patientId']}")
+                        socketio.emit('notification', {'type': 'Appointment', 'content': f"Upcoming: {appt['patientName']} in 5 mins"}, room=f"user_{appt['doctorId']}")
+                        
+                        # Mark as reminded
+                        cursor.execute('UPDATE appointments SET reminderSent = TRUE WHERE id = %s', (appt['id'],))
+                    
+                    conn.commit()
+                    conn.close()
+        except Exception as e:
+            print(f"Reminder Task Error: {e}")
+        eventlet.sleep(60)
+
 if __name__ == '__main__':
     init_db()
-    socketio.run(app, port=8000, debug=True, host='0.0.0.0')
+    # Start background reminder service
+    socketio.start_background_task(check_upcoming_appointments)
+    socketio.run(app, port=5000, debug=True, host='0.0.0.0')

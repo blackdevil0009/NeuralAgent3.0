@@ -157,6 +157,7 @@ def init_db():
             type VARCHAR(50) NOT NULL, -- 'Video Call' or 'Chat'
             status VARCHAR(50) DEFAULT 'Scheduled', -- 'Scheduled', 'Completed', 'Cancelled'
             notes TEXT,
+            reminderSent BOOLEAN DEFAULT FALSE,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(patientId) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY(doctorId) REFERENCES users(id) ON DELETE CASCADE
