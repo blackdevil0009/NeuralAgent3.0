@@ -60,6 +60,19 @@ const statusMeta = {
     rejected: { color: '#e74c3c', icon: '❌', text: 'Your credentials were rejected. Update and contact support to re-submit.' },
 };
 
+/* ── Extracted Field Component to prevent input unmounting ── */
+const Field = ({ label, name, type = 'text', placeholder, children, req, form, handleChange, errors }) => (
+    <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>{label} {req && <span style={{ color: '#e74c3c' }}>*</span>}</label>
+        {children || (
+            <input type={type} name={name} value={form[name] || ''} onChange={handleChange}
+                placeholder={placeholder} aria-invalid={!!errors[name]}
+                style={inputStyle(errors[name])} />
+        )}
+        {errors[name] && <div style={errorStyle}>⚠ {errors[name]}</div>}
+    </div>
+);
+
 export default function DoctorProfile() {
     const [profile, setProfile]   = useState(null);
     const [form, setForm]         = useState(EMPTY);
@@ -281,18 +294,8 @@ export default function DoctorProfile() {
     /* ════════════════════════════════════════════
        EDIT MODE (full editable form)
     ════════════════════════════════════════════ */
-    const Field = ({ label, name, type = 'text', placeholder, children, req }) => (
-        <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>{label} {req && <span style={{ color: '#e74c3c' }}>*</span>}</label>
-            {children || (
-                <input type={type} name={name} value={form[name]} onChange={handleChange}
-                    placeholder={placeholder} aria-invalid={!!errors[name]}
-                    style={inputStyle(errors[name])} />
-            )}
-            {errors[name] && <div style={errorStyle}>⚠ {errors[name]}</div>}
-        </div>
-    );
     const sel = (name) => ({ name, value: form[name], onChange: handleChange, style: inputStyle(errors[name]) });
+    const fProps = { form, handleChange, errors }; // Shared props for Field
 
     return (
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
@@ -323,60 +326,60 @@ export default function DoctorProfile() {
                 {/* Personal */}
                 <div style={cardStyle}>
                     <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>👤 Personal Information</h3>
-                    <Field label="Full Name" name="name" placeholder="Dr. Full Name" req />
+                    <Field label="Full Name" name="name" placeholder="Dr. Full Name" req {...fProps} />
                     <div style={{ marginBottom: 16 }}>
                         <label style={labelStyle}>Email <span style={{ color: '#aaa', textTransform: 'none', fontSize: '0.7rem' }}>(read-only)</span></label>
                         <input value={email} readOnly style={{ ...inputStyle(false), background: '#f5f5f5', color: '#999' }} />
                     </div>
-                    <Field label="Mobile" name="mobile" type="tel" placeholder="10-digit mobile" req />
+                    <Field label="Mobile" name="mobile" type="tel" placeholder="10-digit mobile" req {...fProps} />
                 </div>
 
                 {/* Address */}
                 <div style={cardStyle}>
                     <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>🏡 Address</h3>
-                    <Field label="Street Address" name="address" placeholder="House, Street, Locality" req />
-                    <Field label="City" name="city" placeholder="City" req />
-                    <Field label="State" name="state" req>
+                    <Field label="Street Address" name="address" placeholder="House, Street, Locality" req {...fProps} />
+                    <Field label="City" name="city" placeholder="City" req {...fProps} />
+                    <Field label="State" name="state" req {...fProps}>
                         <select {...sel('state')} style={{ ...inputStyle(errors.state), cursor: 'pointer' }}>
                             <option value="">-- Select State --</option>
                             {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </Field>
-                    <Field label="PIN Code" name="pin" placeholder="6-digit PIN" req />
+                    <Field label="PIN Code" name="pin" placeholder="6-digit PIN" req {...fProps} />
                 </div>
 
                 {/* Credentials */}
                 <div style={cardStyle}>
                     <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>🎓 Professional Credentials</h3>
-                    <Field label="Degree" name="degree" req>
+                    <Field label="Degree" name="degree" req {...fProps}>
                         <select {...sel('degree')} style={{ ...inputStyle(errors.degree), cursor: 'pointer' }}>
                             <option value="">-- Select Degree --</option>
                             {VALID_DEGREES.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                     </Field>
-                    <Field label="Position / Designation" name="position" req>
+                    <Field label="Position / Designation" name="position" req {...fProps}>
                         <select {...sel('position')} style={{ ...inputStyle(errors.position), cursor: 'pointer' }}>
                             <option value="">-- Select Position --</option>
                             {VALID_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </Field>
-                    <Field label="Specialization" name="specialization" req>
+                    <Field label="Specialization" name="specialization" req {...fProps}>
                         <select {...sel('specialization')} style={{ ...inputStyle(errors.specialization), cursor: 'pointer' }}>
                             <option value="">-- Select Specialization --</option>
                             {VALID_SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </Field>
-                    <Field label="Years of Experience" name="experience" type="number" placeholder="e.g. 5" req />
-                    <Field label="Medical Reg. Number" name="regNumber" placeholder="e.g. MH-123456" req />
+                    <Field label="Years of Experience" name="experience" type="number" placeholder="e.g. 5" req {...fProps} />
+                    <Field label="Medical Reg. Number" name="regNumber" placeholder="e.g. MH-123456" req {...fProps} />
                 </div>
 
                 {/* Practice */}
                 <div style={cardStyle}>
                     <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>🏥 Practice Details</h3>
-                    <Field label="Hospital / Clinic Name" name="hospital" placeholder="Official name" req />
-                    <Field label="Clinic / Hospital Location" name="clinicLocation" placeholder="Area, street, locality" req />
-                    <Field label="Working Hours" name="workingHours" placeholder="e.g. Mon-Fri, 10AM-6PM" req />
-                    <Field label="Consultation Fee (₹)" name="consultantFee" type="number" placeholder="e.g. 500" req />
+                    <Field label="Hospital / Clinic Name" name="hospital" placeholder="Official name" req {...fProps} />
+                    <Field label="Clinic / Hospital Location" name="clinicLocation" placeholder="Area, street, locality" req {...fProps} />
+                    <Field label="Working Hours" name="workingHours" placeholder="e.g. Mon-Fri, 10AM-6PM" req {...fProps} />
+                    <Field label="Consultation Fee (₹)" name="consultantFee" type="number" placeholder="e.g. 500" req {...fProps} />
                 </div>
             </div>
 
