@@ -17,6 +17,7 @@ export default function DoctorInbox() {
     const [messages, setMessages] = useState({});
     const [inputText, setInputText] = useState('');
     const [activeReportOverlay, setActiveReportOverlay] = useState(null);
+    const [inboxTab, setInboxTab] = useState('active'); // 'active' | 'history'
 
     /* Fetch only appointed patients */
     useEffect(() => {
@@ -121,6 +122,11 @@ export default function DoctorInbox() {
         if (e.key === 'Enter') handleSendMessage();
     };
 
+    const isCompleted = selectedConvo?.status === 'Completed';
+    const activeConvs = conversations.filter(c => c.status !== 'Completed');
+    const historyConvs = conversations.filter(c => c.status === 'Completed');
+    const displayConvs = inboxTab === 'history' ? historyConvs : activeConvs;
+
     return (
         <div style={{ display: 'flex', height: 'calc(100vh - 130px)', gap: 20, position: 'relative' }}>
             {/* ── Left: Convo List ── */}
@@ -132,15 +138,31 @@ export default function DoctorInbox() {
                         borderRadius: 8, border: '1px solid var(--doc-border)', fontSize: '0.85rem'
                     }} />
                 </div>
+                {/* Active / History Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--doc-border)', background: '#f9fcfa' }}>
+                    {['active', 'history'].map(tab => (
+                        <button key={tab} onClick={() => setInboxTab(tab)} style={{
+                            flex: 1, padding: '9px 0', border: 'none', background: 'none', cursor: 'pointer',
+                            fontWeight: inboxTab === tab ? 700 : 400,
+                            color: inboxTab === tab ? '#2d6a4f' : '#888',
+                            borderBottom: inboxTab === tab ? '2px solid #2d6a4f' : '2px solid transparent',
+                            fontSize: '0.78rem'
+                        }}>
+                            {tab === 'active' ? `💬 Active (${activeConvs.length})` : `🗂️ History (${historyConvs.length})`}
+                        </button>
+                    ))}
+                </div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                    {conversations.map(c => (
+                    {displayConvs.map(c => (
                         <div
                             key={c.id}
                             onClick={() => setSelectedConvo(c)}
                             style={{
                                 padding: '16px 20px', borderBottom: '1px solid var(--doc-border)',
-                                cursor: 'pointer', background: selectedConvo?.id === c.id ? '#f0f7f2' : 'transparent',
-                                borderLeft: selectedConvo?.id === c.id ? '4px solid var(--doc-green-light)' : 'none'
+                                cursor: 'pointer',
+                                background: selectedConvo?.id === c.id ? '#f0f7f2' : 'transparent',
+                                borderLeft: selectedConvo?.id === c.id ? '4px solid var(--doc-green-light)' : 'none',
+                                opacity: c.status === 'Completed' ? 0.75 : 1
                             }}
                         >
                             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -151,6 +173,7 @@ export default function DoctorInbox() {
                                         <span style={{ fontSize: '0.75rem', color: 'var(--doc-text-mute)' }}>{c.time}</span>
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--doc-text-mute)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.lastMsg}</div>
+                                    {c.status === 'Completed' && <span style={{ fontSize: '0.65rem', background: '#e8f4ec', color: '#2d6a4f', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>DONE</span>}
                                 </div>
                                 {c.unread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--doc-accent)' }}></div>}
                             </div>
@@ -201,6 +224,20 @@ export default function DoctorInbox() {
                     </div>
                 </div>
 
+                {/* Input bar — disabled if appointment completed */}
+                {isCompleted ? (
+                    <div style={{
+                        padding: '18px 24px', background: '#f0faf4',
+                        borderTop: '1px solid #c3e6cb', display: 'flex',
+                        alignItems: 'center', gap: 12
+                    }}>
+                        <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#2d6a4f' }}>Consultation Completed</div>
+                            <div style={{ fontSize: '0.78rem', color: '#6b8f71' }}>This session is archived. Patient may book a new appointment.</div>
+                        </div>
+                    </div>
+                ) : (
                 <div style={{ padding: '20px 24px', borderTop: '1px solid var(--doc-border)' }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                         <button style={{ background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer' }}>📎</button>
@@ -217,6 +254,8 @@ export default function DoctorInbox() {
                         <button className="dd-btn dd-btn-primary" onClick={handleSendMessage}>Send Advice</button>
                     </div>
                 </div>
+                )}
+
             </div>
 
             {/* ── Right: Patient Context (Conditional) ── */}

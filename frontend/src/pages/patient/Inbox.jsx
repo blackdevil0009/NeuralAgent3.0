@@ -20,6 +20,8 @@ export default function Inbox() {
     const [attachPreview, setAttachPreview] = useState(null);
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [mobileShowChat, setMobileShowChat] = useState(!!preselect);
+    const [inboxTab, setInboxTab] = useState('active'); // 'active' | 'history'
+    const [appointmentMap, setAppointmentMap] = useState({});
 
     const active = conversations.find(c => c.id === activeId);
 
@@ -27,31 +29,46 @@ export default function Inbox() {
     const endRef = useRef(null);
     const inputRef = useRef(null);
 
-    /* Fetch Doctors and History */
+    /* Fetch Doctors and Appointment Status */
     useEffect(() => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
+        const headers = { 'Authorization': `Bearer ${token}` };
 
-        // 1. Fetch Doctor list
-        fetch(`${API_BASE_URL}/api/doctors`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-            .then(res => res.json())
-            .then(res => {
-                if (res.data && res.data.doctors) {
-                    const convos = res.data.doctors.map(d => ({
-                        id: d.id,
-                        name: d.name,
-                        spec: d.spec,
-                        badge: '🌿',
-                        online: true,
-                        lastMsg: 'Connect to chat',
-                        messages: []
-                    }));
-                    setConversations(convos);
-                    if (!activeId && convos.length > 0) setActiveId(convos[0].id);
+        const fetchDoctors = fetch(`${API_BASE_URL}/api/doctors`, { headers })
+            .then(res => res.json()).then(res => res.data?.doctors || []).catch(() => []);
+
+        const fetchAppointments = fetch(`${API_BASE_URL}/api/appointments`, { headers })
+            .then(res => res.json()).then(res => res.data?.appointments || []).catch(() => []);
+
+        Promise.all([fetchDoctors, fetchAppointments]).then(([docs, appts]) => {
+            // Build map: doctorId → latest appointment status
+            const map = {};
+            appts.forEach(a => {
+                const key = String(a.doctorId);
+                if (!map[key] || new Date(a.appointmentDate) > new Date(map[key].appointmentDate)) {
+                    map[key] = a;
                 }
             });
+            setAppointmentMap(map);
+
+            // Only include doctors with at least one appointment (Scheduled or Completed)
+            const convos = docs
+                .filter(d => map[String(d.id)])
+                .map(d => ({
+                    id: d.id,
+                    name: d.name,
+                    spec: d.spec,
+                    badge: '🌿',
+                    online: map[String(d.id)]?.status === 'Scheduled',
+                    status: map[String(d.id)]?.status || 'Scheduled',
+                    appointmentDate: map[String(d.id)]?.appointmentDate,
+                    lastMsg: map[String(d.id)]?.status === 'Completed' ? '✅ Consultation completed' : 'Tap to message',
+                    messages: []
+                }));
+            setConversations(convos);
+            if (!activeId && convos.length > 0) setActiveId(convos[0].id);
+        });
     }, []);
 
     useEffect(() => {
@@ -198,7 +215,11 @@ export default function Inbox() {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     };
 
-    const filteredConvs = conversations.filter(c =>
+    const isCompleted = active && appointmentMap[String(active.id)]?.status === 'Completed';
+
+    const activeConvs = conversations.filter(c => c.status !== 'Completed');
+    const historyConvs = conversations.filter(c => c.status === 'Completed');
+    const displayConvs = (inboxTab === 'history' ? historyConvs : activeConvs).filter(c =>
         !searchQ ||
         (c.name && c.name.toLowerCase().includes(searchQ.toLowerCase())) ||
         (c.spec && c.spec.toLowerCase().includes(searchQ.toLowerCase()))
@@ -216,7 +237,21 @@ export default function Inbox() {
                         💬 Messages
                         {totalUnread > 0 && <span className="inbox-unread-total">{totalUnread}</span>}
                     </h2>
-                    <button className="inbox-compose" title="New Message" onClick={() => navigate('/patient/doctors')}>✏️</button>
+                    <button className="inbox-compose" title="Find Doctors" onClick={() => navigate('/patient/doctors')}>✏️</button>
+                </div>
+                {/* Active / History Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #e8f4ec', background: '#f8fbf9' }}>
+                    {['active', 'history'].map(tab => (
+                        <button key={tab} onClick={() => setInboxTab(tab)} style={{
+                            flex: 1, padding: '10px 0', border: 'none', background: 'none', cursor: 'pointer',
+                            fontWeight: inboxTab === tab ? 700 : 400,
+                            color: inboxTab === tab ? '#2d6a4f' : '#888',
+                            borderBottom: inboxTab === tab ? '2px solid #2d6a4f' : '2px solid transparent',
+                            fontSize: '0.82rem', textTransform: 'capitalize'
+                        }}>
+                            {tab === 'active' ? `💬 Active (${activeConvs.length})` : `🗂️ History (${historyConvs.length})`}
+                        </button>
+                    ))}
                 </div>
                 <div className="inbox-search-wrap" style={{ position: 'relative' }}>
                     <input
@@ -273,11 +308,12 @@ export default function Inbox() {
                     {searching && <div style={{ position: 'absolute', right: 12, top: 10, fontSize: '0.8rem' }}>⏳</div>}
                 </div>
                 <ul className="inbox-conv-list">
-                    {filteredConvs.map(c => (
+                    {displayConvs.map(c => (
                         <li
                             key={c.id}
                             className={`inbox-conv-item ${c.id === activeId ? 'active' : ''}`}
-                            onClick={() => selectConv(c.id)}
+                            onClick={() => { selectConv(c.id); setMobileShowChat(true); }}
+                            style={{ opacity: c.status === 'Completed' ? 0.75 : 1 }}
                         >
                             <div className="inbox-conv-avatar">
                                 {c.badge}
@@ -286,10 +322,11 @@ export default function Inbox() {
                             <div className="inbox-conv-info">
                                 <div className="inbox-conv-top">
                                     <span className="inbox-conv-name">{c.name}</span>
-                                    <span className="inbox-conv-time">{c.lastTime || ''}</span>
+                                    <span className="inbox-conv-time">{c.appointmentDate || ''}</span>
                                 </div>
                                 <div className="inbox-conv-bottom">
                                     <span className="inbox-conv-last">{c.lastMsg}</span>
+                                    {c.status === 'Completed' && <span style={{ fontSize: '0.65rem', background: '#e8f4ec', color: '#2d6a4f', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>DONE</span>}
                                     {c.unread > 0 && <span className="inbox-unread-badge">{c.unread}</span>}
                                 </div>
                             </div>
@@ -379,7 +416,24 @@ export default function Inbox() {
                     ))}
                 </div>
 
-                {/* Input bar */}
+                {/* Input bar — disabled if appointment is completed */}
+                {isCompleted ? (
+                    <div style={{
+                        padding: '18px 24px', background: '#f0faf4',
+                        borderTop: '1px solid #c3e6cb', display: 'flex',
+                        alignItems: 'center', gap: 12, color: '#2d6a4f'
+                    }}>
+                        <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>Consultation Completed</div>
+                            <div style={{ fontSize: '0.78rem', color: '#6b8f71' }}>This chat is now archived. Book a new appointment to message again.</div>
+                        </div>
+                        <button className="pd-btn pd-btn-primary pd-btn-sm" style={{ marginLeft: 'auto' }}
+                            onClick={() => navigate('/patient/doctors')}>
+                            📅 Book Again
+                        </button>
+                    </div>
+                ) : (
                 <div className="inbox-input-bar">
                     {/* Attach menu */}
                     <div className="inbox-attach-wrap">
@@ -424,6 +478,7 @@ export default function Inbox() {
                         ➤
                     </button>
                 </div>
+                )}
 
                 {/* Hidden file input */}
                 <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} />
