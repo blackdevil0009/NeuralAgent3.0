@@ -176,7 +176,7 @@ export default function DoctorVideoCall() {
                 }
             };
 
-            // Join WebSocket Room and announce ready
+            // Join WebSocket Room and announce ready immediately
             socket.emit('join_video_room', { room: roomId });
             socket.emit('doctor_ready', { room: roomId });
 

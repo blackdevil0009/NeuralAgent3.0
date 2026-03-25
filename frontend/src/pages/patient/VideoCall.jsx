@@ -62,6 +62,7 @@ export default function VideoCall() {
     const socketRef = useRef(null);
     const pollInterval = useRef(null);
     const timer = useTimer(phase === 'live');
+    const instant = searchParams.get('instant') === 'true';
 
     useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages, chatOpen]);
 
@@ -92,6 +93,14 @@ export default function VideoCall() {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 streamRef.current = stream;
                 if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+                
+                // If instant join is requested, start signaling immediately after camera is ready
+                if (instant) {
+                    setTimeout(() => {
+                        if (isEmergencyCall) connectWebRTC();
+                        else setPhase('connecting');
+                    }, 500);
+                }
             } catch (err) {
                 setPermError("Camera/Mic access required for secure WebRTC. Please allow them.");
             }
@@ -104,7 +113,7 @@ export default function VideoCall() {
             if (pcRef.current) pcRef.current.close();
             if (socketRef.current) socketRef.current.disconnect();
         };
-    }, []);
+    }, [instant]);
 
     /* Set up local streams when references update */
     useEffect(() => {

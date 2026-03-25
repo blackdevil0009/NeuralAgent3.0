@@ -1210,6 +1210,14 @@ def update_appointment(app_id):
         
         content = f"Appointment {app_id} has been {status.lower()} by {caller_name}."
         create_notification(other_user_id, 'Appointment', content)
+
+        # Ringing for Video Calls: Notify patient when doctor starts live session
+        if status == 'Live' and current_user_id == app_data['doctorId']:
+            socketio.emit('appointment_call_incoming', {
+                "doctorName": caller_name,
+                "doctorId": current_user_id,
+                "appointmentId": app_id
+            }, room=f"user_{app_data['patientId']}")
         
         conn.commit()
         return signed_json_response({"message": f"Appointment {status.lower()} successfully!"})

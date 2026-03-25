@@ -81,7 +81,10 @@ export default function PatientLayout() {
                 socketRef.current = socket;
                 socket.emit('join_user_room', { userId: stored.id });
                 socket.on('emergency_call_incoming', (data) => {
-                    setIncomingCall(data);
+                    setIncomingCall({ ...data, isEmergency: true });
+                });
+                socket.on('appointment_call_incoming', (data) => {
+                    setIncomingCall({ ...data, isEmergency: false });
                 });
             }
         } catch (e) { }
@@ -105,44 +108,53 @@ export default function PatientLayout() {
         navigate('/login');
     };
 
-    const acceptEmergencyCall = () => {
+    const acceptCall = () => {
         if (incomingCall) {
-            navigate(`/patient/vcall?room=emergency_${incomingCall.emergencyId}&doctorId=${incomingCall.doctorId}`);
+            if (incomingCall.isEmergency) {
+                navigate(`/patient/vcall?room=emergency_${incomingCall.emergencyId}&doctorId=${incomingCall.doctorId}`);
+            } else {
+                navigate(`/patient/vcall?appt=${incomingCall.appointmentId}&doctor=${incomingCall.doctorId}&instant=true`);
+            }
             setIncomingCall(null);
         }
     };
 
     return (
         <div className="pd-shell">
-            {/* ── Incoming Emergency Call Banner ── */}
+            {/* ── Incoming Call Banner ── */}
             {incomingCall && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-                    background: 'linear-gradient(135deg, #c0392b, #e74c3c)',
+                    background: incomingCall.isEmergency ? 'linear-gradient(135deg, #c0392b, #e74c3c)' : 'linear-gradient(135deg, #2d6a4f, #40916c)',
                     color: '#fff', padding: '16px 24px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-                    boxShadow: '0 4px 20px rgba(192,57,43,0.5)', animation: 'slideDown 0.4s ease'
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)', animation: 'slideDown 0.4s ease'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{ fontSize: '2rem', animation: 'pulse 1s infinite' }}>📞</div>
+                        <div style={{ fontSize: '2.2rem', animation: 'pulse 1s infinite' }}>📞</div>
                         <div>
-                            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>Incoming Emergency Call</div>
-                            <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Dr. {incomingCall.doctorName} is calling regarding your emergency</div>
+                            <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>
+                                {incomingCall.isEmergency ? '⚠️ Incoming EMERGENCY Call' : '📡 Incoming Consultation'}
+                            </div>
+                            <div style={{ fontSize: '0.95rem', opacity: 0.9 }}>
+                                Dr. {incomingCall.doctorName} is requesting to start your video session.
+                            </div>
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
                         <button
-                            onClick={acceptEmergencyCall}
+                            onClick={acceptCall}
                             style={{
-                                padding: '10px 22px', borderRadius: 24, background: '#27ae60',
-                                color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem'
+                                padding: '10px 24px', borderRadius: 24, background: '#27ae60',
+                                color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '1rem',
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
                             }}
                         >✅ Accept</button>
                         <button
                             onClick={() => setIncomingCall(null)}
                             style={{
-                                padding: '10px 22px', borderRadius: 24, background: 'rgba(255,255,255,0.2)',
-                                color: '#fff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem'
+                                padding: '10px 24px', borderRadius: 24, background: 'rgba(255,255,255,0.2)',
+                                color: '#fff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 700, cursor: 'pointer', fontSize: '1rem'
                             }}
                         >❌ Decline</button>
                     </div>
