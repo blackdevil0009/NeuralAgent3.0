@@ -72,6 +72,16 @@ export default function DoctorVideoCall() {
 
     const localVideoRef  = useRef(null);
     const remoteVideoRef = useRef(null);
+    const remoteStreamRef = useRef(null);
+
+    // Attach stream safely when phase switches to live
+    useEffect(() => {
+        if (phase === 'live' && remoteVideoRef.current && remoteStreamRef.current) {
+            if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+                remoteVideoRef.current.srcObject = remoteStreamRef.current;
+            }
+        }
+    }, [phase]);
     const streamRef      = useRef(null);
     const pcRef          = useRef(null);
     const socketRef      = useRef(null);
@@ -181,9 +191,10 @@ export default function DoctorVideoCall() {
             // Add local media
             streamRef.current.getTracks().forEach(track => pc.addTrack(track, streamRef.current));
 
-            // Show remote stream immediately when it arrives
+            // Show remote stream securely, even if remoteVideoRef is not rendered yet
             pc.ontrack = (event) => {
-                if (remoteVideoRef.current && event.streams[0]) {
+                remoteStreamRef.current = event.streams[0];
+                if (remoteVideoRef.current) {
                     remoteVideoRef.current.srcObject = event.streams[0];
                 }
                 setPhase('live');
