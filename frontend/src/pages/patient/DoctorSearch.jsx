@@ -40,7 +40,7 @@ export default function DoctorSearch() {
 
     // Booking form state
     const [aptDate, setAptDate] = useState('');
-    const [aptTime, setAptTime] = useState('10:00 AM');
+    const [aptTime, setAptTime] = useState('10:00');
     const [aptType, setAptType] = useState('Video Call');
     const [aptNotes, setAptNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -89,6 +89,14 @@ export default function DoctorSearch() {
 
     const handleBookSubmit = async () => {
         if (!aptDate || !aptTime) { handleError('Please select date and time'); return; }
+        
+        // Convert 24h to 12h format
+        const [h, m] = aptTime.split(':');
+        const hour = parseInt(h, 10);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const formattedHour = hour % 12 || 12;
+        const formattedTime = `${String(formattedHour).padStart(2, '0')}:${m} ${ampm}`;
+
         setSubmitting(true);
         try {
             const res = await fetch(`${API_BASE_URL}/api/appointments`, {
@@ -97,7 +105,7 @@ export default function DoctorSearch() {
                 body: JSON.stringify({
                     doctorId: bookingDoc.id,
                     date: aptDate,
-                    time: aptTime,
+                    time: formattedTime,
                     type: aptType,
                     notes: aptNotes,
                 }),
@@ -106,7 +114,7 @@ export default function DoctorSearch() {
             if (res.ok) {
                 setBooked(true);
                 // Update local appointment map so buttons unlock immediately
-                const newAppt = { doctorId: bookingDoc.id, status: 'Scheduled', type: aptType, appointmentDate: aptDate, appointmentTime: aptTime };
+                const newAppt = { doctorId: bookingDoc.id, status: 'Scheduled', type: aptType, appointmentDate: aptDate, appointmentTime: formattedTime };
                 setAppointmentMap(prev => ({ ...prev, [String(bookingDoc.id)]: newAppt }));
                 handleSuccess(`Appointment booked! Dr. ${bookingDoc.name} has been notified.`);
             } else {
@@ -338,13 +346,8 @@ export default function DoctorSearch() {
                                     {/* Time */}
                                     <div className="pd-form-group">
                                         <label>Preferred Time</label>
-                                        <select className="pd-select" value={aptTime} onChange={e => setAptTime(e.target.value)}>
-                                            {['08:00 AM','09:00 AM','10:00 AM','11:00 AM','12:00 PM',
-                                              '01:00 PM','02:00 PM','03:00 PM','04:00 PM','05:00 PM',
-                                              '06:00 PM','07:00 PM'].map(t => (
-                                                <option key={t} value={t}>{t}</option>
-                                            ))}
-                                        </select>
+                                        <input type="time" className="pd-input"
+                                            value={aptTime} onChange={e => setAptTime(e.target.value)} />
                                         {bookingDoc.workingHours && (
                                             <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 3 }}>
                                                 🕑 Doctor's hours: {bookingDoc.workingHours}

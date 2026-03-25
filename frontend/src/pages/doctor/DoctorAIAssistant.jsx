@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const ANALYSIS_EXAMPLES = [
-    {
-        id: 1, patient: 'Rohit Sharma', date: '25 Feb 2026', type: 'CBC + Liver Profile',
-        result: 'Elevated Liver Enzymes (ALT/AST)', dosha: 'Pitta Imbalance',
-        advice: 'Reduce spicy foods, introduce Ghee-based preparations, Shatavari supplements recommended.'
-    }
-];
+import { API_BASE_URL } from '../../utils/config';
 
 const MOCK_IOT = [
     { id: 1, label: 'ICU Ventilator-04', status: 'Stable', metric: '65% O2', trend: 'steady' },
@@ -21,12 +14,25 @@ export default function DoctorAIAssistant() {
     const [analysisResult, setAnalysisResult] = useState(null);
     const [cameraActive, setCameraActive] = useState(false);
 
-    const runAnalysis = () => {
+    const runAnalysis = async () => {
+        if (!selectedPatient) return;
         setIsAnalyzing(true);
-        setTimeout(() => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/ai/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ patientName: selectedPatient, reportType: 'General Clinical Report' })
+            });
+            const json = await res.json();
+            if (json.data) {
+                setAnalysisResult(json.data);
+            }
+        } catch (err) {
+            console.error('AI Analysis Error:', err);
+        } finally {
             setIsAnalyzing(false);
-            setAnalysisResult(ANALYSIS_EXAMPLES[0]);
-        }, 1800);
+        }
     };
 
     return (
