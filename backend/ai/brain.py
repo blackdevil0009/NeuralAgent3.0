@@ -5,7 +5,17 @@ Powered by Gemini API with rule-based fallback.
 import os
 import time
 import json
+import math
 from collections import OrderedDict
+
+# Adjust path to import database connection if called from backend directory
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+try:
+    from database import get_db_connection
+except ImportError:
+    # Fallback if run standalone
+    def get_db_connection(): return None
 
 # ─── Gemini API Integration ─────────────────────────────────────────────
 
@@ -26,7 +36,7 @@ Do NOT describe yourself unless the user explicitly asks "who are you".
 GREETING BEHAVIOR:
 * If user says "hi/hello/hey" → reply casually like a human
   Examples:
-  * "Hey! Kaise ho? 😊"
+  * "Hey! Kaise ho?"
   * "Hello! Kya help chahiye?"
   * "Hi! Batao kya chal raha hai?"
 
@@ -347,6 +357,7 @@ class MedAssistX:
 
         # Try to initialize Gemini client
         api_key = GEMINI_API_KEY
+        print("DEBUG API KEY:", repr(api_key))
         if api_key and api_key != "your_gemini_api_key_here":
             try:
                 import google.generativeai as genai
@@ -356,11 +367,11 @@ class MedAssistX:
                     system_instruction=SYSTEM_PROMPT
                 )
                 self.api_available = True
-                print("✚ VaidyaMed-X initialized with Gemini API ✓")
+                print("[+] VaidyaMed-X initialized with Gemini API OK")
             except Exception as e:
-                print(f"✚ VaidyaMed-X: Gemini init failed ({e}), using fallback engine")
+                print(f"[-] VaidyaMed-X: Gemini init failed ({type(e).__name__}: {e}), using fallback engine")
         else:
-            print("✚ VaidyaMed-X initialized (offline mode — set GEMINI_API_KEY for AI responses)")
+            print("[i] VaidyaMed-X initialized (offline mode — set GEMINI_API_KEY for AI responses)")
 
     def _detect_emergency(self, text):
         text_lower = text.lower()
@@ -386,33 +397,162 @@ class MedAssistX:
                         break
         return matched
 
+    # ─── Memory & RAG Functions ──────────────────────────────────────
+
+    def _retrieve_history(self, user_id, limit=6):
+        """Retrieve recent conversation history for a user from the DB."""
+        if not user_id:
+            return []
+        conn = get_db_connection()
+        if not conn: return []
+        try:
+            cursor = conn.cursor(dictionary=True)
+            # Fetch last N messages
+            cursor.execute('''
+                SELECT role, content FROM ai_chat_history
+                WHERE userId = %s
+                ORDER BY timestamp DESC LIMIT %s
+            ''', (user_id, limit))
+            rows = cursor.fetchall()
+            # Reverse to chronological order
+            rows.reverse()
+            
+            history = []
+            for r in rows:
+                role = "user" if r['role'] == "user" else "model"
+                history.append({"role": role, "parts": [r['content']]})
+            return history
+        except Exception as e:
+            print(f"Memory Retrieval Error: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def _save_history(self, user_id, role, content):
+        """Save a message to the AI chat history."""
+        if not user_id: return
+        conn = get_db_connection()
+        if not conn: return
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ai_chat_history (userId, role, content)
+                VALUES (%s, %s, %s)
+            ''', (user_id, role, content))
+            conn.commit()
+        except Exception as e:
+            print(f"Memory Save Error: {e}")
+        finally:
+            conn.close()
+
+    def _cosine_similarity(self, vec1, vec2):
+        dot = sum(a * b for a, b in zip(vec1, vec2))
+        norm1 = math.sqrt(sum(a * a for a in vec1))
+        norm2 = math.sqrt(sum(b * b for b in vec2))
+        if norm1 == 0 or norm2 == 0: return 0.0
+        return dot / (norm1 * norm2)
+
+    def _embed_text(self, text):
+        """Generate vector embedding for standard text using Gemini."""
+        if not self.api_available: return None
+        try:
+            import google.generativeai as genai
+            result = genai.embed_content(
+                model="models/text-embedding-004",
+                content=text,
+                task_type="retrieval_query",
+            )
+            return result['embedding']
+        except Exception as e:
+            print(f"Embedding error: {e}")
+            return None
+
+    def _retrieve_context(self, query_text):
+        """Find the top 2 relevant documents from the knowledge_base using cosine similarity."""
+        conn = get_db_connection()
+        if not conn: return ""
+        try:
+            query_embed = self._embed_text(query_text)
+            if not query_embed: return ""
+
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT title, content, embedding FROM knowledge_base")
+            rows = cursor.fetchall()
+            
+            scored_chunks = []
+            for row in rows:
+                try:
+                    doc_embed = json.loads(row['embedding']) if isinstance(row['embedding'], str) else row['embedding']
+                    if doc_embed:
+                        score = self._cosine_similarity(query_embed, doc_embed)
+                        scored_chunks.append((score, row['title'], row['content']))
+                except Exception:
+                    continue
+            
+            # Sort by similarity
+            scored_chunks.sort(reverse=True, key=lambda x: x[0])
+            top_chunks = scored_chunks[:2]
+            
+            if top_chunks and top_chunks[0][0] > 0.6: # Relevance Threshold
+                context_str = "RELEVANT MEDICAL KNOWLEDGE:\n"
+                for i, (_, title, chunk) in enumerate(top_chunks):
+                    context_str += f"[Source {i+1}: {title}]\n{chunk}\n\n"
+                return context_str
+            return ""
+        except Exception as e:
+            print(f"RAG Retrieval Error: {e}")
+            return ""
+        finally:
+            conn.close()
+
     # ─── Gemini API Call ─────────────────────────────────────────────
 
-    def _call_gemini(self, user_input):
-        """Call Gemini API with the VaidyaMed-X system prompt."""
+    def _call_gemini(self, user_input, user_id=None):
+        """Call Gemini API with Memory and RAG Context."""
         if not self.api_available or not self.client:
             return None
 
+        # 1. Retrieve Context (RAG)
+        context = self._retrieve_context(user_input)
+        
+        # Format the actual prompt the model sees internally
+        prompt = user_input
+        if context:
+            prompt = f"{context}\n\n---USER QUERY---\n{user_input}"
+
         try:
-            response = self.client.generate_content(
-                user_input,
+            # 2. Retrieve History (Memory)
+            history = self._retrieve_history(user_id) if user_id else []
+            
+            # 3. Start Chat Session
+            chat = self.client.start_chat(history=history)
+            
+            response = chat.send_message(
+                prompt,
                 generation_config=dict(
                     temperature=0.4, # Lower temperature for clinical accuracy
                     max_output_tokens=1500
                 )
             )
             content = response.text
+            
             if content and len(content.strip()) > 20:
+                # 4. Save to History
+                if user_id:
+                    self._save_history(user_id, 'user', user_input)
+                    self._save_history(user_id, 'model', content.strip())
                 return content.strip()
             return None
         except Exception as e:
-            print(f"Gemini API Error: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"Gemini API Error details: {e}")
             return None
 
     # ─── Fallback Response Builders ────────────────────────────────────
 
     def _build_greeting(self):
-        return "Hey! Kaise ho 😊 batao kya help chahiye?"
+        return "Hey! Kaise ho? Batao kya help chahiye?"
 
     def _build_emergency(self, trigger):
         return (
@@ -473,31 +613,34 @@ class MedAssistX:
 
     # ─── Main Entry Point ──────────────────────────────────────────────
 
-    def process_query(self, user_input):
+    def process_query(self, user_input, user_id=None):
         """Process a clinical query — Gemini API first, fallback if unavailable."""
         self.query_count += 1
 
         if not user_input or not user_input.strip():
             return self._build_greeting()
 
-        cache_key = user_input.lower().strip()
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
+        # If we have user_id, don't use the simple cache since memory state matters
+        cache_key = None
+        if not user_id:
+            cache_key = user_input.lower().strip()
+            cached = self.cache.get(cache_key)
+            if cached:
+                return cached
 
         # Emergency — always use built-in (faster, no API latency)
         is_emergency, trigger = self._detect_emergency(user_input)
         if is_emergency:
             resp = self._build_emergency(trigger)
-            self.cache.put(cache_key, resp)
+            if cache_key: self.cache.put(cache_key, resp)
             self.session_log.append({"q": user_input, "type": "emergency"})
             return resp
 
-        # Try Gemini API first (now handles everything dynamically)
-        api_response = self._call_gemini(user_input)
+        # Try Gemini API first (now handles memory and RAG)
+        api_response = self._call_gemini(user_input, user_id=user_id)
         if api_response:
-            resp = api_response # No static headers
-            self.cache.put(cache_key, resp)
+            resp = api_response
+            if cache_key: self.cache.put(cache_key, resp)
             self.session_log.append({"q": user_input, "type": "gemini"})
             return resp
 

@@ -1484,7 +1484,8 @@ def ai_chat():
         return signed_json_response({"error": "Message or file required"}, 400)
     
     brain = get_brain()
-    response = brain.process_query(user_query)
+    # Pass user_id for memory
+    response = brain.process_query(user_query, user_id=current_user_id)
     
     return signed_json_response({
         "response": response,
@@ -1504,9 +1505,10 @@ def ai_voice():
     
     # Use browser-side STT (Web Speech API) — just process the text
     text = request.form.get('message', 'Voice input received')
+    current_user_id = int(get_jwt_identity())
     
     brain = get_brain()
-    response = brain.process_query(text)
+    response = brain.process_query(text, user_id=current_user_id)
     
     return signed_json_response({
         "text": text,

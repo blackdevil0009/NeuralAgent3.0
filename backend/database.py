@@ -263,6 +263,28 @@ def init_db():
         )
     ''')
 
+    # AI Chat History (Memory)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_chat_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId INT NOT NULL,
+            role ENUM('user', 'model') NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # AI Knowledge Base (RAG)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS knowledge_base (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            embedding JSON
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
