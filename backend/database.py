@@ -115,7 +115,9 @@ def init_db():
         "ALTER TABLE doctor_details ADD COLUMN bankAccountDetails TEXT AFTER upiId",
         "ALTER TABLE appointments ADD COLUMN paymentId VARCHAR(255) AFTER id",
         "ALTER TABLE appointments ADD COLUMN orderId VARCHAR(255) AFTER paymentId",
-        "ALTER TABLE appointments ADD COLUMN amountPaid INT AFTER orderId"
+        "ALTER TABLE appointments ADD COLUMN amountPaid INT AFTER orderId",
+        "ALTER TABLE appointments ADD COLUMN commissionAmount INT DEFAULT 0 AFTER amountPaid",
+        "ALTER TABLE appointments ADD COLUMN doctorPayoutAmount INT DEFAULT 0 AFTER commissionAmount"
     ]
     for task in migration_tasks:
         try:
@@ -157,6 +159,11 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS appointments (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            paymentId VARCHAR(255),
+            orderId VARCHAR(255),
+            amountPaid INT,
+            commissionAmount INT DEFAULT 0,
+            doctorPayoutAmount INT DEFAULT 0,
             patientId INT NOT NULL,
             doctorId INT NOT NULL,
             appointmentDate DATE NOT NULL,

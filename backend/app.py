@@ -1358,15 +1358,18 @@ def verify_payment():
             conn.close()
             return signed_json_response({"error": "This time slot is already booked. Please choose another slot."}, 409)
             
-        # Get fee to record amountPaid
+        # Get fee and calculate 5/95 split
         cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
         doc = cursor.fetchone()
         fee = doc[0] if doc else 500
+        
+        commission = int(fee * 0.05)
+        payout = fee - commission
             
         cursor.execute('''
-            INSERT INTO appointments (patientId, doctorId, appointmentDate, appointmentTime, type, notes, status, paymentId, orderId, amountPaid)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (current_user_id, doctor_id, appt_date, appt_time, appt_type, notes, 'Scheduled', razorpay_payment_id, razorpay_order_id, fee))
+            INSERT INTO appointments (patientId, doctorId, appointmentDate, appointmentTime, type, notes, status, paymentId, orderId, amountPaid, commissionAmount, doctorPayoutAmount)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (current_user_id, doctor_id, appt_date, appt_time, appt_type, notes, 'Scheduled', razorpay_payment_id, razorpay_order_id, fee, commission, payout))
         
         app_id = cursor.lastrowid
         conn.commit()
