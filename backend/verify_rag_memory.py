@@ -52,7 +52,7 @@ def main():
     
     embed = brain._embed_text(test_kb_content)
     if embed and len(embed) > 100:
-        print(f"✓ Embedded successfully. Vector length: {len(embed)}")
+        print(f"[OK] Embedded successfully. Vector length: {len(embed)}")
         
         # Save to DB
         conn = get_db_connection()
@@ -64,21 +64,21 @@ def main():
                 (test_kb_title, test_kb_content, json.dumps(embed))
             )
             conn.commit()
-            print("✓ Ingested properly to knowledge_base table")
+            print("[OK] Ingested properly to knowledge_base table")
         except Exception as e:
-            print(f"✗ DB error: {e}")
+            print(f"[FAIL] DB error: {e}")
         finally:
             conn.close()
     else:
-        print("✗ Failed to embed")
+        print("[FAIL] Failed to embed")
 
     print("\n=== Test 2: RAG Context Retrieval ===")
     retrieved = brain._retrieve_context("How do I treat Syndrome X?")
     if "Herb Y" in retrieved:
-        print("✓ Retrieved correct context!")
+        print("[OK] Retrieved correct context!")
         print(f"Context Sample: {retrieved[:100]}...\n")
     else:
-        print("✗ Failed to retrieve context or low similarity")
+        print("[FAIL] Failed to retrieve context or low similarity")
         print(f"Got: {retrieved}\n")
 
     print("\n=== Test 3: AI Query with RAG ===")
@@ -95,18 +95,18 @@ def main():
     print(f"Q1: How do I treat Syndrome X?")
     print(f"A1: {resp1[:150]}...\n")
     if "Herb Y" in resp1:
-        print("✓ AI successfully used RAG context!")
+        print("[OK] AI successfully used RAG context!")
     else:
-        print("✗ AI failed to use RAG context.")
+        print("[FAIL] AI failed to use RAG context.")
         
     print("\n=== Test 4: AI Conversational Memory ===")
     resp2 = brain.process_query("What was the name of the condition I just asked about?", user_id=user_id)
     print(f"Q2: What was the name of the condition I just asked about?")
     print(f"A2: {resp2[:150]}...\n")
     if "Syndrome X" in resp2:
-        print("✓ AI successfully remembered the previous turn!")
+        print("[OK] AI successfully remembered the previous turn!")
     else:
-        print("✗ AI failed to remember context.")
+        print("[FAIL] AI failed to remember context.")
 
 if __name__ == "__main__":
     main()

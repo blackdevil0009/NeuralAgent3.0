@@ -1,0 +1,23 @@
+=== Initializing AI Database Tables ===
+
+=== Initializing MedAssistX ===
+API KEY: AIzaSyBGScuXAZxk5eGvrsBGAw82usi9xT0e89U
+GENAI SDK CRASHED: 403 Your API key was reported as leaked. Please use another API key.
+DEBUG API KEY: 'AIzaSyBGScuXAZxk5eGvrsBGAw82usi9xT0e89U'
+[+] VaidyaMed-X initialized with Gemini API OK
+API Available: True
+
+=== Test 1: RAG Knowledge Ingestion ===
+Embedding error: 404 models/text-embedding-004 is not found for API version v1beta, or is not supported for embedContent. Call ListModels to see the list of available models and their supported methods.
+[FAIL] Failed to embed
+
+=== Test 2: RAG Context Retrieval ===
+Embedding error: 404 models/text-embedding-004 is not found for API version v1beta, or is not supported for embedContent. Call ListModels to see the list of available models and their supported methods.
+[FAIL] Failed to retrieve context or low similarity
+Got: 
+
+
+=== Test 3: AI Query with RAG ===
+Embedding error: 404 models/text-embedding-004 is not found for API version v1beta, or is not supported for embedContent. Call ListModels to see the list of available models and their supported methods.
+Gemini API Error details: 404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+Q1: How do I treat Syndrome X?
