@@ -1,17 +1,38 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../../utils/config';
 
-const TIPS = [
-    'Review the patient\'s file before the session starts.',
-    'Use the AI Assistant to cross-reference symptoms.',
-];
+// ── ICE Configuration with STUN + public TURN fallbacks ──────────────────────
+const ICE_SERVERS = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ],
+    iceCandidatePoolSize: 10
+};
 
 function useTimer(active) {
     const [secs, setSecs] = useState(0);
     useEffect(() => {
-        if (!active) return;
+        if (!active) { setSecs(0); return; }
         const id = setInterval(() => setSecs(s => s + 1), 1000);
         return () => clearInterval(id);
     }, [active]);
@@ -20,236 +41,253 @@ function useTimer(active) {
     return `${mm}:${ss}`;
 }
 
-const iceServers = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-};
-
 export default function DoctorVideoCall() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const patientId = searchParams.get('patient') || searchParams.get('patientId');
+    const patientId   = searchParams.get('patient') || searchParams.get('patientId');
     const patientName = searchParams.get('name') || 'Patient';
-    const apptId = searchParams.get('appt');
-    const roomParam = searchParams.get('room');
-    // For emergency calls, room is passed directly. For appointment calls, use apptId.
-    const roomId = apptId || roomParam;
+    const apptId      = searchParams.get('appt');
+    const roomParam   = searchParams.get('room');
+    const roomId      = apptId ? `appt_${apptId}` : roomParam;
 
-    const [phase, setPhase] = useState('permission'); // permission | live | ended
-    const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
-    const [permError, setPermError] = useState('');
-    const [patient, setPatient] = useState({ name: patientName, badge: '🧘' });
-    const [loading, setLoading] = useState(false);
-
-    // Controls
-    const [camOn, setCamOn] = useState(true);
-    const [micOn, setMicOn] = useState(true);
-    
-    // Chat & Side Panels
-    const [chatOpen, setChatOpen] = useState(false);
-    const [aiOpen, setAiOpen] = useState(false);
-    const [messages, setMessages] = useState([]);
-    const [chatInput, setChatInput] = useState('');
-    const [uploading, setUploading] = useState(false);
-    
-    const [aiQuery, setAiQuery] = useState('');
+    const [phase, setPhase]           = useState('init'); // init | setup | live | ended | error
+    const [patient, setPatient]       = useState({ name: patientName, badge: '🧘' });
+    const [permError, setPermError]   = useState('');
+    const [loading, setLoading]       = useState(false);
+    const [connState, setConnState]   = useState('');
+    const [camOn, setCamOn]           = useState(true);
+    const [micOn, setMicOn]           = useState(true);
+    const [chatOpen, setChatOpen]     = useState(false);
+    const [aiOpen, setAiOpen]         = useState(false);
+    const [messages, setMessages]     = useState([]);
+    const [chatInput, setChatInput]   = useState('');
+    const [aiQuery, setAiQuery]       = useState('');
     const [aiResponse, setAiResponse] = useState('');
-    const [aiLoading, setAiLoading] = useState(false);
-
+    const [aiLoading, setAiLoading]   = useState(false);
     const [prescription, setPrescription] = useState('');
-    const [rxSaved, setRxSaved] = useState(false);
-    const [activeOverlay, setActiveOverlay] = useState(null); // 'medical'
-    const [medicalData, setMedicalData] = useState(null);
+    const [rxSaved, setRxSaved]       = useState(false);
+    const [activeOverlay, setActiveOverlay] = useState(null);
+    const [medicalData, setMedicalData]   = useState(null);
     const [patientContact, setPatientContact] = useState('');
 
-    const fileInputRef = useRef(null);
-    const chatEndRef = useRef(null);
-
-    // WebRTC Refs
-    const localVideoRef = useRef(null);
+    const localVideoRef  = useRef(null);
     const remoteVideoRef = useRef(null);
-    const streamRef = useRef(null);
-    const pcRef = useRef(null);
-    const socketRef = useRef(null);
+    const streamRef      = useRef(null);
+    const pcRef          = useRef(null);
+    const socketRef      = useRef(null);
+    const chatEndRef     = useRef(null);
+    const fileInputRef   = useRef(null);
+    const pendingCandidates = useRef([]);
+
     const timer = useTimer(phase === 'live');
 
-    useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages, chatOpen]);
+    useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
 
-    /* Fetch patient info & medical data */
+    // ── Add ICE candidate safely ─────────────────────────────────────────────
+    const addCandidate = useCallback(async (candidate) => {
+        const pc = pcRef.current;
+        if (!pc) return;
+        if (pc.remoteDescription) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
+        } else {
+            pendingCandidates.current.push(candidate);
+        }
+    }, []);
+
+    const flushPendingCandidates = useCallback(async () => {
+        const pc = pcRef.current;
+        if (!pc) return;
+        for (const c of pendingCandidates.current) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
+        }
+        pendingCandidates.current = [];
+    }, []);
+
+    // ── Fetch patient medical data ───────────────────────────────────────────
     useEffect(() => {
         if (!patientId) return;
-        const fetchPatientDetails = async () => {
-            try {
-                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                const res = await fetch(`${API_BASE_URL}/api/patients/${patientId}/medical`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        fetch(`${API_BASE_URL}/api/patients/${patientId}/medical`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data) {
                     setPatient(p => ({ ...p, name: data.fullName || p.name }));
                     setMedicalData(data);
                     setPatientContact(data.mobile || '');
                 }
-            } catch { }
-        };
-        fetchPatientDetails();
+            }).catch(() => {});
     }, [patientId]);
 
-    /* Request Camera on mount */
+    // ── Step 1: Get camera/mic immediately on mount ──────────────────────────
     useEffect(() => {
-        const initCamera = async () => {
+        let mounted = true;
+        const init = async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+                if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
                 streamRef.current = stream;
                 if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+                setPhase('setup');
             } catch (err) {
-                setPermError("Camera/Mic access required for native WebRTC. Please allow it in the browser.");
+                if (!mounted) return;
+                setPermError('Camera & Microphone access required. Please allow it in your browser and reload.');
+                setPhase('error');
             }
         };
-        initCamera();
-
+        init();
         return () => {
-            if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-            if (pcRef.current) pcRef.current.close();
-            if (socketRef.current) socketRef.current.disconnect();
+            mounted = false;
+            cleanup();
         };
+    // eslint-disable-next-line
     }, []);
 
-    /* Set up local streams when references update */
+    // ── Step 2: Doctor clicks "Admit & Start" ───────────────────────────────
+    const startSession = async () => {
+        if (!roomId) { setPermError('Could not determine room ID.'); return; }
+        if (!streamRef.current) { setPermError('Camera access required. Please refresh.'); return; }
+        setLoading(true);
+
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+            // Update appointment status to Live (triggers patient ringing)
+            if (apptId) {
+                await fetch(`${API_BASE_URL}/api/appointments/${apptId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ status: 'Live' })
+                });
+            }
+
+            // Connect with WebSocket transport for speed
+            const socket = io(API_BASE_URL, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                timeout: 10000
+            });
+            socketRef.current = socket;
+
+            // Create RTCPeerConnection
+            const pc = new RTCPeerConnection(ICE_SERVERS);
+            pcRef.current = pc;
+            pendingCandidates.current = [];
+
+            // Add local media
+            streamRef.current.getTracks().forEach(track => pc.addTrack(track, streamRef.current));
+
+            // Show remote stream immediately when it arrives
+            pc.ontrack = (event) => {
+                if (remoteVideoRef.current && event.streams[0]) {
+                    remoteVideoRef.current.srcObject = event.streams[0];
+                }
+                setPhase('live');
+            };
+
+            // Send ICE as gathered
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('ice_candidate', { room: roomId, candidate: event.candidate });
+                }
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                setConnState(pc.iceConnectionState);
+                if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                    setPhase('live');
+                }
+                if (pc.iceConnectionState === 'failed') {
+                    pc.restartIce?.();
+                }
+            };
+
+            socket.on('connect', () => {
+                // Join room and immediately announce doctor is ready
+                socket.emit('join_video_room', { room: roomId, role: 'doctor' });
+                // Announce readiness immediately after joining
+                setTimeout(() => {
+                    socket.emit('doctor_ready', { room: roomId });
+                }, 200);
+            });
+
+            // Handle Offer from Patient
+            socket.on('video_offer', async (data) => {
+                const sdp = data.sdp || data;
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    await flushPendingCandidates();
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('video_answer', { room: roomId, sdp: answer });
+                } catch (e) { console.error('Answer error:', e); }
+            });
+
+            // Handle ICE candidates from patient (both new and legacy)
+            socket.on('ice_candidate', async (candidate) => { await addCandidate(candidate); });
+            socket.on('new_ice_candidate', async (candidate) => { await addCandidate(candidate); });
+
+            socket.on('peer_left', () => { if (phase !== 'ended') endSession(); });
+            socket.on('call_chat_msg', (msg) => setMessages(p => [...p, msg]));
+
+            setPhase('live');
+        } catch (err) {
+            setPermError('Failed to start session. Please try again.');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ── Toggle camera/mic ───────────────────────────────────────────────────
+    useEffect(() => {
+        if (!streamRef.current) return;
+        streamRef.current.getVideoTracks().forEach(t => t.enabled = camOn);
+        streamRef.current.getAudioTracks().forEach(t => t.enabled = micOn);
+    }, [camOn, micOn]);
+
+    // ── Update local video on phase change ──────────────────────────────────
     useEffect(() => {
         if (localVideoRef.current && streamRef.current) {
             localVideoRef.current.srcObject = streamRef.current;
         }
     }, [phase]);
 
-    /* Setup Signaling and Connection */
-    const startSession = async () => {
-        if (!roomId) {
-            setPermError("Could not determine room ID. Please try again.");
-            return;
-        }
-        if (!streamRef.current) {
-            setPermError("Camera/Microphone access is required. Please allow it and refresh.");
-            return;
-        }
-
-        setLoading(true);
-        setPermError('');
-
-        try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            // Only update appointment status for scheduled calls, not emergencies
-            if (apptId) {
-                await fetch(`${API_BASE_URL}/api/appointments/${apptId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ status: 'Live' })
-                });
-            }
-
-            // Initialize Signaling (Polling only)
-            const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
-            socketRef.current = socket;
-
-            // Initialize WebRTC Peer
-            const pc = new RTCPeerConnection(iceServers);
-            pcRef.current = pc;
-
-            // Add local tracks
-            streamRef.current.getTracks().forEach(track => {
-                pc.addTrack(track, streamRef.current);
-            });
-
-            // Handle incoming remote track
-            pc.ontrack = (event) => {
-                if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = event.streams[0];
-                }
-            };
-
-            // Send ICE candidates
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('new_ice_candidate', { room: roomId, candidate: event.candidate });
-                }
-            };
-
-            // Join WebSocket Room and announce ready immediately
-            socket.emit('join_video_room', { room: roomId });
-            socket.emit('doctor_ready', { room: roomId });
-
-            // On incoming Offer from Patient, Doctor creates Answer
-            socket.on('video_offer', async (offer) => {
-                try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    socket.emit('video_answer', { room: roomId, answer });
-                } catch (e) { console.error("Answer generation failed", e); }
-            });
-
-            // Handle Incoming ICE Candidate
-            socket.on('new_ice_candidate', async (candidate) => {
-                try {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (e) { }
-            });
-
-            // Chat
-            socket.on('call_chat_msg', (msg) => {
-                setMessages(prev => [...prev, msg]);
-            });
-
-            socket.on('peer_left', () => endSession());
-
-            setPhase('live');
-        } catch (err) {
-            setPermError("Network error setting up native session.");
-        } finally {
-            setLoading(false);
-        }
+    const cleanup = () => {
+        if (pcRef.current)    { pcRef.current.close();       pcRef.current = null; }
+        if (socketRef.current){ socketRef.current.disconnect(); socketRef.current = null; }
+        if (streamRef.current){ streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     };
 
-    /* Toggle Medias */
-    useEffect(() => {
-        if (streamRef.current) {
-            streamRef.current.getVideoTracks().forEach(t => t.enabled = camOn);
-            streamRef.current.getAudioTracks().forEach(t => t.enabled = micOn);
-        }
-    }, [camOn, micOn]);
-
     const endSession = async () => {
-        if (pcRef.current) pcRef.current.close();
-        if (socketRef.current) socketRef.current.disconnect();
-        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+        if (socketRef.current) socketRef.current.emit?.('leave_video_room', { room: roomId });
+        cleanup();
 
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (apptId) {
             try {
-                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 await fetch(`${API_BASE_URL}/api/appointments/${apptId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                     body: JSON.stringify({ status: 'Completed' })
                 });
-            } catch (err) {}
+            } catch { }
         }
-        // If emergency call, mark it as handled automatically
-        if (roomParam && roomParam.startsWith('emergency_')) {
+        if (roomParam?.startsWith('emergency_')) {
             const emId = roomParam.replace('emergency_', '');
             try {
-                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                 await fetch(`${API_BASE_URL}/api/emergencies/${emId}/handle`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    method: 'PUT', headers: { Authorization: `Bearer ${token}` }
                 });
             } catch { }
         }
         setPhase('ended');
     };
 
-    /* Chat & File Sharing */
     const sendMessage = () => {
         if (!chatInput.trim() || !socketRef.current) return;
         const msg = { text: chatInput, sender: 'Doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
@@ -258,33 +296,6 @@ export default function DoctorVideoCall() {
         setChatInput('');
     };
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !socketRef.current) return;
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-            const data = await res.json();
-            if (res.ok && data.url) {
-                const msg = { text: `Shared file:`, fileUrl: `${API_BASE_URL}${data.url}`, fileName: data.filename, sender: 'Doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-                setMessages(p => [...p, { ...msg, self: true }]);
-                socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
-            }
-        } catch (err) { } finally {
-            setUploading(false);
-            if(fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
-
-    /* AI Assistant Panel */
     const getAiSuggestion = async () => {
         if (!aiQuery.trim()) return;
         setAiLoading(true);
@@ -292,56 +303,63 @@ export default function DoctorVideoCall() {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/ai/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ message: "As a medical AI assistant for doctors, analyze these symptoms concisely: " + aiQuery })
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ message: 'As a medical AI for doctors, concisely analyze: ' + aiQuery })
             });
             const data = await res.json();
-            if (res.ok && data.data?.response) {
-                setAiResponse(data.data.response);
-            } else if (res.ok && data.response) {
-                setAiResponse(data.response);
-            }
-        } catch { }
-        finally { setAiLoading(false); }
+            setAiResponse(data.data?.response || data.response || 'No response.');
+        } catch { } finally { setAiLoading(false); }
     };
 
-    const savePrescription = () => {
-        setRxSaved(true);
-        setTimeout(() => setRxSaved(false), 3000);
-    };
-
+    const savePrescription = () => { setRxSaved(true); setTimeout(() => setRxSaved(false), 3000); };
     const dialFamily = () => {
-        if (!patientContact) {
-            alert("No contact number available for this patient.");
-            return;
-        }
-        const cleaned = patientContact.replace(/[\s\-()]/g, '');
-        window.location.href = `tel:${cleaned}`;
+        if (!patientContact) { alert('No contact on file.'); return; }
+        window.location.href = `tel:${patientContact.replace(/[\s\-()]/g, '')}`;
     };
 
-    /* ─── PERMISSION SCREEN ─── */
-    if (phase === 'permission') return (
+    // ─── LOADING ─────────────────────────────────────────────────────────────
+    if (phase === 'init') return (
         <div className="vcall-shell vcall-centered">
-            {/* hidden video to keep camera warm */}
             <video ref={localVideoRef} autoPlay muted style={{ display: 'none' }} />
-            
             <div className="vcall-connecting-card">
-                <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>📹</div>
-                <h2 className="vcall-conn-name">Native Video Session</h2>
+                <div style={{ fontSize: '3rem', marginBottom: 12, animation: 'pulse 1.5s infinite' }}>📷</div>
+                <h2 className="vcall-conn-name">Starting Camera…</h2>
+                <p style={{ color: '#6b8f71', fontSize: '0.85rem' }}>Allow camera and microphone access</p>
+            </div>
+        </div>
+    );
+
+    // ─── ERROR ───────────────────────────────────────────────────────────────
+    if (phase === 'error') return (
+        <div className="vcall-shell vcall-centered">
+            <div className="vcall-connecting-card">
+                <div style={{ fontSize: '3rem', marginBottom: 12 }}>⚠️</div>
+                <h2 className="vcall-conn-name">Permission Required</h2>
+                <div style={{ background: '#fef2f2', color: '#991b1b', padding: '12px 16px', borderRadius: 12, fontSize: '0.85rem', marginTop: 12 }}>{permError}</div>
+                <button className="pd-btn pd-btn-primary" style={{ width: '100%', marginTop: 20, justifyContent: 'center' }} onClick={() => window.location.reload()}>🔄 Retry</button>
+            </div>
+        </div>
+    );
+
+    // ─── SETUP/PERMISSION SCREEN ─────────────────────────────────────────────
+    if (phase === 'setup') return (
+        <div className="vcall-shell vcall-centered">
+            <video ref={localVideoRef} autoPlay muted style={{ display: 'none' }} />
+            <div className="vcall-connecting-card">
+                <div style={{ fontSize: '3rem', marginBottom: 12 }}>📹</div>
+                <h2 className="vcall-conn-name">Ready to Connect</h2>
                 <p className="vcall-conn-spec">with {patient.name}</p>
                 <p style={{ color: '#6b8f71', fontSize: '0.85rem', marginTop: 8, lineHeight: 1.7, textAlign: 'center' }}>
-                    This native WebRTC session connects directly to the patient securely.
-                    Click below to start signaling configuration.
+                    Clicking "Admit" will start the secure P2P session and notify the patient instantly.
                 </p>
                 {permError && (
                     <div style={{ background: '#fef2f2', color: '#991b1b', padding: '12px 16px', borderRadius: 12, fontSize: '0.82rem', marginTop: 12 }}>
                         ⚠️ {permError}
                     </div>
                 )}
-                <div className="vcall-tip" style={{ marginTop: 16 }}>💡 {tip}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 22, width: '100%' }}>
                     <button className="pd-btn pd-btn-primary" style={{ justifyContent: 'center' }} onClick={startSession} disabled={loading}>
-                        {loading ? '⏳ Initiating...' : '✅ Admit Patient & Connect P2P'}
+                        {loading ? '⏳ Connecting…' : '✅ Admit Patient & Start Call'}
                     </button>
                     <button className="pd-btn pd-btn-outline" style={{ justifyContent: 'center' }} onClick={() => navigate(-1)}>✕ Cancel</button>
                 </div>
@@ -349,46 +367,37 @@ export default function DoctorVideoCall() {
         </div>
     );
 
-    /* ─── ENDED SCREEN (PRESCRIPTION) ─── */
+    // ─── ENDED SCREEN ────────────────────────────────────────────────────────
     if (phase === 'ended') return (
         <div className="vcall-shell vcall-centered">
             <div className="vcall-connecting-card" style={{ maxWidth: 500, padding: 30 }}>
-                <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>📝</div>
+                <div style={{ fontSize: '3rem', marginBottom: 12 }}>📝</div>
                 <h2 className="vcall-conn-name">Post-Consultation</h2>
                 <p className="vcall-conn-spec">Patient: {patient.name} | Duration: {timer}</p>
-                
                 <div style={{ textAlign: 'left', marginTop: 20 }}>
-                    <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#444' }}>Generate Prescription / Notes:</label>
-                    <textarea 
-                        value={prescription}
-                        onChange={e => setPrescription(e.target.value)}
-                        placeholder="Type diagnosis, medicines, and advice here..."
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', color: '#444' }}>Prescription / Notes:</label>
+                    <textarea
+                        value={prescription} onChange={e => setPrescription(e.target.value)}
+                        placeholder="Type diagnosis, medicines, advice…"
                         style={{ width: '100%', height: 120, marginTop: 8, padding: 12, borderRadius: 8, border: '1px solid #ccc', fontSize: '0.9rem', fontFamily: 'inherit', resize: 'vertical' }}
                     />
                 </div>
-
-                {rxSaved && <div style={{ color: 'var(--doc-primary)', fontSize: '0.85rem', marginTop: 10, fontWeight: 600 }}>✅ Prescribed to patient record securely.</div>}
-
+                {rxSaved && <div style={{ color: 'var(--doc-primary)', fontSize: '0.85rem', marginTop: 10, fontWeight: 600 }}>✅ Prescription saved to patient record.</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 20, width: '100%' }}>
-                    <button className="pd-btn pd-btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={savePrescription}>
-                        Save Prescription
-                    </button>
-                    <button className="pd-btn pd-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => navigate('/doctor/schedule')}>
-                        Exit to Schedule
-                    </button>
+                    <button className="pd-btn pd-btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={savePrescription}>Save Prescription</button>
+                    <button className="pd-btn pd-btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => navigate('/doctor/schedule')}>Exit to Schedule</button>
                 </div>
             </div>
         </div>
     );
 
-    /* ─── NATIVE LIVE SCREEN ─── */
+    // ─── LIVE SCREEN ─────────────────────────────────────────────────────────
     return (
         <div className="vcall-shell">
-            <div className={`vcall-remote ${(chatOpen || aiOpen) ? 'chat-active' : ''}`} style={{ transition: 'all 0.3s' }}>
-                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div className="vcall-remote-pulse" style={{ opacity: 0.1, zIndex: -1 }} />
+            <div className={`vcall-remote ${(chatOpen || aiOpen) ? 'chat-active' : ''}`} style={{ transition: 'all 0.3s', background: '#0a1a0a' }}>
+                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onLoadedMetadata={e => e.target.play().catch(() => {})} />
             </div>
-
             <div className={`vcall-self ${(chatOpen || aiOpen) ? 'chat-active' : ''}`} style={{ transition: 'all 0.3s' }}>
                 <video ref={localVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                 <div className="vcall-self-label">You</div>
@@ -399,57 +408,46 @@ export default function DoctorVideoCall() {
                     <span className="vcall-live-dot" />
                     <span>{patient.name}</span>
                     <span className="vcall-spec">Live WebRTC</span>
+                    {connState && <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: 8 }}>{connState}</span>}
                 </div>
                 <div className="vcall-timer">{timer}</div>
             </div>
 
             <div className="vcall-controls">
                 <button className={`vcall-ctrl ${micOn ? '' : 'off'}`} onClick={() => setMicOn(p => !p)}>
-                    {micOn ? '🎤' : '🔇'} <span>Mute</span>
+                    {micOn ? '🎤' : '🔇'} <span>{micOn ? 'Mute' : 'Unmute'}</span>
                 </button>
                 <button className={`vcall-ctrl ${camOn ? '' : 'off'}`} onClick={() => setCamOn(p => !p)}>
-                    {camOn ? '📹' : '🚫'} <span>Stop Cam</span>
+                    {camOn ? '📹' : '🚫'} <span>Cam</span>
                 </button>
                 <button className={`vcall-ctrl ${chatOpen ? 'active' : ''}`} onClick={() => { setChatOpen(p => !p); setAiOpen(false); }}>
                     💬 <span>Chat</span>
                 </button>
                 <button className={`vcall-ctrl ${aiOpen ? 'active' : ''}`} onClick={() => { setAiOpen(p => !p); setChatOpen(false); }} style={{ background: '#e0f2fe', color: '#0369a1' }}>
-                    🤖 <span>AI Assist</span>
+                    🤖 <span>AI</span>
                 </button>
-                <button className="vcall-ctrl" onClick={() => setActiveOverlay('medical')}>
-                    📋 <span>History</span>
-                </button>
-                <button className="vcall-ctrl" onClick={dialFamily}>
-                    📞 <span>Family</span>
-                </button>
-                <button className="vcall-ctrl end" onClick={endSession}>
-                    📵 <span>End Call</span>
-                </button>
+                <button className="vcall-ctrl" onClick={() => setActiveOverlay('medical')}>📋 <span>History</span></button>
+                <button className="vcall-ctrl" onClick={dialFamily}>📞 <span>Family</span></button>
+                <button className="vcall-ctrl end" onClick={endSession}>📵 <span>End Call</span></button>
             </div>
 
             {/* MEDICAL HISTORY OVERLAY */}
             {activeOverlay === 'medical' && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                     <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 500, maxHeight: '80vh', overflow: 'auto', position: 'relative', color: '#333' }}>
-                        <button onClick={() => setActiveOverlay(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(0,0,0,0.1)', border: 'none', width: 36, height: 36, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', zIndex: 10 }}>×</button>
+                        <button onClick={() => setActiveOverlay(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(0,0,0,0.1)', border: 'none', width: 36, height: 36, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
                         <div style={{ padding: 36 }}>
                             <h2 style={{ color: 'var(--doc-green-deep)', marginBottom: 20 }}>📋 Medical History: {patient.name}</h2>
-                            {!medicalData ? (
-                                <p style={{ color: '#888' }}>No medical history on file.</p>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                    <div style={{ background: '#f8f9f8', padding: 15, borderRadius: 10 }}>
-                                        <h4 style={{ margin: '0 0 5px' }}>🏥 Conditions</h4>
-                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.conditions || 'None reported'}</p>
-                                    </div>
-                                    <div style={{ background: '#f8f9f8', padding: 15, borderRadius: 10 }}>
-                                        <h4 style={{ margin: '0 0 5px' }}>💊 Medications</h4>
-                                        <p style={{ margin: 0, fontSize: '0.9rem' }}>{medicalData.medications || 'None reported'}</p>
-                                    </div>
-                                    <div style={{ background: '#fff5f5', padding: 15, borderRadius: 10, border: '1px solid #feb2b2' }}>
-                                        <h4 style={{ margin: '0 0 5px', color: '#c53030' }}>⚠️ Allergies</h4>
-                                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#c53030', fontWeight: 600 }}>{medicalData.allergies || 'None reported'}</p>
-                                    </div>
+                            {!medicalData ? (<p style={{ color: '#888' }}>No medical history on file.</p>) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                                    {[['Conditions', medicalData.conditions, '🏥', '#f8f9f8', '#333'],
+                                      ['Medications', medicalData.medications, '💊', '#f8f9f8', '#333'],
+                                      ['Allergies', medicalData.allergies, '⚠️', '#fff5f5', '#c53030']].map(([label, val, icon, bg, color]) => (
+                                        <div key={label} style={{ background: bg, padding: 15, borderRadius: 10 }}>
+                                            <h4 style={{ margin: '0 0 5px', color }}>{icon} {label}</h4>
+                                            <p style={{ margin: 0, fontSize: '0.9rem', color }}>{val || 'None reported'}</p>
+                                        </div>
+                                    ))}
                                     {medicalData.dosha && (
                                         <div style={{ background: '#f0fff4', padding: 15, borderRadius: 10 }}>
                                             <h4 style={{ margin: '0 0 5px', color: '#22543d' }}>🌿 Dosha</h4>
@@ -466,35 +464,27 @@ export default function DoctorVideoCall() {
 
             {/* AI ASSISTANT PANEL */}
             {aiOpen && (
-                <div className="vcall-chat-panel" style={{ position: 'absolute', right: 20, bottom: 90, width: 380, height: 500, background: '#fff', borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }}>
-                    <div style={{ padding: '15px 20px', background: '#0369a1', color: '#fff', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-                        <span>🤖 Neural AI Medical Assistant</span>
+                <div className="vcall-chat-panel" style={{ position: 'absolute', right: 20, bottom: 90, width: 370, height: 480, background: '#fff', borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 18px', background: '#0369a1', color: '#fff', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                        <span>🤖 AI Medical Assistant</span>
                         <button onClick={() => setAiOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✕</button>
                     </div>
-                    
-                    <div style={{ flex: 1, overflowY: 'auto', padding: 15, background: '#f0f9ff', display: 'flex', flexDirection: 'column', gap: 15 }}>
-                        <div style={{ background: '#fff', padding: 12, borderRadius: 8, fontSize: '0.85rem', color: '#333', border: '1px solid #bae6fd' }}>
-                            <strong>Private AI Assistant</strong><br/>
-                            Enter patient symptoms to receive diagnostic suggestions. This panel is invisible to the patient.
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 14, background: '#f0f9ff', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ background: '#fff', padding: 12, borderRadius: 8, fontSize: '0.82rem', color: '#333', border: '1px solid #bae6fd' }}>
+                            <strong>Private Diagnostic Assistant</strong> — invisible to patient.
                         </div>
-
                         {aiResponse && (
-                            <div style={{ background: '#e0f2fe', padding: 12, borderRadius: 8, fontSize: '0.9rem', color: '#0369a1', border: '1px solid #bae6fd', whiteSpace: 'pre-wrap' }}>
-                                <strong>AI Suggestion:</strong><br/><br/>
-                                {aiResponse}
+                            <div style={{ background: '#e0f2fe', padding: 12, borderRadius: 8, fontSize: '0.88rem', color: '#0369a1', border: '1px solid #bae6fd', whiteSpace: 'pre-wrap' }}>
+                                <strong>AI Suggestion:</strong><br /><br />{aiResponse}
                             </div>
                         )}
                     </div>
-
                     <div style={{ padding: 10, borderTop: '1px solid #bae6fd', display: 'flex', flexDirection: 'column', gap: 8, background: '#fff' }}>
-                        <textarea 
-                            value={aiQuery} 
-                            onChange={e => setAiQuery(e.target.value)} 
-                            placeholder="Enter symptoms (e.g., severe headache, nausea for 3 days)..." 
-                            style={{ width: '100%', height: 60, padding: '10px', borderRadius: 8, border: '1px solid #ddd', fontSize: '0.9rem', resize: 'none' }} 
-                        />
+                        <textarea value={aiQuery} onChange={e => setAiQuery(e.target.value)}
+                            placeholder="Symptoms, e.g. persistent headache + nausea for 3 days…"
+                            style={{ width: '100%', height: 58, padding: 10, borderRadius: 8, border: '1px solid #ddd', fontSize: '0.88rem', resize: 'none' }} />
                         <button className="pd-btn pd-btn-primary" style={{ background: '#0369a1', borderColor: '#0369a1', justifyContent: 'center' }} onClick={getAiSuggestion} disabled={aiLoading}>
-                            {aiLoading ? '⏳ Analyzing...' : 'Analyze Symptoms'}
+                            {aiLoading ? '⏳ Analyzing…' : '🔍 Analyze Symptoms'}
                         </button>
                     </div>
                 </div>
@@ -502,36 +492,27 @@ export default function DoctorVideoCall() {
 
             {/* CHAT PANEL */}
             {chatOpen && (
-                <div className="vcall-chat-panel" style={{ position: 'absolute', right: 20, bottom: 90, width: 350, height: 450, background: '#fff', borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }}>
-                    <div style={{ padding: '15px 20px', background: 'var(--doc-primary)', color: '#fff', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Secure Messaging</span>
+                <div className="vcall-chat-panel" style={{ position: 'absolute', right: 20, bottom: 90, width: 340, height: 440, background: '#fff', borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 18px', background: 'var(--doc-primary)', color: '#fff', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                        <span>💬 Secure Chat</span>
                         <button onClick={() => setChatOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>✕</button>
                     </div>
-                    
-                    <div style={{ flex: 1, overflowY: 'auto', padding: 15, background: '#f8faf9', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {messages.length === 0 && <div style={{ textAlign: 'center', color: '#999', fontSize: '0.8rem', marginTop: 20 }}>Encrypted Chat securely established.</div>}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 14, background: '#f8faf9', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {messages.length === 0 && <div style={{ textAlign: 'center', color: '#aaa', fontSize: '0.8rem', marginTop: 20 }}>Chat started securely.</div>}
                         {messages.map((m, i) => (
                             <div key={i} style={{ alignSelf: m.self ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                                <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: 2, textAlign: m.self ? 'right' : 'left' }}>{m.sender} - {m.time}</div>
-                                <div style={{ padding: '8px 12px', borderRadius: 12, background: m.self ? 'var(--doc-primary)' : '#e2e8f0', color: m.self ? '#fff' : '#333', fontSize: '0.9rem', wordBreak: 'break-word' }}>
-                                    {m.text}
-                                    {m.fileUrl && (
-                                        <div style={{ marginTop: 5 }}>
-                                            <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" style={{ color: m.self ? '#e0f2fe' : 'var(--doc-primary)', textDecoration: 'underline', fontSize: '0.85rem' }}>📄 {m.fileName}</a>
-                                        </div>
-                                    )}
-                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: 2, textAlign: m.self ? 'right' : 'left' }}>{m.sender} · {m.time}</div>
+                                <div style={{ padding: '9px 13px', borderRadius: 12, background: m.self ? 'var(--doc-primary)' : '#e2e8f0', color: m.self ? '#fff' : '#333', fontSize: '0.88rem', wordBreak: 'break-word' }}>{m.text}</div>
                             </div>
                         ))}
                         <div ref={chatEndRef} />
                     </div>
-
-                    <div style={{ padding: 10, borderTop: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 8, background: '#fff' }}>
-                        <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} />
-                        <button className="pd-btn pd-btn-outline" style={{ padding: '8px 10px', height: 40, width: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }} onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Attach File">
-                            {uploading ? '⏳' : '📎'}
-                        </button>
-                        <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()} placeholder="Type message..." style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: '1px solid #ddd', fontSize: '0.9rem' }} />
+                    <div style={{ padding: 10, borderTop: '1px solid #eee', display: 'flex', gap: 8, background: '#fff' }}>
+                        <input type="file" ref={fileInputRef} style={{ display: 'none' }} />
+                        <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                            placeholder="Type message…"
+                            style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: '1px solid #ddd', fontSize: '0.88rem' }} />
                         <button className="pd-btn pd-btn-primary" style={{ padding: '8px 14px', borderRadius: 20, height: 40 }} onClick={sendMessage}>➤</button>
                     </div>
                 </div>

@@ -1810,32 +1810,53 @@ def on_join_user_room(data):
         join_room(room)
 
 # --- WEBRTC SIGNALING ENDPOINTS ---
+
 @socketio.on('join_video_room')
 def on_join_video_room(data):
-    if 'room' in data:
-        room = str(data['room'])
-        join_room(room)
-        emit('peer_joined', {'message': 'A peer has joined'}, to=room, include_self=False)
-
-@socketio.on('video_offer')
-def on_video_offer(data):
-    if 'room' in data and 'offer' in data:
-        emit('video_offer', data['offer'], to=str(data['room']), include_self=False)
-
-@socketio.on('video_answer')
-def on_video_answer(data):
-    if 'room' in data and 'answer' in data:
-        emit('video_answer', data['answer'], to=str(data['room']), include_self=False)
-
-@socketio.on('new_ice_candidate')
-def on_new_ice_candidate(data):
-    if 'room' in data and 'candidate' in data:
-        emit('new_ice_candidate', data['candidate'], to=str(data['room']), include_self=False)
+    if 'room' not in data:
+        return
+    room = str(data['room'])
+    role = data.get('role', 'unknown')
+    join_room(room)
+    # Notify others in the room that a new peer has joined
+    emit('peer_joined', {'role': role, 'message': f'{role} has joined'}, to=room, include_self=False)
+    app.logger.info(f"[WebRTC] {role} joined room {room}")
 
 @socketio.on('doctor_ready')
 def on_doctor_ready(data):
     if 'room' in data:
-        emit('doctor_ready', {'message': 'Doctor is ready'}, to=str(data['room']), include_self=False)
+        room = str(data['room'])
+        app.logger.info(f"[WebRTC] doctor_ready in room {room}")
+        emit('doctor_ready', {'message': 'Doctor is ready'}, to=room, include_self=False)
+
+@socketio.on('video_offer')
+def on_video_offer(data):
+    if 'room' in data and 'sdp' in data:
+        emit('video_offer', data['sdp'], to=str(data['room']), include_self=False)
+    # Legacy support
+    elif 'room' in data and 'offer' in data:
+        emit('video_offer', data['offer'], to=str(data['room']), include_self=False)
+
+@socketio.on('video_answer')
+def on_video_answer(data):
+    if 'room' in data and 'sdp' in data:
+        emit('video_answer', data['sdp'], to=str(data['room']), include_self=False)
+    # Legacy support
+    elif 'room' in data and 'answer' in data:
+        emit('video_answer', data['answer'], to=str(data['room']), include_self=False)
+
+# New unified ICE candidate event
+@socketio.on('ice_candidate')
+def on_ice_candidate(data):
+    if 'room' in data and 'candidate' in data:
+        emit('ice_candidate', data['candidate'], to=str(data['room']), include_self=False)
+
+# Legacy ICE candidate event (backward compat)
+@socketio.on('new_ice_candidate')
+def on_new_ice_candidate(data):
+    if 'room' in data and 'candidate' in data:
+        emit('new_ice_candidate', data['candidate'], to=str(data['room']), include_self=False)
+        emit('ice_candidate', data['candidate'], to=str(data['room']), include_self=False)
 
 @socketio.on('call_chat_msg')
 def on_call_chat_msg(data):
@@ -1848,6 +1869,7 @@ def on_leave_video_room(data):
         room = str(data['room'])
         leave_room(room)
         emit('peer_left', {'message': 'A peer has left'}, to=room, include_self=False)
+        app.logger.info(f"[WebRTC] peer left room {room}")
 
 # --- Background Task for Appointment Reminders ---
 def check_upcoming_appointments():
