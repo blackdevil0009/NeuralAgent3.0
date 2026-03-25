@@ -19,7 +19,7 @@ except ImportError:
 
 # ─── Gemini API Integration ─────────────────────────────────────────────
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBGScuXAZxk5eGvrsBGAw82usi9xT0e89U")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyByDFMLB2rbTpgKm9MIjZtbUpVizfIgOJI")
 GEMINI_MODEL = "gemini-1.5-flash"
 
 SYSTEM_PROMPT = """You are "VaidyaMed-X", but you NEVER sound like a bot or system.
