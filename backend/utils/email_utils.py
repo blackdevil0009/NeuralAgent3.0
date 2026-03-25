@@ -6,9 +6,11 @@ from email.mime.multipart import MIMEMultipart
 SENDER_EMAIL = 'vaidyamedx@gmail.com'
 SENDER_PASSWORD = 'ibes vhks akgu mcyi'
 
-def _send_email_common(to_email, subject, body):
+import threading
+
+def _send_email_async_worker(to_email, subject, body):
     """
-    Internal helper to send email with Port 587/465 fallback.
+    Background worker to handle the SMTP handshake and transmission without blocking the user.
     """
     try:
         msg = MIMEMultipart()
@@ -24,7 +26,6 @@ def _send_email_common(to_email, subject, body):
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
             server.quit()
-            return True
         except Exception as e1:
             # Fallback to Port 465 (SSL)
             try:
@@ -32,13 +33,19 @@ def _send_email_common(to_email, subject, body):
                 server.login(SENDER_EMAIL, SENDER_PASSWORD)
                 server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
                 server.quit()
-                return True
             except Exception as e2:
-                print(f"SMTP Failure - P587: {e1} | P465: {e2}")
-                return False
+                print(f"SMTP Failure - Async P587: {e1} | P465: {e2}")
     except Exception as e:
-        print(f"Error in _send_email_common: {e}")
-        return False
+        print(f"Error in _send_email_async_worker: {e}")
+
+def _send_email_common(to_email, subject, body):
+    """
+    Spawns a daemon thread to send the email and immediately returns True,
+    resulting in lighting-fast logins/registrations for the end user.
+    """
+    thread = threading.Thread(target=_send_email_async_worker, args=(to_email, subject, body), daemon=True)
+    thread.start()
+    return True
 
 def send_verification_email(to_email, verification_link, verification_otp):
     subject = "Verify your VaidyaMed-X Account"
