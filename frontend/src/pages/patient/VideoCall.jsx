@@ -227,10 +227,11 @@ export default function VideoCall() {
         });
 
         // Doctor sent answer → set remote description
-        socket.on('video_answer', async (sdp) => {
+        socket.on('video_answer', async (data) => {
+            const answerDesc = data.type ? data : (data.sdp || data.answer || data);
             try {
                 if (pc.signalingState === 'have-local-offer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    await pc.setRemoteDescription(new RTCSessionDescription(answerDesc));
                     await flushPendingCandidates();
                 }
             } catch (e) { console.error('Answer error:', e); }
@@ -244,10 +245,10 @@ export default function VideoCall() {
         // Legacy event names for backward compat
         socket.on('new_ice_candidate', async (candidate) => { await addCandidate(candidate); });
         socket.on('video_answer', async (data) => {
-            const sdp = data.answer || data;
+            const answerDesc = data.type ? data : (data.sdp || data.answer || data);
             try {
                 if (pc.signalingState === 'have-local-offer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    await pc.setRemoteDescription(new RTCSessionDescription(answerDesc));
                     await flushPendingCandidates();
                 }
             } catch (e) {}

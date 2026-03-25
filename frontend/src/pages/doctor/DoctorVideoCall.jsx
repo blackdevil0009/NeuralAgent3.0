@@ -228,10 +228,10 @@ export default function DoctorVideoCall() {
 
             // Handle Offer from Patient
             socket.on('video_offer', async (data) => {
-                const sdp = data.sdp || data;
+                const offerDesc = data.type ? data : (data.sdp || data.offer || data);
                 try {
                     if (pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer') {
-                        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                        await pc.setRemoteDescription(new RTCSessionDescription(offerDesc));
                         await flushPendingCandidates();
                         const answer = await pc.createAnswer();
                         await pc.setLocalDescription(answer);
