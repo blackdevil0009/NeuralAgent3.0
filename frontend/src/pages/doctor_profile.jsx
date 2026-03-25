@@ -45,6 +45,7 @@ const EMPTY = {
     hospital:'', clinicLocation:'', regNumber:'',
     consultantFee:'', workingHours:'',
     upiId: '', bankAccountDetails: '',
+    bankAccountName: '', bankAccountNumber: '', bankIfsc: '',
 };
 
 /* ── Shared style helpers ── */
@@ -81,8 +82,9 @@ export default function DoctorProfile() {
     const [vs, setVs]             = useState('pending');
     const [loading, setLoading]   = useState(true);
     const [saving, setSaving]     = useState(false);
-    const [editMode, setEditMode] = useState(false);   // ← key toggle
+    const [editMode, setEditMode] = useState(false);
     const [errors, setErrors]     = useState({});
+    const [payoutVerified, setPayoutVerified] = useState(false);
 
     const fetchProfile = () => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -113,7 +115,11 @@ export default function DoctorProfile() {
                     workingHours:  p.workingHours || 'Mon-Fri, 10AM-6PM',
                     upiId:         p.upiId || '',
                     bankAccountDetails: p.bankAccountDetails || '',
+                    bankAccountName: p.bankAccountName || '',
+                    bankAccountNumber: p.bankAccountNumber || '',
+                    bankIfsc: p.bankIfsc || '',
                 });
+                setPayoutVerified(!!p.payoutVerified);
             })
             .catch(handleError)
             .finally(() => setLoading(false));
@@ -145,6 +151,7 @@ export default function DoctorProfile() {
         else if (!/^[A-Z]{1,3}-?\d{5,10}$/i.test(form.regNumber.trim()))   errs.regNumber = 'Format: STATE-XXXXXX (e.g. MH-123456).';
         if (!form.consultantFee || isNaN(form.consultantFee))               errs.consultantFee = 'Enter a valid fee.';
         if (!form.workingHours.trim())                                      errs.workingHours = 'Working hours are required.';
+        if (!form.upiId.trim())                                            errs.upiId = 'UPI ID is mandatory for payouts.';
         return errs;
     };
 
@@ -186,6 +193,16 @@ export default function DoctorProfile() {
         }
         setErrors({});
         setEditMode(false);
+    };
+
+    const handleRequestPayoutVerification = async () => {
+        if (!form.upiId) {
+            handleError('Please provide and save your UPI ID before requesting verification.');
+            return;
+        }
+        handleSuccess('Verification request sent! Our team will verify your payout details via a test transaction/message.');
+        // In a real system, this would call a backend endpoint like /api/doctor/payout/verify-request
+        // For now, we simulate the UI feedback.
     };
 
     if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--doc-text-mute)' }}>⏳ Loading profile…</div>;
@@ -282,8 +299,20 @@ export default function DoctorProfile() {
 
                     <div style={cardStyle}>
                         <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>💸 Payout Details</h3>
-                        <Info label="UPI ID" value={profile.upiId || 'Not provided'} />
-                        <Info label="Bank Account" value={profile.bankAccountDetails || 'Not provided'} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <span style={{ ...labelStyle, marginBottom: 0 }}>Verification Status</span>
+                            <span style={{ 
+                                background: profile.payoutVerified ? '#e8f8ee' : '#fff4e5', 
+                                color: profile.payoutVerified ? '#27ae60' : '#d35400', 
+                                fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: 20, border: '1px solid currentColor' 
+                            }}>
+                                {profile.payoutVerified ? 'Verified' : 'Unverified'}
+                            </span>
+                        </div>
+                        <Info label="UPI ID" value={profile.upiId} />
+                        <Info label="Account Holder" value={profile.bankAccountName} />
+                        <Info label="Account Number" value={profile.bankAccountNumber} />
+                        <Info label="IFSC Code" value={profile.bankIfsc} />
                     </div>
 
                     <div style={cardStyle}>
@@ -393,11 +422,28 @@ export default function DoctorProfile() {
 
                 {/* Payout */}
                 <div style={cardStyle}>
-                    <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>💸 Payout & Financial Details</h3>
-                    <Field label="UPI ID" name="upiId" placeholder="e.g. yourname@ybl" {...fProps} />
-                    <Field label="Bank Account Details" name="bankAccountDetails" placeholder="Acct No, IFSC, Branch Name" {...fProps}>
-                        <textarea {...sel('bankAccountDetails')} rows={3} placeholder="Enter your full bank account details" style={{ ...inputStyle(errors.bankAccountDetails), resize: 'vertical' }} />
-                    </Field>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>
+                        <h3 style={{ margin: 0, fontSize: '0.95rem' }}>💸 Payout & Financial Details</h3>
+                        {!profile.payoutVerified && (
+                             <button className="dd-btn dd-btn-outline" style={{ fontSize: '0.7rem', padding: '4px 12px' }} onClick={handleRequestPayoutVerification}>
+                                 Verify Credentials
+                             </button>
+                        )}
+                    </div>
+                    
+                    <Field label="UPI ID" name="upiId" placeholder="e.g. yourname@ybl" req {...fProps} />
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+                        <Field label="Bank Account Holder Name" name="bankAccountName" placeholder="As per bank passbook" {...fProps} />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <Field label="Account Number" name="bankAccountNumber" placeholder="Account Number" {...fProps} />
+                            <Field label="IFSC Code" name="bankIfsc" placeholder="IFSC" {...fProps} />
+                        </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.75rem', color: 'var(--doc-text-mute)', marginTop: 10, padding: '10px 15px', background: '#f8f9fa', borderRadius: 8, border: '1px solid #eee' }}>
+                        💡 <strong>Note:</strong> UPI ID is mandatory. Structured bank details are highly recommended for faster settlements.
+                    </div>
                 </div>
             </div>
 

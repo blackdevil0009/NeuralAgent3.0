@@ -886,7 +886,8 @@ def handle_profile():
                    pd.dosha, pd.allergies, pd.conditions, pd.medications,
                    dd.degree, dd.position, dd.specialization, dd.experience, dd.hospital,
                    dd.clinic_location as clinicLocation, dd.regNumber, dd.consultantFee,
-                   dd.workingHours, dd.verificationStatus, dd.upiId, dd.bankAccountDetails
+                   dd.workingHours, dd.verificationStatus, dd.upiId, dd.bankAccountDetails,
+                   dd.bankAccountName, dd.bankAccountNumber, dd.bankIfsc, dd.payoutVerified
             FROM users u
             LEFT JOIN patient_details pd ON u.id = pd.userId
             LEFT JOIN doctor_details dd ON u.id = dd.userId
@@ -945,13 +946,15 @@ def handle_profile():
                     UPDATE doctor_details
                     SET degree=%s, position=%s, specialization=%s, experience=%s,
                         hospital=%s, clinic_location=%s, regNumber=%s,
-                        consultantFee=%s, workingHours=%s, upiId=%s, bankAccountDetails=%s
+                        consultantFee=%s, workingHours=%s, upiId=%s, bankAccountDetails=%s,
+                        bankAccountName=%s, bankAccountNumber=%s, bankIfsc=%s
                     WHERE userId=%s
                 ''', (
                     data.get('degree'), data.get('position'), data.get('specialization'),
                     data.get('experience'), data.get('hospital'), data.get('clinicLocation'),
                     data.get('regNumber'), data.get('consultantFee'), data.get('workingHours'),
                     data.get('upiId'), data.get('bankAccountDetails'),
+                    data.get('bankAccountName'), data.get('bankAccountNumber'), data.get('bankIfsc'),
                     current_user_id
                 ))
         

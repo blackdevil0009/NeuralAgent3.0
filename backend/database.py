@@ -84,6 +84,10 @@ def init_db():
             verificationStatus ENUM('pending','verified','rejected') DEFAULT 'pending',
             upiId VARCHAR(100),
             bankAccountDetails TEXT,
+            bankAccountName VARCHAR(255),
+            bankAccountNumber VARCHAR(100),
+            bankIfsc VARCHAR(50),
+            payoutVerified BOOLEAN DEFAULT FALSE,
             FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
@@ -112,7 +116,10 @@ def init_db():
         "ALTER TABLE doctor_details ADD COLUMN consultantFee INT DEFAULT 500 AFTER experience",
         "ALTER TABLE doctor_details ADD COLUMN workingHours VARCHAR(255) DEFAULT 'Mon-Fri, 10AM-6PM' AFTER consultantFee",
         "ALTER TABLE doctor_details ADD COLUMN upiId VARCHAR(100) AFTER workingHours",
-        "ALTER TABLE doctor_details ADD COLUMN bankAccountDetails TEXT AFTER upiId",
+        "ALTER TABLE doctor_details ADD COLUMN bankAccountName VARCHAR(255) AFTER bankAccountDetails",
+        "ALTER TABLE doctor_details ADD COLUMN bankAccountNumber VARCHAR(100) AFTER bankAccountName",
+        "ALTER TABLE doctor_details ADD COLUMN bankIfsc VARCHAR(50) AFTER bankAccountNumber",
+        "ALTER TABLE doctor_details ADD COLUMN payoutVerified BOOLEAN DEFAULT FALSE AFTER bankIfsc",
         "ALTER TABLE appointments ADD COLUMN paymentId VARCHAR(255) AFTER id",
         "ALTER TABLE appointments ADD COLUMN orderId VARCHAR(255) AFTER paymentId",
         "ALTER TABLE appointments ADD COLUMN amountPaid INT AFTER orderId",
