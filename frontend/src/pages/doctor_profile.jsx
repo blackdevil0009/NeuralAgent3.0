@@ -44,6 +44,7 @@ const EMPTY = {
     degree:'', position:'', specialization:'', experience:'',
     hospital:'', clinicLocation:'', regNumber:'',
     consultantFee:'', workingHours:'',
+    upiId: '', bankAccountDetails: '',
 };
 
 /* ── Shared style helpers ── */
@@ -110,6 +111,8 @@ export default function DoctorProfile() {
                     regNumber:     p.regNumber || '',
                     consultantFee: p.consultantFee ?? 500,
                     workingHours:  p.workingHours || 'Mon-Fri, 10AM-6PM',
+                    upiId:         p.upiId || '',
+                    bankAccountDetails: p.bankAccountDetails || '',
                 });
             })
             .catch(handleError)
@@ -278,6 +281,12 @@ export default function DoctorProfile() {
                     </div>
 
                     <div style={cardStyle}>
+                        <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>💸 Payout Details</h3>
+                        <Info label="UPI ID" value={profile.upiId || 'Not provided'} />
+                        <Info label="Bank Account" value={profile.bankAccountDetails || 'Not provided'} />
+                    </div>
+
+                    <div style={cardStyle}>
                         <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>📅 Consultation Types</h3>
                         {['💬 Chat Consultation', '🎥 Video Call', '🏥 Offline / In-Clinic'].map(t => (
                             <div key={t} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--doc-border)', fontSize: '0.88rem' }}>
@@ -380,6 +389,15 @@ export default function DoctorProfile() {
                     <Field label="Clinic / Hospital Location" name="clinicLocation" placeholder="Area, street, locality" req {...fProps} />
                     <Field label="Working Hours" name="workingHours" placeholder="e.g. Mon-Fri, 10AM-6PM" req {...fProps} />
                     <Field label="Consultation Fee (₹)" name="consultantFee" type="number" placeholder="e.g. 500" req {...fProps} />
+                </div>
+
+                {/* Payout */}
+                <div style={cardStyle}>
+                    <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>💸 Payout & Financial Details</h3>
+                    <Field label="UPI ID" name="upiId" placeholder="e.g. yourname@ybl" {...fProps} />
+                    <Field label="Bank Account Details" name="bankAccountDetails" placeholder="Acct No, IFSC, Branch Name" {...fProps}>
+                        <textarea {...sel('bankAccountDetails')} rows={3} placeholder="Enter your full bank account details" style={{ ...inputStyle(errors.bankAccountDetails), resize: 'vertical' }} />
+                    </Field>
                 </div>
             </div>
 
