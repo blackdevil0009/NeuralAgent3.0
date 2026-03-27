@@ -1486,7 +1486,12 @@ def create_payment_order():
     try:
         app.logger.info(f"Creating Razorpay order for doctor {doctor_id}, amount: {amount}")
         order = razorpay_service.create_order(amount, f"receipt_{int(time.time())}")
-        return signed_json_response(order)
+        return signed_json_response({
+            "order_id": order["id"],
+            "amount": amount,
+            "currency": "INR",
+            "key_id": razorpay_service.key_id
+        })
     except Exception as e:
         error_msg = str(e)
         app.logger.error(f"Razorpay Order Creation Failed: {error_msg}")
