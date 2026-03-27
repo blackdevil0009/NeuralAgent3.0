@@ -427,5 +427,75 @@ def get_notifications():
     """Empty notifications to stop frontend 404 polling errors."""
     return signed_json_response({"data": []}, 200)
 
+# --- PROFILE AND EMERGENCIES ROUTES ---
+
+@app.route('/api/user/profile', methods=['GET'])
+@jwt_required()
+def get_user_profile():
+    """Fetch complete profile metadata based on user role."""
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        # Get base user details
+        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user_data = cur.fetchone()
+        if not user_data: return signed_json_response({"message": "User not found"}, 404)
+        
+        if 'password' in user_data: del user_data['password']
+        if 'rsaPrivateKeyEncrypted' in user_data: del user_data['rsaPrivateKeyEncrypted']
+        if 'createdAt' in user_data: user_data['createdAt'] = str(user_data['createdAt'])
+        if 'otpExpiry' in user_data: user_data['otpExpiry'] = str(user_data['otpExpiry'])
+        
+        if user_data.get('role') == 'doctor':
+            cur.execute("SELECT * FROM doctor_details WHERE userId = %s", (user_id,))
+        else:
+            cur.execute("SELECT * FROM patient_details WHERE userId = %s", (user_id,))
+            
+        details = cur.fetchone() or {}
+        user_data.update(details)
+        return signed_json_response({"profile": user_data}, 200)
+    except Exception as e:
+        app.logger.error(f"Profile Fetch Error: {e}")
+        return signed_json_response({"message": "Failed to fetch profile"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/emergencies/my', methods=['GET'])
+@jwt_required()
+def get_my_emergencies():
+    """Fetch emergencies linked to the current user (patient cases or doctor handled cases)."""
+    user_id = get_jwt_identity()
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        # Check user role
+        cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+        u = cur.fetchone()
+        if not u: return signed_json_response({"message": "User not found"}, 404)
+        
+        if u['role'] == 'doctor':
+            cur.execute("SELECT * FROM emergencies WHERE handledById = %s OR status = 'Active' ORDER BY createdAt DESC", (user_id,))
+        else:
+            cur.execute("SELECT * FROM emergencies WHERE patientId = %s ORDER BY createdAt DESC", (user_id,))
+            
+        emgs = cur.fetchall()
+        for e in emgs:
+            e['createdAt'] = str(e['createdAt'])
+            
+        return signed_json_response({"data": emgs}, 200)
+    except Exception as e:
+        app.logger.error(f"Emergencies Fetch Error: {e}")
+        return signed_json_response({"message": "Failed to fetch emergencies"}, 500)
+    finally:
+        if conn: conn.close()
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True, host='0.0.0.0')
