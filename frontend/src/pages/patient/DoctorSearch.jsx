@@ -134,7 +134,8 @@ export default function DoctorSearch() {
             const orderJson = await orderRes.json();
             
             if (!orderRes.ok) {
-                handleError(orderJson.data?.error || orderJson.error || 'Failed to initialize payment order');
+                // The backend now returns { error: "...", details: "..." }
+                handleError(orderJson.details || orderJson.data?.error || orderJson.error || 'Failed to initialize payment order');
                 setSubmitting(false);
                 return;
             }
@@ -179,10 +180,10 @@ export default function DoctorSearch() {
                             setAppointmentMap(prev => ({ ...prev, [String(bookingDoc.id)]: newAppt }));
                             handleSuccess(`Payment successful! Appointment booked with Dr. ${bookingDoc.name}.`);
                         } else {
-                            handleError(verifyJson.data?.error || verifyJson.error || 'Payment verification failed');
+                            handleError(verifyJson.details || verifyJson.data?.error || verifyJson.error || 'Payment verification failed');
                         }
                     } catch (err) {
-                        handleError('Payment verification error.');
+                        handleError(`Verification error: ${err.message}`);
                     } finally {
                         setSubmitting(false);
                     }
@@ -207,7 +208,7 @@ export default function DoctorSearch() {
             rzp.open();
             
         } catch (err) {
-            handleError('Connection error. Please try again.');
+            handleError(`Order error: ${err.message || 'Connection failed'}`);
             setSubmitting(false);
         }
     };
