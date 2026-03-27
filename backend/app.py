@@ -488,7 +488,7 @@ def register():
                         c.close()
                 except Exception as ex:
                     app.logger.error(f"REGISTER: Background RSA failed uid={uid}: {ex}")
-            threading.Thread(target=_bg_rsa, args=(user_id,), daemon=True).start()
+            gevent.get_hub().threadpool.spawn(_bg_rsa, user_id)
 
             extra = " Credentials will be reviewed shortly." if role == 'doctor' else ''
             app.logger.info(f"REGISTER: Success for {email}")
@@ -1134,7 +1134,7 @@ def handle_profile():
                         app.logger.info(f"UPI confirmation email sent to {doc_user['email']}")
                     except Exception as e:
                         app.logger.error(f"UPI email failed: {e}")
-                threading.Thread(target=send_upi_email, daemon=True).start()
+                gevent.get_hub().threadpool.spawn(send_upi_email)
         
         # return updated profile with doctor fields
         cursor.execute('''
@@ -1641,7 +1641,7 @@ def verify_payment():
         conn.commit()
         
         # Trigger Payout in background
-        threading.Thread(target=run_payout_in_background, args=(appt_id,)).start()
+        gevent.get_hub().threadpool.spawn(run_payout_in_background, appt_id)
         
         return signed_json_response({"message": "Appointment booked and payout initiated!", "appointmentId": appt_id}, 201)
     except Exception as e:
