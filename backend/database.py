@@ -1,5 +1,6 @@
 import mysql.connector
 import os
+import logging
 from mysql.connector import Error
 
 # MySQL Configuration
@@ -16,7 +17,7 @@ def get_db_connection():
         if conn.is_connected():
             return conn
     except Error as e:
-        print(f"Error while connecting to MySQL: {e}")
+        logging.error(f"Error while connecting to MySQL on {DB_CONFIG['host']} with user {DB_CONFIG['user']}: {e}")
         return None
 
 def init_db():
