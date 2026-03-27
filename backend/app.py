@@ -46,6 +46,7 @@ jwt = JWTManager(app)
 
 # Auto-create all database tables on startup
 init_db()
+print("VaidyaMed-X Backend: BOOT SUCCESS")
 app.logger.info("VaidyaMed-X Backend: BOOT SUCCESS")
 
 

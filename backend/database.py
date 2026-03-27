@@ -134,8 +134,14 @@ def init_db():
         try:
             cursor.execute(task)
             conn.commit()
-        except:
-            pass # Already exists
+            logging.info(f"Migration successful: {task}")
+        except Exception as e:
+            # Only ignore "Duplicate column" or "Duplicate entry" errors
+            err_msg = str(e).lower()
+            if "duplicate" in err_msg or "already exists" in err_msg or "1060" in err_msg:
+                pass
+            else:
+                logging.error(f"Migration failed for '{task}': {e}")
 
     # Patient details table
     cursor.execute('''
