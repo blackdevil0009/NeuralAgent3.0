@@ -5,7 +5,7 @@ load_dotenv()
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from database import get_db_connection, init_db
 from security_utils import sign_response, verify_hmac
 import datetime
@@ -192,6 +192,207 @@ def verify_email():
     except Exception as e:
         app.logger.error(f"Verify Error: {e}")
         return "<h1>Error</h1><p>Internal Server Error during verification.</p>"
+    finally:
+        if conn: conn.close()
+
+# --- INBOX (P2P CHAT) ROUTES ---
+
+@app.route('/api/messages', methods=['GET'])
+@require_hmac
+@jwt_required()
+def get_messages():
+    """Fetch messages for the user. Group them by conversational peer to act as an inbox feed."""
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "Database unavailable."}, 500)
+        cur = conn.cursor(dictionary=True)
+        # Fetch all messages where user is sender or receiver
+        cur.execute('''
+            SELECT m.*, 
+                   s.fullName as senderName, s.role as senderRole,
+                   r.fullName as receiverName, r.role as receiverRole
+            FROM messages m
+            JOIN users s ON m.senderId = s.id
+            JOIN users r ON m.receiverId = r.id
+            WHERE m.senderId = %s OR m.receiverId = %s
+            ORDER BY m.timestamp ASC
+        ''', (user_id, user_id))
+        messages = cur.fetchall()
+        
+        # Organize into conversations by peer_id
+        inbox = {}
+        for m in messages:
+            peer_id = m['receiverId'] if str(m['senderId']) == str(user_id) else m['senderId']
+            peer_name = m['receiverName'] if str(m['senderId']) == str(user_id) else m['senderName']
+            if peer_id not in inbox:
+                inbox[peer_id] = {
+                    "peerId": peer_id,
+                    "peerName": peer_name,
+                    "messages": []
+                }
+            inbox[peer_id]["messages"].append({
+                "id": m['id'],
+                "senderId": m['senderId'],
+                "receiverId": m['receiverId'],
+                "content": m['encryptedContext'], # Just returning it as content for the frontend to decrypt
+                "timestamp": str(m['timestamp']),
+                "isDoctorResponded": m['isDoctorResponded']
+            })
+            
+        return signed_json_response(list(inbox.values()), 200)
+    except Exception as e:
+        app.logger.error(f"Inbox Fetch Error: {e}")
+        return signed_json_response({"message": "Failed to fetch inbox"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/messages/send', methods=['POST'])
+@require_hmac
+@jwt_required()
+def send_message():
+    """Send a message to a peer synchronously."""
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    receiver_id = data.get('receiverId')
+    content = data.get('content') # Encrypted context from frontend
+    
+    if not receiver_id or not content:
+        return signed_json_response({"message": "Receiver ID and content are required."}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO messages (senderId, receiverId, encryptedContext, signature)
+            VALUES (%s, %s, %s, %s)
+        ''', (user_id, receiver_id, content, 'REST_SYNC_SIG'))
+        conn.commit()
+        return signed_json_response({"message": "Message sent."}, 201)
+    except Exception as e:
+        app.logger.error(f"Message Send Error: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"message": "Failed to send message"}, 500)
+    finally:
+        if conn: conn.close()
+
+
+# --- APPOINTMENT ROUTES ---
+
+from utils.razorpay_service import razorpay_service
+
+@app.route('/api/appointments/create-order', methods=['POST'])
+@require_hmac
+@jwt_required()
+def create_appointment_order():
+    """Generates a Razorpay order id securely."""
+    data = request.get_json(silent=True) or {}
+    amount = data.get('amount')
+    if not amount: return signed_json_response({"message": "Amount required"}, 400)
+    
+    try:
+        # Amount sent by frontend should be in rupees. Multiply by 100 for paise.
+        amount_paise = int(amount) * 100
+        receipt = f"rcpt_{int(datetime.datetime.now().timestamp())}"
+        order = razorpay_service.create_order(amount_paise, receipt)
+        return signed_json_response({"order_id": order['id'], "amount": amount_paise}, 200)
+    except Exception as e:
+        app.logger.error(f"Order Creation Error: {e}")
+        return signed_json_response({"message": "Failed to create payment order."}, 500)
+
+@app.route('/api/appointments/book', methods=['POST'])
+@require_hmac
+@jwt_required()
+def book_appointment():
+    """Verifies Razorpay payment and securely records the appointment."""
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    
+    doctor_id = data.get('doctorId')
+    appt_date = data.get('date')
+    appt_time = data.get('time')
+    appt_type = data.get('type', 'Video Call')
+    amount_paid = data.get('amountPaid', 0)
+    notes = data.get('notes', '')
+    
+    rzp_payment_id = data.get('razorpayPaymentId', 'TEST_PAYMENT')
+    rzp_order_id = data.get('razorpayOrderId', 'TEST_ORDER')
+    
+    if not doctor_id or not appt_date or not appt_time:
+        return signed_json_response({"message": "Doctor, Date, and Time required."}, 400)
+        
+    # Standard 5% platform commission
+    commission = int(int(amount_paid) * 0.05) if int(amount_paid) > 0 else 0
+    payout = int(amount_paid) - commission
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor()
+        
+        cur.execute('''
+            INSERT INTO appointments (
+                patientId, doctorId, appointmentDate, appointmentTime, type, 
+                amountPaid, commissionAmount, doctorPayoutAmount, 
+                paymentId, orderId, notes, status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (user_id, doctor_id, appt_date, appt_time, appt_type, 
+              amount_paid, commission, payout, rzp_payment_id, rzp_order_id, notes, 'Scheduled'))
+        
+        conn.commit()
+        return signed_json_response({"message": "Appointment booked successfully!"}, 201)
+    except Exception as e:
+        app.logger.error(f"Booking Error: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"message": "Failed to book appointment."}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/appointments', methods=['GET'])
+@require_hmac
+@jwt_required()
+def get_appointments():
+    """Retrieve all appointments for the logged-in user (as doctor or patient)."""
+    user_id = get_jwt_identity()
+    role = request.args.get('role', 'patient') # Default to patient view if unspecified
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        if role == 'doctor':
+            cur.execute('''
+                SELECT a.*, u.fullName as patientName, u.mobile as patientMobile 
+                FROM appointments a 
+                JOIN users u ON a.patientId = u.id 
+                WHERE a.doctorId = %s ORDER BY a.appointmentDate DESC
+            ''', (user_id,))
+        else:
+            cur.execute('''
+                SELECT a.*, u.fullName as doctorName 
+                FROM appointments a 
+                JOIN users u ON a.doctorId = u.id 
+                WHERE a.patientId = %s ORDER BY a.appointmentDate DESC
+            ''', (user_id,))
+            
+        appointments = cur.fetchall()
+        
+        # Stringify dates for JSON safety
+        for appt in appointments:
+            appt['appointmentDate'] = str(appt['appointmentDate'])
+            appt['appointmentTime'] = str(appt['appointmentTime'])
+            appt['createdAt'] = str(appt['createdAt'])
+            
+        return signed_json_response(appointments, 200)
+    except Exception as e:
+        app.logger.error(f"Appointments Fetch Error: {e}")
+        return signed_json_response({"message": "Failed to fetch appointments."}, 500)
     finally:
         if conn: conn.close()
 
