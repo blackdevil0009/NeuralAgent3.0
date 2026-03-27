@@ -1484,10 +1484,16 @@ def create_payment_order():
         amount = (doc['consultantFee'] if doc else 500) * 100
         
     try:
+        app.logger.info(f"Creating Razorpay order for doctor {doctor_id}, amount: {amount}")
         order = razorpay_service.create_order(amount, f"receipt_{int(time.time())}")
         return signed_json_response(order)
     except Exception as e:
-        return signed_json_response({"error": str(e)}, 500)
+        error_msg = str(e)
+        app.logger.error(f"Razorpay Order Creation Failed: {error_msg}")
+        return signed_json_response({
+            "error": "Payment Gateway Error", 
+            "details": error_msg
+        }, 500)
 
 @app.route('/api/payments/verify', methods=['POST'])
 @jwt_required()
