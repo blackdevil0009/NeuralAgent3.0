@@ -298,9 +298,8 @@ def not_found(e):
     return signed_json_response({"error": "Path not found", "path": request.path}, 404)
 
 @app.route('/api/auth/register', methods=['POST'])
-@app.route('/api/register', methods=['POST'])  # backward compat
+@app.route('/api/register', methods=['POST'])
 def register():
-    # ── Accepted medical credentials ──────────────────────────────
     VALID_DEGREES = {
         'MBBS','MD','MS','BDS','MDS','BAMS','BHMS','BUMS','BPT','MPT',
         'BNYS','BVSC','MVSc','DNB','DM','MCh','PhD','MSc','BSc Nursing',
@@ -309,295 +308,299 @@ def register():
         'DO','DOMS','FRCS','MRCP','FRCP','FRCOG','FACS','FIACS'
     }
     VALID_POSITIONS = {
-        'Consultant', 'Senior Consultant', 'Resident Doctor', 'Junior Resident',
-        'Senior Resident', 'Professor', 'Associate Professor', 'Assistant Professor',
-        'HOD', 'Chief of Medicine', 'Vaidya', 'Chief Vaidya', 'Medical Officer',
-        'General Practitioner', 'Specialist', 'Surgeon', 'Physician',
-        'Intern', 'Fellow', 'Super Specialist', 'Director', 'CMO'
+        'Consultant','Senior Consultant','Resident Doctor','Junior Resident',
+        'Senior Resident','Professor','Associate Professor','Assistant Professor',
+        'HOD','Chief of Medicine','Vaidya','Chief Vaidya','Medical Officer',
+        'General Practitioner','Specialist','Surgeon','Physician',
+        'Intern','Fellow','Super Specialist','Director','CMO'
     }
     VALID_SPECIALIZATIONS = {
-        'Ayurveda', 'Allopathy', 'Homeopathy', 'Unani', 'Naturopathy', 'Yoga & Naturopathy',
-        'General Medicine', 'General Surgery', 'Cardiology', 'Dermatology', 'Neurology',
-        'Orthopedics', 'Pediatrics', 'Gynecology', 'Psychiatry', 'Ophthalmology',
-        'ENT', 'Radiology', 'Anesthesiology', 'Pathology', 'Oncology', 'Nephrology',
-        'Urology', 'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
-        'Hematology', 'Infectious Disease', 'Emergency Medicine', 'Family Medicine',
-        'Community Medicine', 'Geriatrics', 'Sports Medicine', 'Palliative Care',
-        'Physical Medicine', 'Dentistry', 'Oral Surgery', 'Physiotherapy',
-        'Pharmacy', 'Nursing', 'Medical Genetics', 'Biomedicine', 'Nutrition & Dietetics',
-        'Neonatology', 'Hepatology', 'Interventional Cardiology', 'Plastic Surgery',
-        'Neurosurgery', 'Vascular Surgery', 'Thoracic Surgery', 'Transplant Medicine'
+        'Ayurveda','Allopathy','Homeopathy','Unani','Naturopathy','Yoga & Naturopathy',
+        'General Medicine','General Surgery','Cardiology','Dermatology','Neurology',
+        'Orthopedics','Pediatrics','Gynecology','Psychiatry','Ophthalmology',
+        'ENT','Radiology','Anesthesiology','Pathology','Oncology','Nephrology',
+        'Urology','Endocrinology','Gastroenterology','Pulmonology','Rheumatology',
+        'Hematology','Infectious Disease','Emergency Medicine','Family Medicine',
+        'Community Medicine','Geriatrics','Sports Medicine','Palliative Care',
+        'Physical Medicine','Dentistry','Oral Surgery','Physiotherapy',
+        'Pharmacy','Nursing','Medical Genetics','Biomedicine','Nutrition & Dietetics',
+        'Neonatology','Hepatology','Interventional Cardiology','Plastic Surgery',
+        'Neurosurgery','Vascular Surgery','Thoracic Surgery','Transplant Medicine'
     }
-    DUMMY_PATTERNS = ['test', 'dummy', 'fake', 'abc', 'xyz', 'asdf', 'qwerty', 'aaa', '123',
-                      'na', 'n/a', 'none', 'nil', 'null', 'temporary', 'temp', 'sample']
 
     try:
-        app.logger.info(f"AUTH: Registration attempt started for email: {request.form.get('email') or request.get_json().get('email')}")
-        # Handle both JSON and FormData
-        if request.content_type.startswith('multipart/form-data'):
+        # ── Parse request body ──────────────────────────────────────────────────
+        if request.content_type and request.content_type.startswith('multipart/form-data'):
             data = request.form.to_dict()
-            file = request.files.get('document')
+            doc_file = request.files.get('document')
             doc_path = None
-            if file:
-                filename = secure_filename(file.filename)
-                # Use time.time() for unique filename
-                doc_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{int(time.time())}_{filename}")
-                file.save(doc_path)
+            if doc_file and doc_file.filename:
+                fname = secure_filename(doc_file.filename)
+                doc_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{int(time.time())}_{fname}")
+                doc_file.save(doc_path)
         else:
-            data = request.get_json()
+            data = request.get_json(silent=True) or {}
             doc_path = None
 
-        role = data.get('role')
+        role     = (data.get('role') or '').strip()
+        email    = (data.get('email') or '').strip().lower()
+        password = (data.get('password') or '').strip()
+        mobile   = (data.get('mobile') or '').strip()
 
-        # ── Mobile format validation ─────────────────────────────────
-        mobile = (data.get('mobile') or '').strip()
-        if not mobile or not re.match(r'^[6-9]\d{9}$', mobile):
+        app.logger.info(f"REGISTER: Attempt for {email} as {role}")
+
+        # ── Basic field checks ─────────────────────────────────────────────────
+        if not email or not password or not role:
+            return signed_json_response({"message": "Email, password and role are required."}, 400)
+
+        if role not in ('patient', 'doctor'):
+            return signed_json_response({"message": "Role must be 'patient' or 'doctor'."}, 400)
+
+        if not re.match(r'^[6-9]\d{9}$', mobile):
             return signed_json_response({"message": "Enter a valid 10-digit Indian mobile number starting with 6-9."}, 400)
 
-        # ── Address validation (relaxed – catch only obvious garbage) ────────
-        address_raw = (data.get('address') or '').strip().lower()
-        if not address_raw or len(address_raw) < 5:
-            return signed_json_response({"message": "Please enter a valid address."}, 400)
-        # Block only exact dummy-word matches (not startsWith to avoid false positives)
-        if address_raw in DUMMY_PATTERNS or address_raw in [p * 2 for p in DUMMY_PATTERNS]:
-            return signed_json_response({"message": "Please enter a real address. Dummy or placeholder addresses are not allowed."}, 400)
+        address_raw = (data.get('address') or '').strip()
+        if len(address_raw) < 5:
+            return signed_json_response({"message": "Please enter a valid address (at least 5 characters)."}, 400)
 
-        # ── Doctor-specific validations ──────────────────────────────
+        # ── Doctor-specific validations ────────────────────────────────────────
         if role == 'doctor':
-            degree = (data.get('degree') or '').strip()
-            position = (data.get('position') or '').strip()
-            specialization = (data.get('specialization') or '').strip()
-            hospital = (data.get('hospital') or '').strip()
-            clinic_location = (data.get('clinicLocation') or data.get('clinic_location') or '').strip()
-            reg_number = (data.get('regNumber') or '').strip()
+            degree     = (data.get('degree') or '').strip()
+            position   = (data.get('position') or '').strip()
+            spec       = (data.get('specialization') or '').strip()
+            hospital   = (data.get('hospital') or '').strip()
+            clinic_loc = (data.get('clinicLocation') or data.get('clinic_location') or '').strip()
+            reg_num    = (data.get('regNumber') or '').strip()
 
             if degree not in VALID_DEGREES:
-                return signed_json_response({"message": f"Invalid degree '{degree}'. Please select from the accepted medical qualifications."}, 400)
+                return signed_json_response({"message": f"Invalid degree '{degree}'. Select from accepted qualifications."}, 400)
             if position not in VALID_POSITIONS:
-                return signed_json_response({"message": f"Invalid position '{position}'. Please select from the accepted positions."}, 400)
-            if specialization not in VALID_SPECIALIZATIONS:
-                return signed_json_response({"message": f"Invalid specialization '{specialization}'. Please select from the accepted specializations."}, 400)
-            if not hospital or len(hospital) < 3:
+                return signed_json_response({"message": f"Invalid position '{position}'."}, 400)
+            if spec not in VALID_SPECIALIZATIONS:
+                return signed_json_response({"message": f"Invalid specialization '{spec}'."}, 400)
+            if len(hospital) < 3:
                 return signed_json_response({"message": "Hospital / Clinic name is required."}, 400)
-            if not clinic_location or len(clinic_location) < 5:
-                return signed_json_response({"message": "Clinic location (address/area) is required for doctors."}, 400)
-            if not reg_number:
-                return signed_json_response({"message": "Medical Registration Number is required."}, 400)
-            # Accept formats: MH-123456 / KA123456 / 12345678 (min 6 chars, alphanumeric)
-            if not re.match(r'^[A-Z]{1,3}[-]?\d{5,10}$', reg_number.upper()):
-                return signed_json_response({"message": "Invalid Medical Registration Number format. Expected format: STATE-XXXXXX (e.g. MH-123456 or DL12345)."}, 400)
+            if len(clinic_loc) < 5:
+                return signed_json_response({"message": "Clinic location is required for doctors."}, 400)
+            if not reg_num or not re.match(r'^[A-Z]{1,3}[-]?\d{5,10}$', reg_num.upper()):
+                return signed_json_response({"message": "Invalid Medical Registration Number. Expected: MH-123456 or DL12345."}, 400)
 
-        # ── Password hashing in native thread (non-blocking for Gevent) ──
-        _tp = gevent.get_hub().threadpool
-        hashed_password = _tp.spawn(
-            bcrypt.generate_password_hash, data.get('password')
-        ).get().decode('utf-8')
-
-        # RSA keys are generated in the background after registration to avoid blocking
-        public_pem = ''
-        private_key_encrypted = ''
-
-        # Age Validation (Patient minimum 1 year)
+        # ── Age check for patient ──────────────────────────────────────────────
         if role == 'patient':
             dob_str = data.get('dob')
             if dob_str:
                 try:
                     dob = datetime.datetime.strptime(dob_str, '%Y-%m-%d')
-                    one_year_ago = datetime.datetime.now() - datetime.timedelta(days=365)
-                    if dob > one_year_ago:
+                    if dob > datetime.datetime.now() - datetime.timedelta(days=365):
                         return signed_json_response({"message": "Patient must be at least 1 year old."}, 400)
                 except ValueError:
-                    return signed_json_response({"message": "Invalid date of birth format."}, 400)
+                    return signed_json_response({"message": "Invalid date of birth format (use YYYY-MM-DD)."}, 400)
+
+        # ── Hash password in Gevent-friendly thread ────────────────────────────
+        hashed_password = gevent.get_hub().threadpool.spawn(
+            bcrypt.generate_password_hash, password
+        ).get().decode('utf-8')
+
+        # ── Database work ──────────────────────────────────────────────────────
+        conn = None
+        try:
+            conn = get_db_connection()
+            if not conn:
+                app.logger.error("REGISTER: DB connection failed")
+                return signed_json_response({"message": "Database unavailable. Try again later."}, 500)
+
+            cur = conn.cursor(dictionary=True)
+
+            # Check duplicate email
+            cur.execute('SELECT id, isVerified FROM users WHERE email = %s', (email,))
+            existing = cur.fetchone()
+            if existing:
+                if existing['isVerified']:
+                    return signed_json_response({"message": "Email already registered. Please log in."}, 400)
+                # Resend verification
+                vtoken = secrets.token_urlsafe(32)
+                votp   = generate_otp()
+                cur.execute('UPDATE users SET verificationToken=%s, verificationOtp=%s WHERE id=%s',
+                            (vtoken, votp, existing['id']))
+                conn.commit()
+                api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
+                send_verification_email(email,
+                    f"{api_url}/api/auth/verify-email?token={vtoken}", votp)
+                return signed_json_response({"message": "Account exists but is unverified. Verification email resent."}, 200)
+
+            # Check duplicate mobile
+            cur.execute('SELECT id FROM users WHERE mobile = %s', (mobile,))
+            if cur.fetchone():
+                return signed_json_response({"message": "Mobile number already registered."}, 400)
+
+            # Insert user
+            vtoken = secrets.token_urlsafe(32)
+            votp   = generate_otp()
+            cur.execute('''
+                INSERT INTO users
+                    (fullName, email, password, role, mobile, dob, gender, blood_group,
+                     address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted,
+                     isVerified, verificationToken, verificationOtp)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ''', (
+                data.get('fullName'), email, hashed_password, role,
+                mobile, data.get('dob'), data.get('gender'), data.get('bloodGroup'),
+                data.get('address'), data.get('city'), data.get('state'), data.get('pincode'),
+                '', '', 0, vtoken, votp
+            ))
+            user_id = cur.lastrowid
+
+            # Doctor detail row
+            if role == 'doctor':
+                cur.execute('''
+                    INSERT INTO doctor_details
+                        (userId, degree, position, specialization, experience,
+                         hospital, clinic_location, regNumber, documentPath, verificationStatus)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'pending')
+                ''', (
+                    user_id, data.get('degree'), data.get('position'), data.get('specialization'),
+                    data.get('experience'), data.get('hospital'), clinic_loc,
+                    data.get('regNumber'), doc_path
+                ))
+
+            # Patient detail row
+            if role == 'patient':
+                cur.execute('INSERT INTO patient_details (userId) VALUES (%s)', (user_id,))
+
+            conn.commit()
+
+            # Send verification email (non-blocking — already uses background thread)
+            api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
+            send_verification_email(email,
+                f"{api_url}/api/auth/verify-email?token={vtoken}", votp)
+
+            # RSA key generation in background (fire-and-forget, non-blocking)
+            def _bg_rsa(uid):
+                try:
+                    priv, pub = generate_rsa_keypair()
+                    enc = encrypt_data(priv)
+                    c = get_db_connection()
+                    if c:
+                        cx = c.cursor()
+                        cx.execute('UPDATE users SET rsaPublicKey=%s, rsaPrivateKeyEncrypted=%s WHERE id=%s',
+                                   (pub, enc, uid))
+                        c.commit()
+                        c.close()
+                except Exception as ex:
+                    app.logger.error(f"REGISTER: Background RSA failed uid={uid}: {ex}")
+            threading.Thread(target=_bg_rsa, args=(user_id,), daemon=True).start()
+
+            extra = " Credentials will be reviewed shortly." if role == 'doctor' else ''
+            app.logger.info(f"REGISTER: Success for {email}")
+            return signed_json_response({
+                "message": f"{role.capitalize()} registered! Check your email to verify your account.{extra}"
+            }, 201)
+
+        except mysql.connector.IntegrityError as ie:
+            app.logger.error(f"REGISTER: IntegrityError: {ie}")
+            msg = "Mobile number already registered." if 'mobile' in str(ie) else "Email already registered."
+            return signed_json_response({"message": msg}, 400)
+        except Exception as db_err:
+            app.logger.error(f"REGISTER: DB error: {db_err}")
+            return signed_json_response({"message": "Internal server error. Please try again."}, 500)
+        finally:
+            if conn:
+                conn.close()
+
+    except Exception as err:
+        app.logger.error(f"REGISTER: Unexpected error: {err}")
+        return signed_json_response({"message": f"Registration error: {str(err)}"}, 500)
+
+
+@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])
+def login():
+    try:
+        data     = request.get_json(silent=True) or {}
+        email    = (data.get('email') or '').strip().lower()
+        password = (data.get('password') or '')
+        role     = (data.get('role') or '').strip()
+
+        app.logger.info(f"LOGIN: Attempt for {email}")
+
+        if not email or not password or not role:
+            return signed_json_response({"message": "Email, password and role are required."}, 400)
 
         conn = None
         try:
             conn = get_db_connection()
             if not conn:
-                app.logger.error("AUTH: Database connection failed during registration")
-                return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
-            
-            app.logger.info("AUTH: Database connected for registration")
-            cursor = conn.cursor(dictionary=True)
+                app.logger.error("LOGIN: DB connection failed")
+                return signed_json_response({"message": "Database unavailable. Try again later."}, 500)
 
-            # Check if user already exists by email
-            cursor.execute('SELECT id, isVerified FROM users WHERE email = %s', (data.get('email'),))
-            existing_user = cursor.fetchone()
+            cur = conn.cursor(dictionary=True)
+            cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+            user = cur.fetchone()
 
-            if existing_user:
-                if existing_user.get('isVerified', 0):
-                    return signed_json_response({"message": "Email already registered and verified. Please log in."}, 400)
-                else:
-                    # User exists but not verified - Resend verification
-                    verification_token = secrets.token_urlsafe(32)
-                    verification_otp = generate_otp()
-                    cursor.execute('UPDATE users SET verificationToken = %s, verificationOtp = %s WHERE id = %s', (verification_token, verification_otp, existing_user['id']))
-                    conn.commit()
+            if not user:
+                app.logger.info(f"LOGIN: No account found for {email}")
+                return signed_json_response({"message": "Invalid email or password."}, 401)
 
-                    api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
-                    verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
-                    if send_verification_email(data.get('email'), verification_link, verification_otp):
-                        return signed_json_response({"message": "Account already exists but is unverified. A new verification email has been sent."}, 200)
-                    else:
-                        return signed_json_response({"message": "Account exists but verification email failed to send. Please contact support."}, 500)
+            # bcrypt check in Gevent-friendly thread (cooperative, non-blocking)
+            pw_ok = gevent.get_hub().threadpool.spawn(
+                bcrypt.check_password_hash, user['password'], password
+            ).get()
 
-            # Check if mobile number already registered
-            cursor.execute('SELECT id FROM users WHERE mobile = %s', (mobile,))
-            if cursor.fetchone():
-                return signed_json_response({"message": "This mobile number is already registered with another account."}, 400)
+            if not pw_ok:
+                app.logger.info(f"LOGIN: Wrong password for {email}")
+                return signed_json_response({"message": "Invalid email or password."}, 401)
 
-            # Generate Verification Token and OTP
-            verification_token = secrets.token_urlsafe(32)
-            verification_otp = generate_otp()
+            if user['role'] != role:
+                return signed_json_response({
+                    "message": f"Access denied. You are registered as a {user['role']}."
+                }, 403)
 
-            cursor.execute('''
-                INSERT INTO users (fullName, email, password, role, mobile, dob, gender, blood_group, address, city, state, pincode, rsaPublicKey, rsaPrivateKeyEncrypted, isVerified, verificationToken, verificationOtp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (
-                data.get('fullName'), data.get('email'), hashed_password, role,
-                mobile, data.get('dob'), data.get('gender'), data.get('bloodGroup'),
-                data.get('address'), data.get('city'), data.get('state'), data.get('pincode'),
-                public_pem, private_key_encrypted, 0, verification_token, verification_otp
-            ))
-            user_id = cursor.lastrowid
+            if not user.get('isVerified', 0):
+                return signed_json_response({
+                    "message": "Please verify your email before logging in. Check your inbox."
+                }, 403)
 
-            if role == 'doctor':
-                clinic_location = (data.get('clinicLocation') or data.get('clinic_location') or '').strip()
-                cursor.execute('''
-                    INSERT INTO doctor_details (userId, degree, position, specialization, experience, hospital, clinic_location, regNumber, documentPath, verificationStatus)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
-                ''', (
-                    user_id, data.get('degree'), data.get('position'), data.get('specialization'),
-                    data.get('experience'), data.get('hospital'), clinic_location,
-                    data.get('regNumber'), doc_path
-                ))
-            if role == 'patient':
-                cursor.execute('''
-                    INSERT INTO patient_details (userId)
-                    VALUES (%s)
-                ''', (user_id,))
-
-            conn.commit()
-
-            # Send Verification Email
-            api_url = os.environ.get('API_BASE_URL', 'https://api.vaidyamedx.in')
-            verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
-            send_verification_email(data.get('email'), verification_link, verification_otp)
-
-            # Generate RSA keys in background (non-blocking)
-            def _generate_rsa_for_user(uid):
-                try:
-                    priv_pem, pub_pem = generate_rsa_keypair()
-                    enc_priv = encrypt_data(priv_pem)
-                    rsa_conn = get_db_connection()
-                    if rsa_conn:
-                        rsa_cur = rsa_conn.cursor()
-                        rsa_cur.execute('UPDATE users SET rsaPublicKey=%s, rsaPrivateKeyEncrypted=%s WHERE id=%s',
-                                        (pub_pem, enc_priv, uid))
-                        rsa_conn.commit()
-                        rsa_conn.close()
-                except Exception as rsa_err:
-                    app.logger.error(f"AUTH: Background RSA gen failed for user {uid}: {rsa_err}")
-            threading.Thread(target=_generate_rsa_for_user, args=(user_id,), daemon=True).start()
-
-            extra_msg = " Your credentials will be reviewed and verified shortly." if role == 'doctor' else ""
-            app.logger.info(f"AUTH: Registration successful for {data.get('email')}")
-            return signed_json_response({"message": f"{role.capitalize()} registered successfully! Please check your email to verify your account.{extra_msg}"}, 201)
-
-        except mysql.connector.IntegrityError as ie:
-            err_msg = str(ie)
-            if 'mobile' in err_msg:
-                return signed_json_response({"message": "This mobile number is already registered."}, 400)
-            return signed_json_response({"message": "Email already registered."}, 400)
-        except Exception as db_e:
-            app.logger.error(f"AUTH: Database error during registration: {db_e}")
-            return signed_json_response({"message": "Internal server error during registration."}, 500)
-        finally:
-            if conn:
-                conn.close()
-                app.logger.info("AUTH: Database connection closed for registration")
-
-    except Exception as e:
-        app.logger.error(f"AUTH: Registration outer error: {e}")
-        return signed_json_response({"message": f"Registration failed: {str(e)}"}, 500)
-
-
-@app.route('/api/auth/login', methods=['POST'])
-@app.route('/api/login', methods=['POST'])  # backward compat
-def login():
-    data = request.get_json()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password')
-    role = data.get('role')
-
-    app.logger.info(f"AUTH: Login attempt for email: {email}")
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn:
-            app.logger.error("AUTH: Database connection failed during login")
-            return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
-        
-        app.logger.info("AUTH: Database connected for login")
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
-        user = cursor.fetchone()
-        
-        if not user:
-            app.logger.info(f"AUTH: Login failed - User not found: {email}")
-            return signed_json_response({"message": "Invalid email or password."}, 401)
-        
-        # bcrypt check in native thread — cooperative with Gevent, no event loop block
-        _tp = gevent.get_hub().threadpool
-        pw_match = _tp.spawn(bcrypt.check_password_hash, user['password'], password).get()
-        if not pw_match:
-            app.logger.info(f"AUTH: Login failed - Invalid password: {email}")
-            return signed_json_response({"message": "Invalid email or password."}, 401)
-        
-        if user['role'] != role:
-            app.logger.info(f"AUTH: Login failed - Role mismatch for {email} (Expected {role}, Got {user['role']})")
-            return signed_json_response({"message": f"Access denied. You are registered as a {user['role']}."}, 403)
-
-        if not user.get('isVerified', 0):
-            app.logger.info(f"AUTH: Login failed - Unverified account: {email}")
-            return signed_json_response({"message": "Please verify your email address before logging in. Check your inbox for the verification link."}, 403)
-
-        # 2FA Check
-        if user.get('twoFactorEnabled'):
-            app.logger.info(f"AUTH: 2FA required for {email}")
-            otp_code = generate_otp()
-            otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=5)
-            cursor.execute("UPDATE users SET otpCode = %s, otpExpiry = %s WHERE id = %s", (otp_code, otp_expiry, user['id']))
-            conn.commit()
-            
-            if send_otp_email(user['email'], otp_code):
+            # 2FA check
+            if user.get('twoFactorEnabled'):
+                otp_code   = generate_otp()
+                otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=5)
+                cur.execute('UPDATE users SET otpCode=%s, otpExpiry=%s WHERE id=%s',
+                            (otp_code, otp_expiry, user['id']))
+                conn.commit()
+                send_otp_email(user['email'], otp_code)
+                app.logger.info(f"LOGIN: 2FA required for {email}")
                 return signed_json_response({
                     "status": "2fa_required",
                     "message": "A 2FA code has been sent to your email.",
                     "email": user['email']
                 }, 200)
-            else:
-                return signed_json_response({"message": "Failed to send 2FA code. Please try again later."}, 500)
 
-        access_token = create_access_token(identity=str(user['id']))
-        app.logger.info(f"AUTH: Login successful for {email}")
-        return signed_json_response({
-            "token": access_token,
-            "user_id": user['id'],
-            "role": user['role'],
-            "user": {
-                "id": user['id'],
-                "name": user['fullName'],
-                "email": user['email'],
-                "mobile": user['mobile']
-            }
-        })
-    except Exception as e:
-        app.logger.error(f"AUTH: Login database error: {e}")
-        return signed_json_response({"message": "Internal server error during login."}, 500)
-    finally:
-        if conn:
-            conn.close()
-            app.logger.info("AUTH: Database connection closed for login")
+            token = create_access_token(identity=str(user['id']))
+            app.logger.info(f"LOGIN: Success for {email}")
+            return signed_json_response({
+                "token": token,
+                "user_id": user['id'],
+                "role": user['role'],
+                "user": {
+                    "id": user['id'],
+                    "name": user['fullName'],
+                    "email": user['email'],
+                    "mobile": user['mobile']
+                }
+            }, 200)
+
+        except Exception as db_err:
+            app.logger.error(f"LOGIN: DB error: {db_err}")
+            return signed_json_response({"message": "Internal server error. Please try again."}, 500)
+        finally:
+            if conn:
+                conn.close()
+
+    except Exception as err:
+        app.logger.error(f"LOGIN: Unexpected error: {err}")
+        return signed_json_response({"message": f"Login error: {str(err)}"}, 500)
+
+
 
 @app.route('/api/auth/verify-email', methods=['GET'])
 def verify_email():
