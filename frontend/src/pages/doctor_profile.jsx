@@ -85,6 +85,9 @@ export default function DoctorProfile() {
     const [editMode, setEditMode] = useState(false);
     const [errors, setErrors]     = useState({});
     const [payoutVerified, setPayoutVerified] = useState(false);
+    const [ifscInfo, setIfscInfo] = useState(null);
+    const [ifscLoading, setIfscLoading] = useState(false);
+    const [upiValid, setUpiValid] = useState(null);
 
     const fetchProfile = () => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -133,6 +136,26 @@ export default function DoctorProfile() {
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
     }, [errors]);
 
+    // IFSC lookup on blur
+    const handleIfscBlur = useCallback(async (e) => {
+        const code = e.target.value.trim().toUpperCase();
+        if (code.length !== 11) { setIfscInfo(null); return; }
+        setIfscLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/utils/ifsc/${code}`);
+            const json = await res.json();
+            if (res.ok) setIfscInfo(json.data || json);
+            else setIfscInfo({ error: 'IFSC not found' });
+        } catch { setIfscInfo({ error: 'Lookup failed' }); }
+        finally { setIfscLoading(false); }
+    }, []);
+
+    // UPI format validation
+    const handleUpiBlur = useCallback((e) => {
+        const val = e.target.value.trim();
+        setUpiValid(val ? /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/.test(val) : null);
+    }, []);
+
     const validate = () => {
         const errs = {};
         if (!form.name.trim())                                              errs.name = 'Full name is required.';
@@ -167,9 +190,9 @@ export default function DoctorProfile() {
                 body: JSON.stringify({ ...form, consultantFee: Number(form.consultantFee), experience: String(form.experience) }),
             });
             if (!res.ok) { const j = await res.json(); throw new Error(j.data?.message || j.message || 'Save failed'); }
-            handleSuccess('Profile saved successfully!');
-            setProfile(f => ({ ...f, ...form }));   // keep view in sync
-            setEditMode(false);                       // ← go back to view after save
+            handleSuccess('Profile saved! A UPI confirmation email has been sent if your UPI changed.');
+            setProfile(f => ({ ...f, ...form }));
+            setEditMode(false);
         } catch (err) {
             handleError(err);
         } finally {
@@ -449,13 +472,44 @@ export default function DoctorProfile() {
                         )}
                     </div>
                     
-                    <Field label="UPI ID" name="upiId" placeholder="e.g. yourname@ybl" req {...fProps} />
+                    <Field label="UPI ID" name="upiId" placeholder="e.g. yourname@ybl" req {...fProps}>
+                        <input
+                            type="text"
+                            name="upiId"
+                            value={form.upiId || ''}
+                            onChange={handleChange}
+                            onBlur={handleUpiBlur}
+                            placeholder="e.g. yourname@ybl"
+                            style={{ ...inputStyle(errors.upiId), borderColor: upiValid === false ? '#e74c3c' : upiValid === true ? '#27ae60' : undefined }}
+                        />
+                        {upiValid === true && <div style={{ color: '#27ae60', fontSize: '0.76rem', marginTop: 3 }}>✅ Valid UPI format</div>}
+                        {upiValid === false && <div style={{ color: '#e74c3c', fontSize: '0.76rem', marginTop: 3 }}>⚠ Invalid UPI format (e.g. name@ybl)</div>}
+                    </Field>
                     
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                         <Field label="Bank Account Holder Name" name="bankAccountName" placeholder="As per bank passbook" {...fProps} />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                             <Field label="Account Number" name="bankAccountNumber" placeholder="Account Number" {...fProps} />
-                            <Field label="IFSC Code" name="bankIfsc" placeholder="IFSC" {...fProps} />
+                            <Field label="IFSC Code" name="bankIfsc" placeholder="e.g. HDFC0001234" {...fProps}>
+                                <input
+                                    type="text"
+                                    name="bankIfsc"
+                                    value={form.bankIfsc || ''}
+                                    onChange={e => { handleChange(e); setIfscInfo(null); }}
+                                    onBlur={handleIfscBlur}
+                                    placeholder="11-char IFSC (auto-lookup)"
+                                    style={{ ...inputStyle(errors.bankIfsc), textTransform: 'uppercase' }}
+                                    maxLength={11}
+                                />
+                                {ifscLoading && <div style={{ color: '#888', fontSize: '0.76rem', marginTop: 3 }}>🔍 Looking up...</div>}
+                                {ifscInfo && !ifscInfo.error && (
+                                    <div style={{ background: '#e8f8ee', border: '1px solid #27ae60', borderRadius: 6, padding: '6px 10px', marginTop: 4, fontSize: '0.78rem', color: '#1a5c2e' }}>
+                                        🏦 <b>{ifscInfo.bank}</b> — {ifscInfo.branch}<br/>
+                                        📍 {ifscInfo.city}, {ifscInfo.state}
+                                    </div>
+                                )}
+                                {ifscInfo?.error && <div style={{ color: '#e74c3c', fontSize: '0.76rem', marginTop: 3 }}>⚠ {ifscInfo.error}</div>}
+                            </Field>
                         </div>
                     </div>
 

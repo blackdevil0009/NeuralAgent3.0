@@ -977,10 +977,14 @@ def handle_profile():
                     VALUES (%s, %s, %s, %s, %s)
                 ''', (current_user_id, data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications')))
 
-        # update doctor_details if doctor
+        # update or INSERT doctor_details if doctor
         if user_role == 'doctor':
-            cursor.execute("SELECT userId FROM doctor_details WHERE userId=%s", (current_user_id,))
-            if cursor.fetchone():
+            upi_changed = False
+            cursor.execute("SELECT userId, upiId FROM doctor_details WHERE userId=%s", (current_user_id,))
+            existing_doc = cursor.fetchone()
+            if existing_doc:
+                old_upi = existing_doc.get('upiId', '')
+                upi_changed = old_upi != data.get('upiId', '')
                 cursor.execute('''
                     UPDATE doctor_details
                     SET degree=%s, position=%s, specialization=%s, experience=%s,
@@ -996,18 +1000,102 @@ def handle_profile():
                     data.get('bankAccountName'), data.get('bankAccountNumber'), data.get('bankIfsc'),
                     current_user_id
                 ))
+            else:
+                upi_changed = bool(data.get('upiId'))
+                cursor.execute('''
+                    INSERT INTO doctor_details
+                        (userId, degree, position, specialization, experience,
+                         hospital, clinic_location, regNumber, consultantFee, workingHours,
+                         upiId, bankAccountDetails, bankAccountName, bankAccountNumber, bankIfsc)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ''', (
+                    current_user_id,
+                    data.get('degree'), data.get('position'), data.get('specialization'),
+                    data.get('experience'), data.get('hospital'), data.get('clinicLocation'),
+                    data.get('regNumber'), data.get('consultantFee'), data.get('workingHours'),
+                    data.get('upiId'), data.get('bankAccountDetails'),
+                    data.get('bankAccountName'), data.get('bankAccountNumber'), data.get('bankIfsc')
+                ))
         
         conn.commit()
         
-        # return updated
+        # Send UPI confirmation email if UPI was set/changed
+        if user_role == 'doctor' and upi_changed and data.get('upiId'):
+            cursor.execute("SELECT email, fullName FROM users WHERE id=%s", (current_user_id,))
+            doc_user = cursor.fetchone()
+            if doc_user:
+                def send_upi_email():
+                    try:
+                        from utils.email_utils import send_verification_email
+                        upi_id = data.get('upiId')
+                        subject = "VaidyaMed-X — UPI ID Confirmation"
+                        body = f"""<div style='font-family:sans-serif;max-width:540px;margin:auto'>
+<h2 style='color:#27ae60'>UPI ID Registered ✅</h2>
+<p>Hello Dr. {doc_user['fullName']},</p>
+<p>Your UPI ID <b>{upi_id}</b> has been saved on VaidyaMed-X.</p>
+<p>If this is correct, no action is needed. If you did NOT save this UPI, <b>please update it immediately</b> in your profile.</p>
+<p style='color:#888;font-size:0.85em'>Payouts for patient consultations will be sent to this UPI ID.</p>
+</div>"""
+                        import smtplib
+                        from email.mime.multipart import MIMEMultipart
+                        from email.mime.text import MIMEText
+                        smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+                        smtp_port = int(os.environ.get('SMTP_PORT', 587))
+                        smtp_user = os.environ.get('SMTP_USER', '')
+                        smtp_pass = os.environ.get('SMTP_PASS', '')
+                        msg = MIMEMultipart('alternative')
+                        msg['Subject'] = subject
+                        msg['From'] = f'VaidyaMed-X <{smtp_user}>'
+                        msg['To'] = doc_user['email']
+                        msg.attach(MIMEText(body, 'html'))
+                        with smtplib.SMTP(smtp_host, smtp_port) as server:
+                            server.starttls()
+                            server.login(smtp_user, smtp_pass)
+                            server.sendmail(smtp_user, doc_user['email'], msg.as_string())
+                        app.logger.info(f"UPI confirmation email sent to {doc_user['email']}")
+                    except Exception as e:
+                        app.logger.error(f"UPI email failed: {e}")
+                threading.Thread(target=send_upi_email, daemon=True).start()
+        
+        # return updated profile with doctor fields
         cursor.execute('''
-            SELECT u.fullName as name, u.email, u.mobile, u.twoFactorEnabled, u.dob, u.gender, u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role
+            SELECT u.fullName as name, u.email, u.mobile, u.twoFactorEnabled, u.dob, u.gender,
+                   u.blood_group as bloodGroup, u.address, u.city, u.state, u.pincode as pin, u.isVerified, u.role,
+                   dd.degree, dd.position, dd.specialization, dd.experience, dd.hospital,
+                   dd.clinic_location as clinicLocation, dd.regNumber, dd.consultantFee,
+                   dd.workingHours, dd.verificationStatus, dd.upiId, dd.bankAccountDetails,
+                   dd.bankAccountName, dd.bankAccountNumber, dd.bankIfsc, dd.payoutVerified
             FROM users u
+            LEFT JOIN doctor_details dd ON u.id = dd.userId
             WHERE u.id = %s
         ''', (current_user_id,))
         profile = cursor.fetchone()
         conn.close()
         return signed_json_response(profile or {"message": "Profile updated!"})
+
+@app.route('/api/utils/ifsc/<string:ifsc_code>', methods=['GET'])
+def lookup_ifsc(ifsc_code):
+    """Lookup bank branch details from IFSC code using Razorpay's free IFSC API."""
+    if not ifsc_code or len(ifsc_code) != 11:
+        return signed_json_response({"error": "Invalid IFSC code format"}, 400)
+    try:
+        resp = requests.get(f"https://ifsc.razorpay.com/{ifsc_code.upper()}", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            return signed_json_response({
+                "bank": data.get("BANK", ""),
+                "branch": data.get("BRANCH", ""),
+                "city": data.get("CITY", ""),
+                "state": data.get("STATE", ""),
+                "address": data.get("ADDRESS", ""),
+                "contact": data.get("CONTACT", ""),
+                "rtgs": data.get("RTGS", False),
+                "neft": data.get("NEFT", False),
+                "imps": data.get("IMPS", False),
+            })
+        return signed_json_response({"error": "IFSC not found"}, 404)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
 
 @app.route('/api/doctors', methods=['GET'])
 @jwt_required()
