@@ -330,6 +330,7 @@ def register():
                       'na', 'n/a', 'none', 'nil', 'null', 'temporary', 'temp', 'sample']
 
     try:
+        app.logger.info(f"AUTH: Registration attempt started for email: {request.form.get('email') or request.get_json().get('email')}")
         # Handle both JSON and FormData
         if request.content_type.startswith('multipart/form-data'):
             data = request.form.to_dict()
@@ -337,7 +338,8 @@ def register():
             doc_path = None
             if file:
                 filename = secure_filename(file.filename)
-                doc_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{int(timedelta(seconds=1).total_seconds())}_{filename}")
+                # Use time.time() for unique filename
+                doc_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{int(time.time())}_{filename}")
                 file.save(doc_path)
         else:
             data = request.get_json()
@@ -401,16 +403,16 @@ def register():
                 except ValueError:
                     return signed_json_response({"message": "Invalid date of birth format."}, 400)
 
-        # Generate Verification Token and OTP
-        verification_token = secrets.token_urlsafe(32)
-        verification_otp = generate_otp()
-
-        conn = get_db_connection()
-        if not conn:
-            return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
-        cursor = conn.cursor(dictionary=True)
-
+        conn = None
         try:
+            conn = get_db_connection()
+            if not conn:
+                app.logger.error("AUTH: Database connection failed during registration")
+                return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
+            
+            app.logger.info("AUTH: Database connected for registration")
+            cursor = conn.cursor(dictionary=True)
+
             # Check if user already exists by email
             cursor.execute('SELECT id, isVerified FROM users WHERE email = %s', (data.get('email'),))
             existing_user = cursor.fetchone()
@@ -476,6 +478,7 @@ def register():
             send_verification_email(data.get('email'), verification_link, verification_otp)
 
             extra_msg = " Your credentials will be reviewed and verified shortly." if role == 'doctor' else ""
+            app.logger.info(f"AUTH: Registration successful for {data.get('email')}")
             return signed_json_response({"message": f"{role.capitalize()} registered successfully! Please check your email to verify your account.{extra_msg}"}, 201)
 
         except mysql.connector.IntegrityError as ie:
@@ -483,12 +486,13 @@ def register():
             if 'mobile' in err_msg:
                 return signed_json_response({"message": "This mobile number is already registered."}, 400)
             return signed_json_response({"message": "Email already registered."}, 400)
+        except Exception as db_e:
+            app.logger.error(f"AUTH: Database error during registration: {db_e}")
+            return signed_json_response({"message": "Internal server error during registration."}, 500)
         finally:
-            conn.close()
-
-    except Exception as e:
-        app.logger.error(f"Registration error: {e}")
-        return signed_json_response({"message": f"Registration failed: {str(e)}"}, 500)
+            if conn:
+                conn.close()
+                app.logger.info("AUTH: Database connection closed for registration")
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -499,170 +503,54 @@ def login():
     password = data.get('password')
     role = data.get('role')
 
-    conn = get_db_connection()
-    if not conn:
-        return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
-        
+    app.logger.info(f"AUTH: Login attempt for email: {email}")
+    conn = None
     try:
+        conn = get_db_connection()
+        if not conn:
+            app.logger.error("AUTH: Database connection failed during login")
+            return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
+        
+        app.logger.info("AUTH: Database connected for login")
         cursor = conn.cursor(dictionary=True)
         cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
         user = cursor.fetchone()
         
         if not user:
+            app.logger.info(f"AUTH: Login failed - User not found: {email}")
             return signed_json_response({"message": "Invalid email or password."}, 401)
         
         if not bcrypt.check_password_hash(user['password'], password):
+            app.logger.info(f"AUTH: Login failed - Invalid password: {email}")
             return signed_json_response({"message": "Invalid email or password."}, 401)
-    except Exception as e:
-        app.logger.error(f"Login database error: {e}")
-        return signed_json_response({"message": "Internal server error during login."}, 500)
-    finally:
-        conn.close()
-
-    if user['role'] != role:
-        return signed_json_response({"message": f"Access denied. You are registered as a {user['role']}."}, 403)
-
-    if not user.get('isVerified', 0):
-        return signed_json_response({"message": "Please verify your email address before logging in. Check your inbox for the verification link."}, 403)
-
-    # 2FA Check
-    if user.get('twoFactorEnabled'):
-        otp_code = generate_otp()
-        otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=5)
         
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET otpCode = %s, otpExpiry = %s WHERE id = %s", (otp_code, otp_expiry, user['id']))
-        conn.commit()
-        conn.close()
-        
-        if send_otp_email(user['email'], otp_code):
-            return signed_json_response({
-                "status": "2fa_required",
-                "message": "A 2FA code has been sent to your email.",
-                "email": user['email']
-            }, 200)
-        else:
-            return signed_json_response({"message": "Failed to send 2FA code. Please try again later."}, 500)
+        if user['role'] != role:
+            app.logger.info(f"AUTH: Login failed - Role mismatch for {email} (Expected {role}, Got {user['role']})")
+            return signed_json_response({"message": f"Access denied. You are registered as a {user['role']}."}, 403)
 
-    access_token = create_access_token(identity=str(user['id']))
+        if not user.get('isVerified', 0):
+            app.logger.info(f"AUTH: Login failed - Unverified account: {email}")
+            return signed_json_response({"message": "Please verify your email address before logging in. Check your inbox for the verification link."}, 403)
 
-    return signed_json_response({
-        "token": access_token,
-        "user_id": user['id'],
-        "role": user['role'],
-        "user": {
-            "id": user['id'],
-            "name": user['fullName'],
-            "email": user['email'],
-            "mobile": user['mobile']
-        }
-    })
-
-@app.route('/api/auth/verify-email', methods=['GET'])
-def verify_email():
-    token = request.args.get('token')
-    if not token:
-        return signed_json_response({"error": "Missing verification token"}, 400)
-    
-    conn = get_db_connection()
-    if not conn:
-        return signed_json_response({"error": "Database connection failed"}, 500)
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute("SELECT id FROM users WHERE verificationToken = %s", (token,))
-        user = cursor.fetchone()
-        
-        if not user:
-            return "<h1>Invalid Link</h1><p>This verification link is invalid or has already been used.</p>"
-        
-        cursor.execute("UPDATE users SET isVerified = 1, verificationToken = NULL WHERE id = %s", (user['id'],))
-        conn.commit()
-        
-        return """
-        <html>
-            <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-                <h1 style="color: #2d6a4f;">Email Verified Successfully!</h1>
-                <p>Your account is now active. You will be redirected to the login page in 3 seconds...</p>
-                <script>setTimeout(() => window.location.href='https://vaidyamedx.in/login', 3000)</script>
-            </body>
-        </html>
-        """
-    except Exception as e:
-        return signed_json_response({"error": str(e)}, 500)
-    finally:
-        conn.close()
-
-@app.route('/api/auth/verify-registration-otp', methods=['POST'])
-def verify_registration_otp():
-    data = request.get_json()
-    email = data.get('email', '').strip().lower()
-    otp = data.get('otp', '').strip()
-    
-    if not email or not otp:
-        return signed_json_response({"error": "Email and OTP required"}, 400)
-    
-    conn = get_db_connection()
-    if not conn:
-        return signed_json_response({"error": "Database connection failed"}, 500)
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute("SELECT id FROM users WHERE email = %s AND verificationOtp = %s", (email, otp))
-        user = cursor.fetchone()
-        
-        if not user:
-            return signed_json_response({"error": "Invalid verification code"}, 400)
-        
-        cursor.execute("UPDATE users SET isVerified = 1, verificationToken = NULL, verificationOtp = NULL WHERE id = %s", (user['id'],))
-        conn.commit()
-        
-        return signed_json_response({"message": "Email verified successfully! You can now log in."}, 200)
-    except Exception as e:
-        return signed_json_response({"error": str(e)}, 500)
-    finally:
-        conn.close()
-
-@app.route('/api/auth/verify-2fa-otp', methods=['POST'])
-def verify_2fa_otp():
-    data = request.get_json()
-    email = data.get('email', '').strip().lower()
-    otp = data.get('otp', '').strip()
-
-    if not email or not otp:
-        return signed_json_response({"error": "Email and OTP are required"}, 400)
-
-    conn = get_db_connection()
-    if not conn:
-        return signed_json_response({"error": "Database connection failed"}, 500)
-    cursor = conn.cursor(dictionary=True)
-    try:
-        app.logger.info(f"VERIFY_2FA: Checking OTP for {email}")
-        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-        user = cursor.fetchone()
-
-        if not user:
-            app.logger.warning(f"VERIFY_2FA: User {email} not found")
-            return signed_json_response({"error": "User not found"}, 404)
-
-        stored_otp = user.get('otpCode')
-        expiry = user.get('otpExpiry')
-        current_time = datetime.datetime.now()
-
-        app.logger.info(f"VERIFY_2FA: User found. Input: {otp}, Stored: {stored_otp}, Expiry: {expiry}, Now: {current_time}")
-
-        if not stored_otp or str(stored_otp).strip() != str(otp).strip():
-             app.logger.warning(f"VERIFY_2FA: Invalid OTP match attempt for {email}. Input: {otp}, Stored: {stored_otp}")
-             return signed_json_response({"error": "Invalid OTP code"}, 401)
-        
-        if expiry and expiry < current_time:
-            app.logger.warning(f"VERIFY_2FA: OTP expired for {email}")
-            return signed_json_response({"error": "OTP code has expired"}, 401)
-
-        # Clear OTP after successful use
-        cursor.execute("UPDATE users SET otpCode = NULL, otpExpiry = NULL WHERE id = %s", (user['id'],))
-        conn.commit()
+        # 2FA Check
+        if user.get('twoFactorEnabled'):
+            app.logger.info(f"AUTH: 2FA required for {email}")
+            otp_code = generate_otp()
+            otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=5)
+            cursor.execute("UPDATE users SET otpCode = %s, otpExpiry = %s WHERE id = %s", (otp_code, otp_expiry, user['id']))
+            conn.commit()
+            
+            if send_otp_email(user['email'], otp_code):
+                return signed_json_response({
+                    "status": "2fa_required",
+                    "message": "A 2FA code has been sent to your email.",
+                    "email": user['email']
+                }, 200)
+            else:
+                return signed_json_response({"message": "Failed to send 2FA code. Please try again later."}, 500)
 
         access_token = create_access_token(identity=str(user['id']))
+        app.logger.info(f"AUTH: Login successful for {email}")
         return signed_json_response({
             "token": access_token,
             "user_id": user['id'],
@@ -675,9 +563,146 @@ def verify_2fa_otp():
             }
         })
     except Exception as e:
+        app.logger.error(f"AUTH: Login database error: {e}")
+        return signed_json_response({"message": "Internal server error during login."}, 500)
+    finally:
+        if conn:
+            conn.close()
+            app.logger.info("AUTH: Database connection closed for login")
+
+@app.route('/api/auth/verify-email', methods=['GET'])
+def verify_email():
+    token = request.args.get('token')
+    if not token:
+        return signed_json_response({"error": "Missing verification token"}, 400)
+    
+    app.logger.info(f"AUTH: Email verification attempt with token: {token[:10]}...")
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "Database connection failed"}, 500)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM users WHERE verificationToken = %s", (token,))
+        user = cursor.fetchone()
+        
+        if not user:
+            app.logger.warning(f"AUTH: Invalid verification token: {token[:10]}...")
+            return "<h1>Invalid Link</h1><p>This verification link is invalid or has already been used.</p>"
+        
+        cursor.execute("UPDATE users SET isVerified = 1, verificationToken = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+        app.logger.info(f"AUTH: Email verified for user ID: {user['id']}")
+        
+        return """
+        <html>
+            <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #2d6a4f;">Email Verified Successfully!</h1>
+                <p>Your account is now active. You will be redirected to the login page in 3 seconds...</p>
+                <script>setTimeout(() => window.location.href='https://vaidyamedx.in/login', 3000)</script>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        app.logger.error(f"AUTH: Email verification error: {e}")
         return signed_json_response({"error": str(e)}, 500)
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+
+@app.route('/api/auth/verify-registration-otp', methods=['POST'])
+def verify_registration_otp():
+    data = request.get_json()
+    email = data.get('email', '').strip().lower()
+    otp = data.get('otp', '').strip()
+    
+    if not email or not otp:
+        return signed_json_response({"error": "Email and OTP required"}, 400)
+    
+    app.logger.info(f"AUTH: OTP verification attempt for email: {email}")
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "Database connection failed"}, 500)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id FROM users WHERE email = %s AND verificationOtp = %s", (email, otp))
+        user = cursor.fetchone()
+        
+        if not user:
+            app.logger.warning(f"AUTH: Invalid OTP for {email}")
+            return signed_json_response({"error": "Invalid verification code"}, 400)
+        
+        cursor.execute("UPDATE users SET isVerified = 1, verificationToken = NULL, verificationOtp = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+        app.logger.info(f"AUTH: Email verified via OTP for {email}")
+        
+        return signed_json_response({"message": "Email verified successfully! You can now log in."}, 200)
+    except Exception as e:
+        app.logger.error(f"AUTH: OTP verification error for {email}: {e}")
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/auth/verify-2fa-otp', methods=['POST'])
+def verify_2fa_otp():
+    data = request.get_json()
+    email = data.get('email', '').strip().lower()
+    otp = data.get('otp', '').strip()
+
+    if not email or not otp:
+        return signed_json_response({"error": "Email and OTP are required"}, 400)
+
+    app.logger.info(f"AUTH: 2FA verification attempt for email: {email}")
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "Database connection failed"}, 500)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+
+        if not user:
+            app.logger.warning(f"AUTH: 2FA failed - User {email} not found")
+            return signed_json_response({"error": "User not found"}, 404)
+
+        stored_otp = user.get('otpCode')
+        expiry = user.get('otpExpiry')
+        current_time = datetime.datetime.now()
+
+        if not stored_otp or str(stored_otp).strip() != str(otp).strip():
+             app.logger.warning(f"AUTH: 2FA failed - Invalid OTP for {email}")
+             return signed_json_response({"error": "Invalid OTP code"}, 401)
+        
+        if expiry and expiry < current_time:
+            app.logger.warning(f"AUTH: 2FA failed - OTP expired for {email}")
+            return signed_json_response({"error": "OTP code has expired"}, 401)
+
+        # Clear OTP after successful use
+        cursor.execute("UPDATE users SET otpCode = NULL, otpExpiry = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+
+        access_token = create_access_token(identity=str(user['id']))
+        app.logger.info(f"AUTH: 2FA successful for {email}")
+        return signed_json_response({
+            "token": access_token,
+            "user_id": user['id'],
+            "role": user['role'],
+            "user": {
+                "id": user['id'],
+                "name": user['fullName'],
+                "email": user['email'],
+                "mobile": user['mobile']
+            }
+        })
+    except Exception as e:
+        app.logger.error(f"AUTH: 2FA error for {email}: {e}")
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/auth/2fa/toggle', methods=['POST'])
 @jwt_required()

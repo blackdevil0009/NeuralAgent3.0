@@ -5,10 +5,11 @@ from mysql.connector import Error
 
 # MySQL Configuration
 DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'localhost'),
+    'host': os.environ.get('DB_HOST', '127.0.0.1'),
     'user': os.environ.get('DB_USER', 'root'),
     'password': os.environ.get('DB_PASSWORD', 'Devil@2007%'),
-    'database': os.environ.get('DB_NAME', 'neuralagent_db')
+    'database': os.environ.get('DB_NAME', 'neuralagent_db'),
+    'connect_timeout': 10
 }
 
 def get_db_connection():

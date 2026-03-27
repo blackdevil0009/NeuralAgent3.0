@@ -54,7 +54,7 @@ cd "$BACKEND_DIR"
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip -q
-pip install flask flask-cors flask-bcrypt flask-jwt-extended python-dotenv werkzeug mysql-connector-python flask-limiter cryptography pydantic requests gunicorn flask-socketio eventlet -q
+pip install flask flask-cors flask-bcrypt flask-jwt-extended python-dotenv werkzeug mysql-connector-python flask-limiter cryptography pydantic requests gunicorn flask-socketio gevent gevent-websocket -q
 deactivate
 echo "✅ Python environment ready"
 
@@ -92,7 +92,7 @@ User=root
 WorkingDirectory=$BACKEND_DIR
 EnvironmentFile=$BACKEND_DIR/.env
 Environment=PATH=$BACKEND_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 1 --worker-class eventlet --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
+ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 1 --worker-class gevent --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -123,6 +123,23 @@ server {
     client_max_body_size 50M;
 
     location / {
+        # ── CORS: handle OPTIONS preflight at Nginx level ──────────────
+        if ($request_method = OPTIONS) {
+            add_header 'Access-Control-Allow-Origin' 'https://vaidyamedx.in' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, X-HMAC-Signature, X-Timestamp' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Max-Age' 86400 always;
+            return 204;
+        }
+
+        # ── CORS: always add headers (even on 4xx/5xx responses) ───────
+        add_header 'Access-Control-Allow-Origin' 'https://vaidyamedx.in' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, X-HMAC-Signature, X-Timestamp' always;
+
+        # ── WebSocket + proxy settings ──────────────────────────────────
         proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
