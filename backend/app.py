@@ -77,10 +77,11 @@ def register():
             return signed_json_response({"message": "Database unavailable."}, 500)
         
         cur = conn.cursor()
+        verification_otp = str(secrets.randbelow(900000) + 100000)
         cur.execute('''
-            INSERT INTO users (fullName, email, password, role, mobile, verificationToken, rsaPublicKey, rsaPrivateKeyEncrypted)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (full_name, email, hashed_password, role, mobile, verification_token, "NO_RSA_YET", "NO_RSA_YET"))
+            INSERT INTO users (fullName, email, password, role, mobile, verificationToken, otpCode, otpExpiry, rsaPublicKey, rsaPrivateKeyEncrypted)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, DATE_ADD(NOW(), INTERVAL 1 HOUR), %s, %s)
+        ''', (full_name, email, hashed_password, role, mobile, verification_token, verification_otp, "NO_RSA_YET", "NO_RSA_YET"))
         
         user_id = cur.lastrowid
         
@@ -150,6 +151,23 @@ def login():
         if not user.get('isVerified', 0):
             return signed_json_response({"message": "Please verify your email before logging in."}, 403)
             
+        # 2FA Intercept
+        if user.get('twoFactorEnabled'):
+            otp = str(secrets.randbelow(900000) + 100000)
+            cur.execute("""
+                UPDATE users SET otpCode=%s, otpExpiry=DATE_ADD(NOW(), INTERVAL 10 MINUTE)
+                WHERE id=%s
+            """, (otp, user['id']))
+            conn.commit()
+            
+            # Send Email Asynchronously
+            email_body = f"Your 2FA Login Code is: {otp}\nIt expires in 10 minutes.\n\nIf you did not request this, please change your password immediately."
+            from utils.email_utils import _send_email_sync
+            import threading
+            threading.Thread(target=_send_email_sync, args=(email, "VaidyaMed-X: 2FA Login Code", email_body)).start()
+            
+            return signed_json_response({"data": {"status": "2fa_required", "message": "OTP sent to your email."}}, 200)
+            
         token = create_access_token(identity=str(user['id']))
         return signed_json_response({
             "token": token,
@@ -194,6 +212,113 @@ def verify_email():
     except Exception as e:
         app.logger.error(f"Verify Error: {e}")
         return "<h1>Error</h1><p>Internal Server Error during verification.</p>"
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/auth/2fa/toggle', methods=['POST'])
+@jwt_required()
+def toggle_2fa():
+    """Toggle 2FA state for the logged-in user."""
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    password = data.get('password')
+    enabled = data.get('enabled', False)
+    
+    if not password: return signed_json_response({"error": "Password required to change security settings"}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("SELECT password FROM users WHERE id = %s", (user_id,))
+        u = cur.fetchone()
+        if not u or not bcrypt.check_password_hash(u['password'], password):
+            return signed_json_response({"error": "Invalid password"}, 401)
+            
+        cur.execute("UPDATE users SET twoFactorEnabled = %s WHERE id = %s", (1 if enabled else 0, user_id))
+        conn.commit()
+        
+        status_msg = "enabled" if enabled else "disabled"
+        return signed_json_response({"message": f"2FA securely {status_msg}"}, 200)
+    except Exception as e:
+        app.logger.error(f"2FA Toggle Error: {e}")
+        return signed_json_response({"error": "Failed to update 2FA"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/auth/verify-2fa-otp', methods=['POST'])
+def verify_2fa_otp():
+    """Verify OTP and issue JWT token."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').lower().strip()
+    otp = data.get('otp')
+    if not email or not otp: return signed_json_response({"error": "Email and OTP required."}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        
+        if not user or str(user.get('otpCode')) != str(otp):
+            return signed_json_response({"error": "Invalid or expired OTP"}, 401)
+            
+        cur.execute("UPDATE users SET otpCode = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+        
+        access_token = create_access_token(identity=str(user['id']), expires_delta=datetime.timedelta(days=1))
+        
+        if 'password' in user: del user['password']
+        if 'rsaPrivateKeyEncrypted' in user: del user['rsaPrivateKeyEncrypted']
+        if 'createdAt' in user: user['createdAt'] = str(user['createdAt'])
+        if 'otpExpiry' in user: user['otpExpiry'] = str(user['otpExpiry'])
+        
+        return signed_json_response({
+            "data": {
+                "message": "2FA Verified successfully",
+                "token": access_token,
+                "role": user['role'],
+                "user": user
+            }
+        }, 200)
+    except Exception as e:
+        app.logger.error(f"2FA Verify Error: {e}")
+        return signed_json_response({"error": "Failed to verify 2FA"}, 500)
+    finally:
+        if conn: conn.close()
+        
+@app.route('/api/auth/verify-registration-otp', methods=['POST'])
+def verify_registration_otp():
+    """Verify Email OTP for immediate login access."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').lower().strip()
+    otp = data.get('otp')
+    if not email or not otp: return signed_json_response({"error": "Email and OTP required."}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("SELECT id, otpCode FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        
+        if not user or str(user.get('otpCode')) != str(otp):
+            return signed_json_response({"error": "Invalid or expired OTP"}, 400)
+            
+        cur.execute("UPDATE users SET isVerified = 1, otpCode = NULL WHERE id = %s", (user['id'],))
+        conn.commit()
+        
+        return signed_json_response({"data": {"message": "Email Verified"}}, 200)
+    except Exception as e:
+        app.logger.error(f"Verify Reg OTP Error: {e}")
+        return signed_json_response({"error": "Failed to verify email"}, 500)
     finally:
         if conn: conn.close()
 
