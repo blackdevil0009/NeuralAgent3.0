@@ -102,6 +102,8 @@ def register():
                 int(data.get('consultantFee') or 500),
                 data.get('workingHours', 'Mon-Fri, 10AM-6PM')
             ))
+        else:
+            cur.execute("INSERT INTO patient_details (userId) VALUES (%s)", (user_id,))
             
         conn.commit()
         
@@ -455,10 +457,14 @@ def handle_user_profile():
             
             if u and u['role'] == 'patient':
                 cur.execute('''
-                    UPDATE patient_details 
-                    SET dosha=%s, allergies=%s, conditions=%s, medications=%s
-                    WHERE userId=%s
-                ''', (data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), user_id))
+                    INSERT INTO patient_details (userId, dosha, allergies, conditions, medications)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE 
+                        dosha=VALUES(dosha), 
+                        allergies=VALUES(allergies), 
+                        conditions=VALUES(conditions), 
+                        medications=VALUES(medications)
+                ''', (user_id, data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications')))
             conn.commit()
             
         # Get base user details
