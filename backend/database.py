@@ -6,7 +6,7 @@ from mysql.connector import Error
 # MySQL Configuration
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'localhost'),
-    'user': os.environ.get('DB_USER', 'vaidyamedx'),
+    'user': os.environ.get('DB_USER', 'root'),
     'password': os.environ.get('DB_PASSWORD', 'Devil@2007%'),
     'database': os.environ.get('DB_NAME', 'neuralagent_db')
 }
