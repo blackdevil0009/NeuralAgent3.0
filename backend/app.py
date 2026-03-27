@@ -160,24 +160,24 @@ def login():
             """, (otp, user['id']))
             conn.commit()
             
-            # Send Email Asynchronously
+            # Send Email via background thread
             email_body = f"Your 2FA Login Code is: {otp}\nIt expires in 10 minutes.\n\nIf you did not request this, please change your password immediately."
-            from utils.email_utils import _send_email_sync
-            import threading
-            threading.Thread(target=_send_email_sync, args=(email, "VaidyaMed-X: 2FA Login Code", email_body)).start()
+            from utils.email_utils import _send_email_common
+            _send_email_common(email, "VaidyaMed-X: 2FA Login Code", email_body)
             
             return signed_json_response({"data": {"status": "2fa_required", "message": "OTP sent to your email."}}, 200)
             
         token = create_access_token(identity=str(user['id']))
         return signed_json_response({
-            "token": token,
-            "user_id": user['id'],
-            "role": user['role'],
-            "user": {
-                "id": user['id'],
-                "name": user['fullName'],
-                "email": user['email'],
-                "mobile": user['mobile']
+            "data": {
+                "token": token,
+                "role": user['role'],
+                "user": {
+                    "id": user['id'],
+                    "name": user['fullName'],
+                    "email": user['email'],
+                    "mobile": user['mobile']
+                }
             }
         }, 200)
         
