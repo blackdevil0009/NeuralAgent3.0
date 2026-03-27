@@ -26,7 +26,7 @@ def _send_email_async_worker(to_email, subject, body):
 
         try:
             # Try Port 587 (TLS)
-            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
@@ -34,7 +34,7 @@ def _send_email_async_worker(to_email, subject, body):
         except Exception as e1:
             # Fallback to Port 465 (SSL)
             try:
-                server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+                server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
                 server.login(SENDER_EMAIL, SENDER_PASSWORD)
                 server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
                 server.quit()

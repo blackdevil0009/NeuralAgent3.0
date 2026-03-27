@@ -512,6 +512,11 @@ def register():
         return signed_json_response({"message": f"Registration error: {str(err)}"}, 500)
 
 
+@app.route('/api/ping', methods=['GET'])
+def ping_test():
+    """A pure-python test route that does not touch the CPU, DB or Threadpool."""
+    return jsonify({"status": "ok", "message": "Server is alive and not blocked!"}), 200
+
 @app.route('/api/auth/login', methods=['POST'])
 @app.route('/api/login', methods=['POST'])
 def login():
