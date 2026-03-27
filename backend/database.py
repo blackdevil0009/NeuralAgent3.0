@@ -124,7 +124,9 @@ def init_db():
         "ALTER TABLE appointments ADD COLUMN orderId VARCHAR(255) AFTER paymentId",
         "ALTER TABLE appointments ADD COLUMN amountPaid INT AFTER orderId",
         "ALTER TABLE appointments ADD COLUMN commissionAmount INT DEFAULT 0 AFTER amountPaid",
-        "ALTER TABLE appointments ADD COLUMN doctorPayoutAmount INT DEFAULT 0 AFTER commissionAmount"
+        "ALTER TABLE appointments ADD COLUMN doctorPayoutAmount INT DEFAULT 0 AFTER commissionAmount",
+        "ALTER TABLE appointments ADD COLUMN payoutStatus VARCHAR(50) DEFAULT 'pending' AFTER doctorPayoutAmount",
+        "ALTER TABLE appointments ADD COLUMN payoutId VARCHAR(255) AFTER payoutStatus"
     ]
     for task in migration_tasks:
         try:
@@ -182,6 +184,23 @@ def init_db():
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(patientId) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY(doctorId) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Payout Logs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS payout_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            appointmentId INT NOT NULL,
+            payoutId VARCHAR(255),
+            amount INT NOT NULL,
+            currency VARCHAR(10) DEFAULT 'INR',
+            status VARCHAR(50) DEFAULT 'queued',
+            errorMessage TEXT,
+            retryCount INT DEFAULT 0,
+            processedAt TIMESTAMP NULL,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(appointmentId) REFERENCES appointments(id) ON DELETE CASCADE
         )
     ''')
 

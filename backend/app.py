@@ -18,6 +18,7 @@ import functools
 import time
 import re
 import traceback
+import requests
 from ai.brain import get_brain
 from utils.otp_utils import generate_otp
 from utils.sms_utils import send_fast2sms_otp
@@ -25,6 +26,8 @@ from utils.email_utils import send_reset_email, send_verification_email, send_ot
 import datetime
 import secrets
 import traceback
+from utils.razorpay_service import razorpay_service
+import threading
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -1260,166 +1263,241 @@ def update_appointment(app_id):
             }, room=f"user_{app_data['patientId']}")
         
         conn.commit()
-        return signed_json_response({"message": f"Appointment {status.lower()} successfully!"})
+        return signed_json_response({"message": "Appointment status updated successfully"})
     except Exception as e:
         return signed_json_response({"error": str(e)}, 500)
     finally:
         conn.close()
 
+
+def run_payout_in_background(appointment_id):
+    """Internal helper to process payout in a separate thread."""
+    conn = get_db_connection()
+    if not conn: return
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Get payout details
+        cursor.execute(
+            "SELECT a.doctorPayoutAmount, d.upiId, u.fullName, u.email, u.mobile "
+            "FROM appointments a JOIN doctor_details d ON a.doctorId = d.userId "
+            "JOIN users u ON d.userId = u.id WHERE a.id = %s",
+            (appointment_id,)
+        )
+        data = cursor.fetchone()
+        
+        if not data or not data["upiId"]:
+            return
+
+        # Execute Payout
+        try:
+            # 1. Ensure contact/fund account exists
+            contact_id = razorpay_service.create_contact(data["fullName"], data["email"], data["mobile"])
+            fund_account_id = razorpay_service.create_fund_account_upi(contact_id, data["upiId"])
+            
+            # 2. Trigger Payout
+            payout = razorpay_service.execute_payout(fund_account_id, data["doctorPayoutAmount"])
+            
+            # 3. Log Payout
+            cursor.execute(
+                "INSERT INTO payout_logs (appointmentId, payoutId, amount, status) VALUES (%s, %s, %s, %s)",
+                (appointment_id, payout["id"], data["doctorPayoutAmount"], payout["status"])
+            )
+            cursor.execute(
+                "UPDATE appointments SET payoutId = %s, payoutStatus = %s WHERE id = %s",
+                (payout["id"], payout["status"], appointment_id)
+            )
+            conn.commit()
+            
+        except Exception as payout_err:
+            app.logger.error(f"Payout execution failed: {str(payout_err)}")
+            cursor.execute(
+                "INSERT INTO payout_logs (appointmentId, amount, status, errorMessage) VALUES (%s, %s, %s, %s)",
+                (appointment_id, data["doctorPayoutAmount"], "failed", str(payout_err))
+            )
+            cursor.execute("UPDATE appointments SET payoutStatus = 'failed' WHERE id = %s", (appointment_id,))
+            conn.commit()
+            
+    except Exception as e:
+        app.logger.error(f"Internal payout processing error: {str(e)}")
+    finally:
+        conn.close()
 
 @app.route('/api/payments/create-order', methods=['POST'])
 @jwt_required()
+@require_hmac
 def create_payment_order():
-    import razorpay
-    current_user_id = int(get_jwt_identity())
-    data = request.json
-    purpose = data.get('purpose')
-    doctor_id = data.get('doctorId') if purpose != 'verification' else None
+    """Creates a Razorpay order for an appointment or verification."""
+    data = request.get_json()
+    purpose = data.get('purpose') # 'appointment' or 'verification'
+    doctor_id = data.get('doctorId')
     
-    if purpose != 'verification' and not doctor_id:
-        return signed_json_response({"error": "Doctor ID required"}, 400)
-        
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        if purpose == 'verification':
-            order_amount = 100 # ₹1
-        else:
-            cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
-            doc = cursor.fetchone()
-            fee = doc['consultantFee'] if doc else 500
-            order_amount = fee * 100 # amount in paise
-        
-        order_currency = 'INR'
-        
-        # Initialize Razorpay client. In production, use real keys from .env.
-        key_id = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_placeholder')
-        key_secret = os.environ.get('RAZORPAY_KEY_SECRET', 'test_secret')
-        razorpay_client = razorpay.Client(auth=(key_id, key_secret))
-        
-        payment = razorpay_client.order.create(dict(amount=order_amount, currency=order_currency, payment_capture='1'))
-        
-        return signed_json_response({
-            'order_id': payment['id'],
-            'amount': order_amount,
-            'currency': order_currency,
-            'key_id': key_id
-        })
-    except Exception as e:
-        app.logger.error(f"Error creating Razorpay order: {e}")
-        return signed_json_response({"error": str(e)}, 500)
-    finally:
+    if purpose == 'verification':
+        amount = 100 # ₹1
+    else:
+        if not doctor_id:
+            return signed_json_response({"error": "Doctor ID required"}, 400)
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
+        doc = cursor.fetchone()
         conn.close()
+        amount = (doc['consultantFee'] if doc else 500) * 100
+        
+    try:
+        order = razorpay_service.create_order(amount, f"receipt_{int(time.time())}")
+        return signed_json_response(order)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
 
 @app.route('/api/payments/verify', methods=['POST'])
 @jwt_required()
+@require_hmac
 def verify_payment():
-    import razorpay
+    """Verifies payment and creates appointment."""
     current_user_id = int(get_jwt_identity())
-    data = request.json
+    data = request.get_json()
     
-    razorpay_payment_id = data.get('razorpay_payment_id')
-    razorpay_order_id = data.get('razorpay_order_id')
-    razorpay_signature = data.get('razorpay_signature')
+    # Razorpay details
+    rzp_pay_id = data.get('razorpay_payment_id')
+    rzp_ord_id = data.get('razorpay_order_id')
+    rzp_sig = data.get('razorpay_signature')
     
+    # Appointment details
     doctor_id = data.get('doctorId')
     appt_date = data.get('date')
     appt_time_raw = data.get('time')
     appt_type = data.get('type')
     notes = data.get('notes', '')
     
-    if not all([doctor_id, appt_date, appt_time_raw, appt_type]):
-        return signed_json_response({"error": "Missing appointment details"}, 400)
-    
-    # Convert 12-hour AM/PM format to 24-hour format
+    # Convert time
     try:
         from datetime import datetime as dt
         appt_time = dt.strptime(appt_time_raw.strip(), '%I:%M %p').strftime('%H:%M:%S')
-    except ValueError:
+    except:
         appt_time = appt_time_raw
-        
-    key_id = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_placeholder')
-    key_secret = os.environ.get('RAZORPAY_KEY_SECRET', 'test_secret')
-    razorpay_client = razorpay.Client(auth=(key_id, key_secret))
-    
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
     try:
-        # Verify signature only if real keys are used
-        if key_id != 'rzp_test_placeholder':
-            params_dict = {
-                'razorpay_order_id': razorpay_order_id,
-                'razorpay_payment_id': razorpay_payment_id,
-                'razorpay_signature': razorpay_signature
-            }
-            razorpay_client.utility.verify_payment_signature(params_dict)
-            
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Conflict check
-        cursor.execute('''
-            SELECT id FROM appointments 
-            WHERE doctorId = %s AND appointmentDate = %s AND appointmentTime = %s AND status != 'Cancelled'
-        ''', (doctor_id, appt_date, appt_time))
-        
-        if cursor.fetchone():
-            conn.close()
-            return signed_json_response({"error": "This time slot is already booked. Please choose another slot."}, 409)
-            
-        # Get fee and calculate 5/95 split
+        # Get fee and calculate split
         cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
         doc = cursor.fetchone()
-        fee = doc[0] if doc else 500
+        fee = (doc['consultantFee'] if doc else 500)
         
         commission = int(fee * 0.05)
-        payout = fee - commission
-            
+        payout_amount = (fee - commission) * 100 # work in paise for Razorpay
+        
+        # Create appointment
         cursor.execute('''
             INSERT INTO appointments (patientId, doctorId, appointmentDate, appointmentTime, type, notes, status, paymentId, orderId, amountPaid, commissionAmount, doctorPayoutAmount)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (current_user_id, doctor_id, appt_date, appt_time, appt_type, notes, 'Scheduled', razorpay_payment_id, razorpay_order_id, fee, commission, payout))
+        ''', (current_user_id, doctor_id, appt_date, appt_time, appt_type, notes, 'Scheduled', rzp_pay_id, rzp_ord_id, fee, commission, (fee - commission)))
         
-        app_id = cursor.lastrowid
+        appt_id = cursor.lastrowid
         conn.commit()
         
-        # Notify Doctor
-        cursor.execute('SELECT fullName FROM users WHERE id = %s', (current_user_id,))
-        patient_row = cursor.fetchone()
-        patient_name = patient_row[0] if patient_row else 'A patient'
-        create_notification(doctor_id, 'Appointment', f"New {appt_type} appointment paid and booked for {appt_date} at {appt_time} by {patient_name}.")
+        # Trigger Payout in background
+        threading.Thread(target=run_payout_in_background, args=(appt_id,)).start()
         
-        # Notify Patient
-        cursor.execute('SELECT fullName FROM users WHERE id = %s', (doctor_id,))
-        doc_row = cursor.fetchone()
-        doc_name = doc_row[0] if doc_row else 'the Doctor'
-        create_notification(current_user_id, 'Appointment', f"Confirmed: Your appointment with {doc_name} is set for {appt_date} at {appt_time}")
-        
-        conn.close()
-        
-        return signed_json_response({"message": "Payment verified and appointment confirmed!", "appointmentId": app_id}, 201)
-    except razorpay.errors.SignatureVerificationError:
-        return signed_json_response({"error": "Payment verification failed due to invalid signature"}, 400)
+        return signed_json_response({"message": "Appointment booked and payout initiated!", "appointmentId": appt_id}, 201)
     except Exception as e:
-        app.logger.error(f"Error verifying payment: {e}")
+        conn.rollback()
         return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
 
-@app.route('/api/payments/verify-payout', methods=['POST'])
+@app.route('/api/payments/webhook', methods=['POST'])
+def razorpay_webhook():
+    """Handles Razorpay webhooks for payment.captured."""
+    payload = request.data.decode('utf-8')
+    signature = request.headers.get("X-Razorpay-Signature")
+    
+    if not razorpay_service.verify_webhook_signature(payload, signature):
+        return jsonify({"status": "error", "message": "Invalid signature"}), 400
+        
+    event_data = request.get_json()
+    if event_data.get("event") == "payment.captured":
+        # Additional logic can go here if needed
+        pass
+        
+    return jsonify({"status": "ok"})
+
+@app.route('/api/doctor/payout-setup', methods=['POST'])
 @jwt_required()
-def verify_payout():
-    curr_id = int(get_jwt_identity())
+def setup_doctor_payout():
+    """Updates doctor payout details."""
+    user_id = int(get_jwt_identity())
     data = request.get_json()
-    rzp_pay_id, rzp_ord_id, rzp_sig = data.get('razorpay_payment_id'), data.get('razorpay_order_id'), data.get('razorpay_signature')
+    
+    upi_id = data.get('upiId')
+    acc_name = data.get('bankAccountName')
+    acc_num = data.get('bankAccountNumber')
+    ifsc = data.get('bankIfsc')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        if RAZORPAY_KEY_ID != 'rzp_test_placeholder':
-            razorpay_client.utility.verify_payment_signature({'razorpay_order_id': rzp_ord_id, 'razorpay_payment_id': rzp_pay_id, 'razorpay_signature': rzp_sig})
-        conn = get_db_connection(); cursor = conn.cursor()
-        cursor.execute("UPDATE doctor_details SET payoutVerified = 1 WHERE userId = %s", (curr_id,))
-        conn.commit(); conn.close()
-        if RAZORPAY_KEY_ID != 'rzp_test_placeholder':
-            try: razorpay_client.payment.refund(rzp_pay_id, { "amount": 100 })
-            except Exception as re: app.logger.error(f"Refund failed for {rzp_pay_id}: {re}")
-        return signed_json_response({"message": "UPI Verified! ₹1 refund initiated."}, 200)
+        cursor.execute('''
+            UPDATE doctor_details 
+            SET upiId = %s, bankAccountName = %s, bankAccountNumber = %s, bankIfsc = %s, payoutVerified = FALSE
+            WHERE userId = %s
+        ''', (upi_id, acc_name, acc_num, ifsc, user_id))
+        conn.commit()
+        return signed_json_response({"message": "Payout details updated successfully"})
     except Exception as e:
-        return signed_json_response({"error": str(e)}, 400 if "Signature" in str(e) else 500)
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        conn.close()
+
+@app.route('/api/doctor/verify-upi', methods=['POST'])
+@jwt_required()
+def verify_doctor_upi():
+    """Verifies doctor UPI via ₹1 test payout."""
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    upi_id = data.get('upiId')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT fullName, email, mobile FROM users WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        return signed_json_response({"error": "User not found"}, 404)
+        
+    result = razorpay_service.verify_upi_test_transaction(user['fullName'], user['email'], user['mobile'], upi_id)
+    
+    if result['success']:
+        cursor.execute("UPDATE doctor_details SET upiId = %s, payoutVerified = 0 WHERE userId = %s", (upi_id, user_id))
+        conn.commit()
+        conn.close()
+        return signed_json_response({"message": "Verification payout initiated!", "payout_id": result['payout_id']})
+    else:
+        conn.close()
+        return signed_json_response({"error": result['error']}, 400)
+
+@app.route('/api/payments/payout-status/<payout_id>', methods=['GET'])
+@jwt_required()
+def get_payout_status_route(payout_id):
+    """Checks the status of a payout from Razorpay and updates DB."""
+    auth = (razorpay_service.key_id, razorpay_service.key_secret)
+    url = f"https://api.razorpay.com/v1/payouts/{payout_id}"
+    response = requests.get(url, auth=auth)
+    
+    if response.status_code == 200:
+        data = response.json()
+        status = data["status"]
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE appointments SET payoutStatus = %s WHERE payoutId = %s", (status, payout_id))
+        cursor.execute("UPDATE payout_logs SET status = %s WHERE payoutId = %s", (status, payout_id))
+        conn.commit()
+        conn.close()
+        return signed_json_response(data)
+    else:
+        return signed_json_response({"error": "Failed to fetch payout status"}, response.status_code)
 
 # --- Emergency Endpoints ---
 
