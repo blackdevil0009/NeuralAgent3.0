@@ -1,4 +1,5 @@
 from gevent import monkey
+import gevent
 monkey.patch_all()
 import os
 from dotenv import load_dotenv
@@ -35,6 +36,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization", "X-HMAC-Signature", "X-Timestamp"]}})
+app.config['BCRYPT_LOG_ROUNDS'] = 8  # Fast enough for API, still secure
 bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
@@ -385,15 +387,13 @@ def register():
             if not re.match(r'^[A-Z]{1,3}[-]?\d{5,10}$', reg_number.upper()):
                 return signed_json_response({"message": "Invalid Medical Registration Number format. Expected format: STATE-XXXXXX (e.g. MH-123456 or DL12345)."}, 400)
 
-        # ── Password hashing: run in background thread to avoid blocking Gevent ──
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ex:
-            hashed_password = _ex.submit(
-                lambda: bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
-            ).result()
+        # ── Password hashing in native thread (non-blocking for Gevent) ──
+        _tp = gevent.get_hub().threadpool
+        hashed_password = _tp.spawn(
+            bcrypt.generate_password_hash, data.get('password')
+        ).get().decode('utf-8')
 
         # RSA keys are generated in the background after registration to avoid blocking
-        # They are populated by a background thread below
         public_pem = ''
         private_key_encrypted = ''
 
@@ -546,10 +546,9 @@ def login():
             app.logger.info(f"AUTH: Login failed - User not found: {email}")
             return signed_json_response({"message": "Invalid email or password."}, 401)
         
-        # bcrypt check is CPU-intensive — run in thread to avoid Gevent blocking
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ex:
-            pw_match = _ex.submit(bcrypt.check_password_hash, user['password'], password).result()
+        # bcrypt check in native thread — cooperative with Gevent, no event loop block
+        _tp = gevent.get_hub().threadpool
+        pw_match = _tp.spawn(bcrypt.check_password_hash, user['password'], password).get()
         if not pw_match:
             app.logger.info(f"AUTH: Login failed - Invalid password: {email}")
             return signed_json_response({"message": "Invalid email or password."}, 401)
