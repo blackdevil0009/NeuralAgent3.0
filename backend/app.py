@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
 import os
 from dotenv import load_dotenv
 load_dotenv()  # Load .env before any other config reads
@@ -36,7 +36,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization", "X-HMAC-Signature", "X-Timestamp"]}})
 bcrypt = Bcrypt(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # Configuration
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'neural-agent-secret-2026')
@@ -2192,7 +2192,7 @@ def check_upcoming_appointments():
                     conn.close()
         except Exception as e:
             print(f"Reminder Task Error: {e}")
-        eventlet.sleep(60)
+        socketio.sleep(60)
 
 if __name__ == '__main__':
     init_db()
