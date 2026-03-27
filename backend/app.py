@@ -1484,17 +1484,29 @@ def create_payment_order():
         amount = (doc['consultantFee'] if doc else 500) * 100
         
     try:
-        app.logger.info(f"Creating Razorpay order for doctor {doctor_id}, amount: {amount}")
+        app.logger.info(f"PAYMENT_DEBUG: Starting order creation for doctor {doctor_id}, amount: {amount}")
+        print(f"DEBUG: Calling razorpay_service.create_order with amount {amount}")
+        
+        # Check if keys are set
+        if "placeholder" in razorpay_service.key_id:
+            app.logger.warning("PAYMENT_DEBUG: Razorpay Key ID is still a placeholder!")
+
         order = razorpay_service.create_order(amount, f"receipt_{int(time.time())}")
-        return signed_json_response({
+        app.logger.info(f"PAYMENT_DEBUG: Razorpay order created: {order.get('id')}")
+        
+        response_data = {
             "order_id": order["id"],
             "amount": amount,
             "currency": "INR",
             "key_id": razorpay_service.key_id
-        })
+        }
+        print(f"DEBUG: Returning response data: {response_data}")
+        return signed_json_response(response_data)
     except Exception as e:
         error_msg = str(e)
-        app.logger.error(f"Razorpay Order Creation Failed: {error_msg}")
+        import traceback
+        app.logger.error(f"PAYMENT_DEBUG: Razorpay Order Creation Failed: {error_msg}")
+        app.logger.error(traceback.format_exc())
         return signed_json_response({
             "error": "Payment Gateway Error", 
             "details": error_msg

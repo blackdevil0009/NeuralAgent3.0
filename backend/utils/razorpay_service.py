@@ -15,13 +15,20 @@ class RazorpayService:
 
     def create_order(self, amount_in_paise: int, receipt: str) -> Dict[str, Any]:
         """Creates a Razorpay Payment Order."""
+        print(f"RAZORPAY_SERVICE: Creating order for {amount_in_paise} paise...")
         data = {
             "amount": amount_in_paise,
             "currency": "INR",
             "receipt": receipt,
             "payment_capture": 1
         }
-        return self.client.order.create(data=data)
+        try:
+            order = self.client.order.create(data=data)
+            print(f"RAZORPAY_SERVICE: Order created successfully: {order.get('id')}")
+            return order
+        except Exception as e:
+            print(f"RAZORPAY_SERVICE: Error in create_order: {e}")
+            raise e
 
     def verify_webhook_signature(self, payload: str, signature: str) -> bool:
         """Verifies the webhook signature."""
@@ -41,9 +48,12 @@ class RazorpayService:
             "type": "vendor",
             "reference_id": f"doc_{int(time.time())}"
         }
-        response = requests.post(url, json=data, auth=(self.key_id, self.key_secret))
+        print(f"RAZORPAY_SERVICE: Creating contact for {name}...")
+        response = requests.post(url, json=data, auth=(self.key_id, self.key_secret), timeout=10)
         response.raise_for_status()
-        return response.json()["id"]
+        res_json = response.json()
+        print(f"RAZORPAY_SERVICE: Contact created: {res_json.get('id')}")
+        return res_json["id"]
 
     def create_fund_account_upi(self, contact_id: str, upi_id: str) -> str:
         """Creates a UPI Fund Account."""
@@ -53,9 +63,12 @@ class RazorpayService:
             "account_type": "vpa",
             "vpa": {"address": upi_id}
         }
-        response = requests.post(url, json=data, auth=(self.key_id, self.key_secret))
+        print(f"RAZORPAY_SERVICE: Creating fund account for {contact_id}...")
+        response = requests.post(url, json=data, auth=(self.key_id, self.key_secret), timeout=10)
         response.raise_for_status()
-        return response.json()["id"]
+        res_json = response.json()
+        print(f"RAZORPAY_SERVICE: Fund account created: {res_json.get('id')}")
+        return res_json["id"]
 
     def execute_payout(self, fund_account_id: str, amount_paise: int, mode: str = "UPI", purpose: str = "payout") -> Dict[str, Any]:
         """Executes a payout to a doctor."""
@@ -73,9 +86,12 @@ class RazorpayService:
             "queue_if_low_balance": True,
             "reference_id": f"pay_{int(time.time())}"
         }
-        response = requests.post(url, json=data, auth=(self.key_id, self.key_secret))
+        print(f"RAZORPAY_SERVICE: Executing payout for {fund_account_id}...")
+        response = requests.post(url, json=data, auth=(self.key_id, self.key_secret), timeout=10)
         response.raise_for_status()
-        return response.json()
+        res_json = response.json()
+        print(f"RAZORPAY_SERVICE: Payout executed: {res_json.get('id')}")
+        return res_json
 
     def verify_upi_test_transaction(self, contact_name: str, email: str, phone: str, upi_id: str) -> Dict[str, Any]:
         """Automated UPI verification via ₹1 test transaction."""
