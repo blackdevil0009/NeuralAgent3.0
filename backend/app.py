@@ -2194,8 +2194,12 @@ def check_upcoming_appointments():
             print(f"Reminder Task Error: {e}")
         socketio.sleep(60)
 
-if __name__ == '__main__':
-    init_db()
-    # Start background reminder service
+# Start background reminder service
+def start_background_tasks():
     socketio.start_background_task(check_upcoming_appointments)
+
+with app.app_context():
+    start_background_tasks()
+
+if __name__ == '__main__':
     socketio.run(app, port=5000, debug=True, host='0.0.0.0')
