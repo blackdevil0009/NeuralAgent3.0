@@ -55,7 +55,7 @@ export default function PatientLayout() {
             if (res.ok) {
                 const responseData = json.data || {};
                 const notifs = responseData.notifications || [];
-                const unreadMsgs = notifs.filter(n => !n.read && n.sourceType === 'Message').length;
+                const unreadMsgs = notifs.filter(n => !n.isRead && n.sourceType === 'Message').length;
                 setCounts({ messages: unreadMsgs });
             }
         } catch (err) {
@@ -76,17 +76,7 @@ export default function PatientLayout() {
             const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
             if (stored.name) setUser({ name: stored.name, avatar: '🧘' });
             
-            if (stored.id) {
-                const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
-                socketRef.current = socket;
-                socket.emit('join_user_room', { userId: stored.id });
-                socket.on('emergency_call_incoming', (data) => {
-                    setIncomingCall({ ...data, isEmergency: true });
-                });
-                socket.on('appointment_call_incoming', (data) => {
-                    setIncomingCall({ ...data, isEmergency: false });
-                });
-            }
+            // NOTE: WebSocket connection logic removed as backend migrated to purely REST.
         } catch (e) { }
 
         fetchCounts();

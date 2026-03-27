@@ -46,15 +46,11 @@ export default function DoctorLayout() {
             if (stored.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (stored.name.split(' ')[0]) }));
         } catch { }
 
-        // Socket for real-time critical alerts
-        const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
-        socket.on('new_emergency', (data) => {
-            // Only show if not already on the emergency page
-            if (!window.location.pathname.includes('/doctor/emergency')) {
-                setGlobalAlert(data);
-            }
-        });
-        return () => socket.disconnect();
+        // NOTE: WebSocket connection logic removed as backend migrated to purely REST.
+        // const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
+        // socket.on('new_emergency', (data) => { ... });
+        // return () => socket.disconnect();
+        return () => {};
     }, [navigate]);
 
     const currentPath = location.pathname;

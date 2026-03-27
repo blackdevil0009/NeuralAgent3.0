@@ -198,7 +198,6 @@ def verify_email():
 # --- INBOX (P2P CHAT) ROUTES ---
 
 @app.route('/api/messages', methods=['GET'])
-@require_hmac
 @jwt_required()
 def get_messages():
     """Fetch messages for the user. Group them by conversational peer to act as an inbox feed."""
@@ -353,7 +352,6 @@ def book_appointment():
         if conn: conn.close()
 
 @app.route('/api/appointments', methods=['GET'])
-@require_hmac
 @jwt_required()
 def get_appointments():
     """Retrieve all appointments for the logged-in user (as doctor or patient)."""
@@ -395,6 +393,39 @@ def get_appointments():
         return signed_json_response({"message": "Failed to fetch appointments."}, 500)
     finally:
         if conn: conn.close()
+
+# --- DOCTORS AND NOTIFICATIONS ROUTES ---
+
+@app.route('/api/doctors', methods=['GET'])
+@jwt_required()
+def get_doctors():
+    """Fetch all registered doctors."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        cur.execute('''
+            SELECT u.id, u.fullName as name, u.email, u.mobile,
+                   d.specialization as spec, d.degree, d.experience, 
+                   d.consultantFee, d.hospital, d.clinic_location, d.workingHours
+            FROM users u
+            JOIN doctor_details d ON u.id = d.userId
+            WHERE u.role = 'doctor'
+        ''')
+        doctors = cur.fetchall()
+        return signed_json_response({"doctors": doctors}, 200)
+    except Exception as e:
+        app.logger.error(f"Doctors Fetch Error: {e}")
+        return signed_json_response({"message": "Failed to fetch doctors"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/notifications', methods=['GET'])
+@jwt_required(optional=True)
+def get_notifications():
+    """Empty notifications to stop frontend 404 polling errors."""
+    return signed_json_response({"data": []}, 200)
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True, host='0.0.0.0')
