@@ -385,11 +385,17 @@ def register():
             if not re.match(r'^[A-Z]{1,3}[-]?\d{5,10}$', reg_number.upper()):
                 return signed_json_response({"message": "Invalid Medical Registration Number format. Expected format: STATE-XXXXXX (e.g. MH-123456 or DL12345)."}, 400)
 
-        hashed_password = bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
+        # ── CPU-intensive crypto: run in native thread to avoid blocking Gevent ──
+        from gevent.threadpool import ThreadPool
+        _pool = ThreadPool(4)
 
-        # Generate RSA Keys for new user
-        private_pem, public_pem = generate_rsa_keypair()
-        private_key_encrypted = encrypt_data(private_pem)
+        hashed_password = _pool.spawn(
+            lambda: bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
+        ).get()
+
+        # Generate RSA Keys for new user (CPU-heavy — runs in thread)
+        private_pem, public_pem = _pool.spawn(generate_rsa_keypair).get()
+        private_key_encrypted = _pool.spawn(encrypt_data, private_pem).get()
 
         # Age Validation (Patient minimum 1 year)
         if role == 'patient':
