@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import { API_BASE_URL } from '../../utils/config';
+import { handleError, handleSuccess } from '../../utils/error_handlers';
 
 /* Password strength scorer */
 function scorePassword(pw) {
@@ -40,11 +42,27 @@ export default function ChangePassword() {
         if (Object.keys(errs).length) { setErrors(errs); return; }
         setErrors({});
         setLoading(true);
-        // Simulate API call
-        await new Promise(r => setTimeout(r, 1600));
-        setLoading(false);
-        setSuccess(true);
-        setForm({ old: '', newPw: '', confirm: '' });
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ currentPassword: form.old, newPassword: form.newPw })
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.data?.message || json.error || json.message || 'Failed to update password.');
+            handleSuccess('Password changed successfully!');
+            setSuccess(true);
+            setForm({ old: '', newPw: '', confirm: '' });
+        } catch (err) {
+            handleError(err);
+            setErrors({ old: err.message });
+        } finally {
+            setLoading(false);
+        }
     }, [form]);
 
     return (
@@ -74,6 +92,7 @@ export default function ChangePassword() {
                                     type={show.old ? 'text' : 'password'}
                                     className={`pd-input ${errors.old ? 'input-error' : ''}`}
                                     placeholder="Enter current password"
+                                    autoComplete="current-password"
                                     value={form.old}
                                     onChange={e => setForm(p => ({ ...p, old: e.target.value }))}
                                 />
@@ -92,6 +111,7 @@ export default function ChangePassword() {
                                     type={show.newPw ? 'text' : 'password'}
                                     className={`pd-input ${errors.newPw ? 'input-error' : ''}`}
                                     placeholder="Min. 8 chars, include a number & symbol"
+                                    autoComplete="new-password"
                                     value={form.newPw}
                                     onChange={e => setForm(p => ({ ...p, newPw: e.target.value }))}
                                 />
@@ -127,6 +147,7 @@ export default function ChangePassword() {
                                     type={show.confirm ? 'text' : 'password'}
                                     className={`pd-input ${errors.confirm ? 'input-error' : ''}`}
                                     placeholder="Re-enter new password"
+                                    autoComplete="new-password"
                                     value={form.confirm}
                                     onChange={e => setForm(p => ({ ...p, confirm: e.target.value }))}
                                 />

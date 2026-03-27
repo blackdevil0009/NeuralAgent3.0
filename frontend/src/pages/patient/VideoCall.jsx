@@ -162,9 +162,9 @@ export default function VideoCall() {
         const socket = io(API_BASE_URL, {
             transports: ['websocket', 'polling'],
             reconnection: true,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: 7,
             reconnectionDelay: 1000,
-            timeout: 10000
+            timeout: 15000
         });
         socketRef.current = socket;
 
@@ -215,7 +215,9 @@ export default function VideoCall() {
             // Join room and explicitly announce as patient
             socket.emit('join_video_room', { room: roomId, role: 'patient' });
             // Announce patient presence so doctor knows to send doctor_ready
-            socket.emit('patient_joined', { room: roomId });
+            setTimeout(() => {
+                socket.emit('patient_joined', { room: roomId });
+            }, 500); // Small delay ensures doctor has joined the room if they clicked at the same moment
         });
 
         // Doctor is ready → patient creates and sends offer

@@ -148,6 +148,7 @@ function PatientForm({ onSubmit, loading }) {
                         <input
                             id="p-email" type="email" name="email"
                             placeholder="example@email.com"
+                            autoComplete="email"
                             value={form.email} onChange={handleChange}
                             aria-invalid={!!errors.email}
                         />
@@ -260,6 +261,7 @@ function PatientForm({ onSubmit, loading }) {
                             <input
                                 id="p-password" type={showPass ? 'text' : 'password'}
                                 name="password" placeholder="Min. 8 characters"
+                                autoComplete="new-password"
                                 value={form.password} onChange={handleChange}
                                 aria-invalid={!!errors.password}
                                 style={{ paddingRight: '42px' }}
@@ -286,6 +288,7 @@ function PatientForm({ onSubmit, loading }) {
                             <input
                                 id="p-confirmPass" type={showConfirm ? 'text' : 'password'}
                                 name="confirmPass" placeholder="Re-enter password"
+                                autoComplete="new-password"
                                 value={form.confirmPass} onChange={handleChange}
                                 aria-invalid={!!errors.confirmPass}
                                 style={{ paddingRight: '42px' }}
@@ -491,6 +494,7 @@ function DoctorForm({ onSubmit, loading }) {
                         <input
                             id="d-email" type="email" name="email"
                             placeholder="doctor@hospital.com"
+                            autoComplete="email"
                             value={form.email} onChange={handleChange}
                             aria-invalid={!!errors.email}
                         />
@@ -678,6 +682,7 @@ function DoctorForm({ onSubmit, loading }) {
                             <input
                                 id="d-password" type={showPass ? 'text' : 'password'}
                                 name="password" placeholder="Min. 8 characters"
+                                autoComplete="new-password"
                                 value={form.password} onChange={handleChange}
                                 aria-invalid={!!errors.password}
                                 style={{ paddingRight: '42px' }}
@@ -705,6 +710,7 @@ function DoctorForm({ onSubmit, loading }) {
                             <input
                                 id="d-confirmPass" type={showConfirm ? 'text' : 'password'}
                                 name="confirmPass" placeholder="Re-enter password"
+                                autoComplete="new-password"
                                 value={form.confirmPass} onChange={handleChange}
                                 aria-invalid={!!errors.confirmPass}
                                 style={{ paddingRight: '42px' }}

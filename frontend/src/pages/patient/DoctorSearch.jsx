@@ -197,6 +197,7 @@ export default function DoctorSearch() {
                 modal: {
                     ondismiss: function() {
                         setSubmitting(false);
+                        handleError('Payment cancelled by user.');
                     }
                 }
             };

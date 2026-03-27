@@ -108,6 +108,7 @@ export default function Doctor2FA() {
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
                                 placeholder="Enter password"
+                                autoComplete="current-password"
                                 required
                                 autoFocus
                             />

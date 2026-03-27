@@ -379,14 +379,14 @@ export default function Login() {
 
                             <div className="form-group">
                                 <label>Email Address</label>
-                                <input type="email" value={email} onChange={handleEmailChange} placeholder="email@example.com" />
+                                <input type="email" id="login-email" autoComplete="email" value={email} onChange={handleEmailChange} placeholder="email@example.com" />
                                 {errors.email && <span className="field-error">{errors.email}</span>}
                             </div>
 
                             <div className="form-group">
                                 <label>Password</label>
                                 <div className="pw-wrapper">
-                                    <input type={showPass ? 'text' : 'password'} value={password} onChange={handlePassChange} placeholder="••••••••" />
+                                    <input type={showPass ? 'text' : 'password'} id="login-password" autoComplete="current-password" value={password} onChange={handlePassChange} placeholder="••••••••" />
                                     <button type="button" className="pw-eye-btn" onClick={() => setShowPass(!showPass)}>{showPass ? '🙈' : '👁️'}</button>
                                 </div>
                                 {errors.password && <span className="field-error">{errors.password}</span>}
@@ -417,7 +417,9 @@ export default function Login() {
                             <div className="form-group">
                                 <label>Verification Code</label>
                                 <input
-                                    type="password" maxLength="6" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                                    type="text" inputMode="numeric" pattern="[0-9]*" maxLength="6" value={otp}
+                                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                                    autoComplete="one-time-code"
                                     style={{ fontSize: '1.8rem', textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold' }}
                                     autoFocus
                                 />

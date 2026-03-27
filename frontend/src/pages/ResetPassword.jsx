@@ -89,7 +89,8 @@ export default function ResetPassword() {
                             <input
                                 id="new-password"
                                 type="password"
-                                placeholder="At least 6 characters"
+                                placeholder="At least 8 characters"
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
@@ -101,6 +102,7 @@ export default function ResetPassword() {
                                 id="confirm-password"
                                 type="password"
                                 placeholder="Retype password"
+                                autoComplete="new-password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                             />
