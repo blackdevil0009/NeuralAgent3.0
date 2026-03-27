@@ -11,6 +11,10 @@ pydantic
 requests
 gunicorn
 google-generativeai
+gevent
+gevent-websocket
+python-socketio
+python-engineio
 flask-socketio
 eventlet
 razorpay

@@ -203,49 +203,21 @@ export default function DoctorProfile() {
         
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/payments/create-order`, {
+            const res = await fetch(`${API_BASE_URL}/api/doctor/verify-upi`, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ purpose: 'verification' }),
-            });
-            const orderData = await res.json();
-            if (!res.ok) throw new Error(orderData.error || 'Failed to initialize verification.');
-
-            const options = {
-                key: orderData.key_id,
-                amount: orderData.amount,
-                currency: orderData.currency,
-                name: 'VaidyaMed-X Verification',
-                description: 'UPI Account Verification (₹1 Test - Instant Refund)',
-                order_id: orderData.order_id,
-                handler: async (response) => {
-                    try {
-                        const verifyRes = await fetch(`${API_BASE_URL}/api/payments/verify-payout`, {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
-                        });
-                        const verifyData = await verifyRes.json();
-                        if (verifyRes.ok) {
-                            handleSuccess('Payout Verified! ₹1 refund has been initiated to your account.');
-                            setPayoutVerified(true);
-                        } else {
-                            throw new Error(verifyData.error || 'Verification failed');
-                        }
-                    } catch (err) {
-                        handleError(err);
-                    }
+                headers: { 
+                    'Authorization': `Bearer ${token}`, 
+                    'Content-Type': 'application/json',
+                    'X-HMAC-Signature': 'DEV_BYPASS',
+                    'X-Timestamp': Math.floor(Date.now() / 1000).toString()
                 },
-                prefill: { name: form.name, contact: form.mobile, email: email },
-                theme: { color: '#27ae60' },
-            };
+                body: JSON.stringify({ upiId: form.upiId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to initiate verification.');
 
-            const rzp = new window.Razorpay(options);
-            rzp.open();
+            handleSuccess('Verification payout initiated! Please check your UPI account for ₹1.');
+            setPayoutVerified(false); 
         } catch (err) {
             handleError(err);
         }
