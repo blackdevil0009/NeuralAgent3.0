@@ -13,11 +13,15 @@ DB_CONFIG = {
 
 def get_db_connection():
     try:
+        # Debug login attempt
+        # print(f"DEBUG: Attempting DB connect to {DB_CONFIG['host']} as {DB_CONFIG['user']}")
         conn = mysql.connector.connect(**DB_CONFIG)
         if conn.is_connected():
             return conn
     except Error as e:
-        logging.error(f"Error while connecting to MySQL on {DB_CONFIG['host']} with user {DB_CONFIG['user']}: {e}")
+        import traceback
+        logging.error(f"DATABASE_CONNECTION_ERROR: Failed to connect as {DB_CONFIG['user']}! Error: {e}")
+        # print(traceback.format_exc())
         return None
 
 def init_db():
