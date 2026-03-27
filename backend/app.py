@@ -497,5 +497,46 @@ def get_my_emergencies():
     finally:
         if conn: conn.close()
 
+@app.route('/api/emergencies', methods=['POST'])
+@jwt_required()
+def report_emergency():
+    """Create a new emergency case."""
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    
+    explanation = data.get('explanation')
+    case_type = data.get('caseType', 'critical')
+    contact = data.get('contact')
+    
+    if not explanation or not contact:
+        return signed_json_response({"error": "Explanation and contact are required."}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        # Get patient name
+        cur.execute("SELECT fullName FROM users WHERE id = %s", (user_id,))
+        u = cur.fetchone()
+        pt_name = u['fullName'] if u else "Unknown Patient"
+        
+        cur.execute('''
+            INSERT INTO emergencies (patientId, patientName, contact, caseType, description, status)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (user_id, pt_name, contact, case_type, explanation, 'Active'))
+        
+        emg_id = cur.lastrowid
+        conn.commit()
+        
+        return signed_json_response({"data": {"emergency": {"id": f"EM-{emg_id}"}}}, 201)
+    except Exception as e:
+        app.logger.error(f"Emergency Report Error: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"error": "Failed to report emergency"}, 500)
+    finally:
+        if conn: conn.close()
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True, host='0.0.0.0')
