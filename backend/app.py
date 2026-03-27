@@ -123,6 +123,8 @@ def create_notification(user_id, source_type, content):
 def get_notifications():
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute('''
@@ -146,6 +148,8 @@ def get_notifications():
 def mark_notification_read(notif_id):
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         # Security check: ensure user owns the notification
@@ -395,10 +399,13 @@ def register():
                 except ValueError:
                     return signed_json_response({"message": "Invalid date of birth format."}, 400)
 
-        # Generate Verification Token
+        # Generate Verification Token and OTP
         verification_token = secrets.token_urlsafe(32)
+        verification_otp = generate_otp()
 
         conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
         cursor = conn.cursor(dictionary=True)
 
         try:
@@ -490,6 +497,9 @@ def login():
     role = data.get('role')
 
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
+        
     cursor = conn.cursor(dictionary=True)
     cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
     user = cursor.fetchone()
@@ -548,6 +558,8 @@ def verify_email():
         return signed_json_response({"error": "Missing verification token"}, 400)
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT id FROM users WHERE verificationToken = %s", (token,))
@@ -583,6 +595,8 @@ def verify_registration_otp():
         return signed_json_response({"error": "Email and OTP required"}, 400)
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT id FROM users WHERE email = %s AND verificationOtp = %s", (email, otp))
@@ -610,6 +624,8 @@ def verify_2fa_otp():
         return signed_json_response({"error": "Email and OTP are required"}, 400)
 
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         app.logger.info(f"VERIFY_2FA: Checking OTP for {email}")
@@ -667,6 +683,8 @@ def toggle_2fa():
         return signed_json_response({"error": "Status and password are required"}, 400)
 
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT password FROM users WHERE id = %s", (user_id,))
@@ -694,6 +712,8 @@ def resend_verification():
         return signed_json_response({"error": "Email required"}, 400)
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT id, isVerified FROM users WHERE email = %s", (email,))
@@ -740,6 +760,8 @@ def send_message():
     encrypted_content = encrypt_data(content)
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor()
     
     try:
@@ -761,6 +783,8 @@ def get_messages(other_id):
     user_id = current_user_id
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     
     cursor.execute('''
@@ -803,6 +827,8 @@ def send_hybrid_message():
 
     # Check sender role
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT role FROM users WHERE id = %s", (current_user_id,))
     user = cursor.fetchone()
@@ -879,6 +905,8 @@ def initiate_vcall():
 def handle_profile():
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     
     if request.method == 'GET':
@@ -982,6 +1010,8 @@ def get_doctors():
     specialization = request.args.get('spec', '').strip()
 
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
 
     query = '''
@@ -1022,6 +1052,8 @@ def get_my_patients():
     """Returns only patients who have a Scheduled or Completed appointment with this doctor."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute('''
@@ -1050,6 +1082,8 @@ def check_appointment(doctor_id):
     """Returns whether the current patient has an active appointment with this doctor."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     cursor.execute('''
         SELECT id, type, appointmentDate, appointmentTime, status
@@ -1078,6 +1112,8 @@ def search_doctors():
         return signed_json_response({"doctors": []})
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         search_term = f"%{query}%"
@@ -1100,6 +1136,8 @@ def search_doctors():
 def get_patients():
     """Lists all registered patients."""
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     cursor.execute('''
         SELECT id, fullName, email 
@@ -1180,6 +1218,8 @@ def get_appointments():
     current_user_id = int(get_jwt_identity())
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     
     try:
@@ -1233,6 +1273,8 @@ def update_appointment(app_id):
         return signed_json_response({"error": "Status required"}, 400)
         
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     
     try:
@@ -1337,6 +1379,8 @@ def create_payment_order():
         if not doctor_id:
             return signed_json_response({"error": "Doctor ID required"}, 400)
         conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "Database connection failed"}, 500)
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT consultantFee FROM doctor_details WHERE userId = %s", (doctor_id,))
         doc = cursor.fetchone()
@@ -1377,6 +1421,8 @@ def verify_payment():
         appt_time = appt_time_raw
 
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         # Get fee and calculate split
@@ -1435,6 +1481,8 @@ def setup_doctor_payout():
     ifsc = data.get('bankIfsc')
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor()
     try:
         cursor.execute('''
@@ -1458,6 +1506,8 @@ def verify_doctor_upi():
     upi_id = data.get('upiId')
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT fullName, email, mobile FROM users WHERE id = %s", (user_id,))
     user = cursor.fetchone()
@@ -1490,6 +1540,8 @@ def get_payout_status_route(payout_id):
         status = data["status"]
         
         conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "Database connection failed"}, 500)
         cursor = conn.cursor()
         cursor.execute("UPDATE appointments SET payoutStatus = %s WHERE payoutId = %s", (status, payout_id))
         cursor.execute("UPDATE payout_logs SET status = %s WHERE payoutId = %s", (status, payout_id))
@@ -1508,6 +1560,8 @@ def create_emergency():
     data = request.get_json()
     
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT fullName FROM users WHERE id = %s", (current_user_id,))
@@ -1546,6 +1600,8 @@ def create_emergency():
 @jwt_required()
 def get_emergencies():
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT * FROM emergencies WHERE status = 'Active' ORDER BY createdAt DESC")
@@ -1577,6 +1633,8 @@ def get_my_emergencies():
     """Patient's own emergency history."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT * FROM emergencies WHERE patientId = %s ORDER BY createdAt DESC", (current_user_id,))
@@ -1603,6 +1661,8 @@ def notify_patient_emergency_call(em_id):
     """Doctor initiates a call – notifies patient via their socket room."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT e.patientId, u.fullName FROM emergencies e JOIN users u ON u.id = %s WHERE e.id = %s", (current_user_id, em_id))
@@ -1645,6 +1705,8 @@ def upload_report():
         file_size = f"{os.path.getsize(file_path) / 1024:.0f} KB"
         
         conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "Database connection failed"}, 500)
         cursor = conn.cursor()
         try:
             cursor.execute("""
@@ -1668,6 +1730,8 @@ def get_reports():
     """List all reports for the current user."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT * FROM patient_reports WHERE userId = %s ORDER BY createdAt DESC", (current_user_id,))
@@ -1693,6 +1757,8 @@ def get_dashboard_data():
     """Aggregated data for the Health Dashboard."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         # 1. Fetch Latest Vitals
@@ -1742,6 +1808,8 @@ def analyze_report_api(report_id):
     """Triggers AI analysis for a report and saves metrics."""
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT * FROM patient_reports WHERE id = %s AND userId = %s", (report_id, current_user_id))
@@ -1805,6 +1873,8 @@ def analyze_report_api(report_id):
 def handle_emergency(em_id):
     current_user_id = int(get_jwt_identity())
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor()
     try:
         cursor.execute("UPDATE emergencies SET status = 'Handled', handledById = %s WHERE id = %s AND status = 'Active'", (current_user_id, em_id))
@@ -2031,6 +2101,8 @@ def verify_otp():
 def get_patient_medical(patient_id):
     """Allows a doctor to read a patient's medical profile during emergencies."""
     conn = get_db_connection()
+    if not conn:
+        return signed_json_response({"error": "Database connection failed"}, 500)
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute('''
@@ -2194,12 +2266,15 @@ def check_upcoming_appointments():
             print(f"Reminder Task Error: {e}")
         socketio.sleep(60)
 
-# Start background reminder service
-def start_background_tasks():
-    socketio.start_background_task(check_upcoming_appointments)
+# Delayed start for background tasks to avoid blocking Gunicorn startup
+def start_background_tasks_delayed():
+    time.sleep(5)
+    with app.app_context():
+        socketio.start_background_task(check_upcoming_appointments)
 
-with app.app_context():
-    start_background_tasks()
+# Only start if not in testing
+if not os.environ.get('WERKZEUG_RUN_MAIN') == 'true': # Avoid starting twice in debug mode
+    threading.Thread(target=start_background_tasks_delayed, daemon=True).start()
 
 if __name__ == '__main__':
     socketio.run(app, port=5000, debug=True, host='0.0.0.0')

@@ -4,10 +4,10 @@ from mysql.connector import Error
 
 # MySQL Configuration
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'vaidyamedx',
-    'password': 'Devil@2007%',
-    'database': 'neuralagent_db'
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'user': os.environ.get('DB_USER', 'vaidyamedx'),
+    'password': os.environ.get('DB_PASSWORD', 'Devil@2007%'),
+    'database': os.environ.get('DB_NAME', 'neuralagent_db')
 }
 
 def get_db_connection():
