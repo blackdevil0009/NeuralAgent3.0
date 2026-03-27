@@ -515,36 +515,48 @@ def register():
 @app.route('/api/auth/login', methods=['POST'])
 @app.route('/api/login', methods=['POST'])
 def login():
+    import time
+    t0 = time.time()
     try:
         data     = request.get_json(silent=True) or {}
         email    = (data.get('email') or '').strip().lower()
         password = (data.get('password') or '')
         role     = (data.get('role') or '').strip()
 
-        app.logger.info(f"LOGIN: Attempt for {email}")
+        app.logger.info(f"AUTH TIMING: LOGIN attempt for {email}")
 
         if not email or not password or not role:
             return signed_json_response({"message": "Email, password and role are required."}, 400)
 
         conn = None
         try:
+            t_db_start = time.time()
             conn = get_db_connection()
+            t_db_end = time.time()
+            app.logger.info(f"AUTH TIMING: DB Connect took {t_db_end - t_db_start:.3f}s")
+            
             if not conn:
                 app.logger.error("LOGIN: DB connection failed")
                 return signed_json_response({"message": "Database unavailable. Try again later."}, 500)
 
             cur = conn.cursor(dictionary=True)
+            t_q_start = time.time()
             cur.execute('SELECT * FROM users WHERE email = %s', (email,))
             user = cur.fetchone()
+            t_q_end = time.time()
+            app.logger.info(f"AUTH TIMING: DB Query took {t_q_end - t_q_start:.3f}s")
 
             if not user:
                 app.logger.info(f"LOGIN: No account found for {email}")
                 return signed_json_response({"message": "Invalid email or password."}, 401)
 
-            # bcrypt check in Gevent-friendly thread (cooperative, non-blocking)
+            # bcrypt check in Gevent-friendly thread
+            t_b_start = time.time()
             pw_ok = gevent.get_hub().threadpool.spawn(
                 bcrypt.check_password_hash, user['password'], password
             ).get()
+            t_b_end = time.time()
+            app.logger.info(f"AUTH TIMING: Bcrypt check took {t_b_end - t_b_start:.3f}s")
 
             if not pw_ok:
                 app.logger.info(f"LOGIN: Wrong password for {email}")
@@ -562,12 +574,17 @@ def login():
 
             # 2FA check
             if user.get('twoFactorEnabled'):
+                t_2fa_start = time.time()
                 otp_code   = generate_otp()
                 otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=5)
                 cur.execute('UPDATE users SET otpCode=%s, otpExpiry=%s WHERE id=%s',
                             (otp_code, otp_expiry, user['id']))
                 conn.commit()
+                t_email_start = time.time()
                 send_otp_email(user['email'], otp_code)
+                t_email_end = time.time()
+                app.logger.info(f"AUTH TIMING: send_otp_email took {t_email_end - t_email_start:.3f}s")
+                app.logger.info(f"AUTH TIMING: Full 2FA block took {time.time() - t_2fa_start:.3f}s")
                 app.logger.info(f"LOGIN: 2FA required for {email}")
                 return signed_json_response({
                     "status": "2fa_required",
@@ -575,7 +592,12 @@ def login():
                     "email": user['email']
                 }, 200)
 
+            t_token_start = time.time()
             token = create_access_token(identity=str(user['id']))
+            t_token_end = time.time()
+            app.logger.info(f"AUTH TIMING: JWT Create took {t_token_end - t_token_start:.3f}s")
+
+            app.logger.info(f"AUTH TIMING: COMPLETE LOGIN took {time.time() - t0:.3f}s")
             app.logger.info(f"LOGIN: Success for {email}")
             return signed_json_response({
                 "token": token,
