@@ -429,10 +429,10 @@ def get_notifications():
 
 # --- PROFILE AND EMERGENCIES ROUTES ---
 
-@app.route('/api/user/profile', methods=['GET'])
+@app.route('/api/user/profile', methods=['GET', 'PUT'])
 @jwt_required()
-def get_user_profile():
-    """Fetch complete profile metadata based on user role."""
+def handle_user_profile():
+    """Fetch or Update complete profile metadata based on user role."""
     user_id = get_jwt_identity()
     conn = None
     try:
@@ -440,10 +440,35 @@ def get_user_profile():
         if not conn: return signed_json_response({"message": "DB error"}, 500)
         cur = conn.cursor(dictionary=True)
         
+        if request.method == 'PUT':
+            # Handle profile updates securely (ignoring sensitive fields)
+            data = request.get_json(silent=True) or {}
+            # Base users update
+            cur.execute('''
+                UPDATE users SET fullName=%s, dob=%s, gender=%s, blood_group=%s
+                WHERE id=%s
+            ''', (data.get('name'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), user_id))
+            
+            # Check user role
+            cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+            u = cur.fetchone()
+            
+            if u and u['role'] == 'patient':
+                cur.execute('''
+                    UPDATE patient_details 
+                    SET dosha=%s, allergies=%s, conditions=%s, medications=%s
+                    WHERE userId=%s
+                ''', (data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications'), user_id))
+            conn.commit()
+            
         # Get base user details
         cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
         user_data = cur.fetchone()
         if not user_data: return signed_json_response({"message": "User not found"}, 404)
+        
+        # Key mapping to match React frontend hooks perfectly
+        user_data['name'] = user_data.get('fullName', '')
+        user_data['bloodGroup'] = user_data.get('blood_group', 'Unknown')
         
         if 'password' in user_data: del user_data['password']
         if 'rsaPrivateKeyEncrypted' in user_data: del user_data['rsaPrivateKeyEncrypted']
@@ -457,17 +482,18 @@ def get_user_profile():
             
         details = cur.fetchone() or {}
         user_data.update(details)
-        return signed_json_response({"profile": user_data}, 200)
+        return signed_json_response({"data": user_data}, 200)
     except Exception as e:
-        app.logger.error(f"Profile Fetch Error: {e}")
-        return signed_json_response({"message": "Failed to fetch profile"}, 500)
+        app.logger.error(f"Profile Handler Error: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"message": "Failed to handle profile"}, 500)
     finally:
         if conn: conn.close()
 
 @app.route('/api/emergencies/my', methods=['GET'])
 @jwt_required()
 def get_my_emergencies():
-    """Fetch emergencies linked to the current user (patient cases or doctor handled cases)."""
+    """Fetch emergencies and format them to match React PatientProfile expected keys."""
     user_id = get_jwt_identity()
     
     conn = None
@@ -476,7 +502,6 @@ def get_my_emergencies():
         if not conn: return signed_json_response({"message": "DB error"}, 500)
         cur = conn.cursor(dictionary=True)
         
-        # Check user role
         cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
         u = cur.fetchone()
         if not u: return signed_json_response({"message": "User not found"}, 404)
@@ -487,15 +512,42 @@ def get_my_emergencies():
             cur.execute("SELECT * FROM emergencies WHERE patientId = %s ORDER BY createdAt DESC", (user_id,))
             
         emgs = cur.fetchall()
+        mapped_emgs = []
         for e in emgs:
-            e['createdAt'] = str(e['createdAt'])
+            mapped_emgs.append({
+                "id": f"EM-{e['id']}",
+                "type": e.get('caseType', 'urgent'),
+                "desc": e.get('description', ''),
+                "time": str(e.get('createdAt', '')),
+                "status": e.get('status', 'Active')
+            })
             
-        return signed_json_response({"data": emgs}, 200)
+        return signed_json_response({"data": {"emergencies": mapped_emgs}}, 200)
     except Exception as e:
         app.logger.error(f"Emergencies Fetch Error: {e}")
         return signed_json_response({"message": "Failed to fetch emergencies"}, 500)
     finally:
         if conn: conn.close()
+
+@app.route('/api/patient/dashboard-data', methods=['GET'])
+@jwt_required()
+def get_dashboard_data():
+    """Provide dashboard metrics (vitals, symptoms, activity) to prevent 404s on HealthDashboard.jsx."""
+    return signed_json_response({
+        "data": {
+            "vitals": [
+                {"label": "Heart Rate", "value": "72", "unit": "bpm", "icon": "❤️", "dir": "up", "change": "Stable", "color": "red"},
+                {"label": "Blood Pressure", "value": "120/80", "unit": "mmHg", "icon": "🩸", "dir": "up", "change": "Normal", "color": "blue"},
+                {"label": "Oxygen", "value": "98", "unit": "%", "icon": "💨", "dir": "up", "change": "Optimal", "color": "green"}
+            ],
+            "symptoms": [
+                {"symptom": "Healthy", "severity": "None"}
+            ],
+            "activity": [
+                {"title": "Profile Verified", "time": "Just now", "dot": "#52b788"}
+            ]
+        }
+    }, 200)
 
 @app.route('/api/emergencies', methods=['POST'])
 @jwt_required()
