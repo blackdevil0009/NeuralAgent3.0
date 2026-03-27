@@ -92,7 +92,7 @@ User=root
 WorkingDirectory=$BACKEND_DIR
 EnvironmentFile=$BACKEND_DIR/.env
 Environment=PATH=$BACKEND_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 1 --worker-class gevent --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
+ExecStart=$BACKEND_DIR/venv/bin/gunicorn --workers 2 --threads 4 --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
 Restart=always
 RestartSec=5
 StandardOutput=journal

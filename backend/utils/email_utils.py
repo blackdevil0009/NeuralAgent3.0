@@ -45,14 +45,10 @@ def _send_email_async_worker(to_email, subject, body):
 
 def _send_email_common(to_email, subject, body):
     """
-    Uses the Gevent native threadpool to send emails in the background.
-    This true native thread avoids freezing the Gevent loop during slow SMTP DNS resolution or SSL handshakes.
+    Uses standard threading to send emails in the background.
     """
-    if HAS_GEVENT:
-        gevent.get_hub().threadpool.spawn(_send_email_async_worker, to_email, subject, body)
-    else:
-        thread = threading.Thread(target=_send_email_async_worker, args=(to_email, subject, body), daemon=True)
-        thread.start()
+    thread = threading.Thread(target=_send_email_async_worker, args=(to_email, subject, body), daemon=True)
+    thread.start()
     return True
 
 def send_verification_email(to_email, verification_link, verification_otp):
