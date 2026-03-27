@@ -385,17 +385,17 @@ def register():
             if not re.match(r'^[A-Z]{1,3}[-]?\d{5,10}$', reg_number.upper()):
                 return signed_json_response({"message": "Invalid Medical Registration Number format. Expected format: STATE-XXXXXX (e.g. MH-123456 or DL12345)."}, 400)
 
-        # ── CPU-intensive crypto: run in native thread to avoid blocking Gevent ──
-        from gevent.threadpool import ThreadPool
-        _pool = ThreadPool(4)
+        # ── Password hashing: run in background thread to avoid blocking Gevent ──
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ex:
+            hashed_password = _ex.submit(
+                lambda: bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
+            ).result()
 
-        hashed_password = _pool.spawn(
-            lambda: bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
-        ).get()
-
-        # Generate RSA Keys for new user (CPU-heavy — runs in thread)
-        private_pem, public_pem = _pool.spawn(generate_rsa_keypair).get()
-        private_key_encrypted = _pool.spawn(encrypt_data, private_pem).get()
+        # RSA keys are generated in the background after registration to avoid blocking
+        # They are populated by a background thread below
+        public_pem = ''
+        private_key_encrypted = ''
 
         # Age Validation (Patient minimum 1 year)
         if role == 'patient':
@@ -483,6 +483,22 @@ def register():
             verification_link = f"{api_url}/api/auth/verify-email?token={verification_token}"
             send_verification_email(data.get('email'), verification_link, verification_otp)
 
+            # Generate RSA keys in background (non-blocking)
+            def _generate_rsa_for_user(uid):
+                try:
+                    priv_pem, pub_pem = generate_rsa_keypair()
+                    enc_priv = encrypt_data(priv_pem)
+                    rsa_conn = get_db_connection()
+                    if rsa_conn:
+                        rsa_cur = rsa_conn.cursor()
+                        rsa_cur.execute('UPDATE users SET rsaPublicKey=%s, rsaPrivateKeyEncrypted=%s WHERE id=%s',
+                                        (pub_pem, enc_priv, uid))
+                        rsa_conn.commit()
+                        rsa_conn.close()
+                except Exception as rsa_err:
+                    app.logger.error(f"AUTH: Background RSA gen failed for user {uid}: {rsa_err}")
+            threading.Thread(target=_generate_rsa_for_user, args=(user_id,), daemon=True).start()
+
             extra_msg = " Your credentials will be reviewed and verified shortly." if role == 'doctor' else ""
             app.logger.info(f"AUTH: Registration successful for {data.get('email')}")
             return signed_json_response({"message": f"{role.capitalize()} registered successfully! Please check your email to verify your account.{extra_msg}"}, 201)
@@ -530,7 +546,11 @@ def login():
             app.logger.info(f"AUTH: Login failed - User not found: {email}")
             return signed_json_response({"message": "Invalid email or password."}, 401)
         
-        if not bcrypt.check_password_hash(user['password'], password):
+        # bcrypt check is CPU-intensive — run in thread to avoid Gevent blocking
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ex:
+            pw_match = _ex.submit(bcrypt.check_password_hash, user['password'], password).result()
+        if not pw_match:
             app.logger.info(f"AUTH: Login failed - Invalid password: {email}")
             return signed_json_response({"message": "Invalid email or password."}, 401)
         
