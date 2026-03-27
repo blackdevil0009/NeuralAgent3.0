@@ -486,7 +486,8 @@ def register():
             conn.close()
 
     except Exception as e:
-        return signed_json_response({"message": str(e)}, 500)
+        app.logger.error(f"Registration error: {e}")
+        return signed_json_response({"message": f"Registration failed: {str(e)}"}, 500)
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -501,16 +502,21 @@ def login():
     if not conn:
         return signed_json_response({"message": "Database connection failed. Please try again later."}, 500)
         
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
-    user = cursor.fetchone()
-    conn.close()
-
-    if not user:
-        return signed_json_response({"message": "Invalid email or password."}, 401)
-    
-    if not bcrypt.check_password_hash(user['password'], password):
-        return signed_json_response({"message": "Invalid email or password."}, 401)
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return signed_json_response({"message": "Invalid email or password."}, 401)
+        
+        if not bcrypt.check_password_hash(user['password'], password):
+            return signed_json_response({"message": "Invalid email or password."}, 401)
+    except Exception as e:
+        app.logger.error(f"Login database error: {e}")
+        return signed_json_response({"message": "Internal server error during login."}, 500)
+    finally:
+        conn.close()
 
     if user['role'] != role:
         return signed_json_response({"message": f"Access denied. You are registered as a {user['role']}."}, 403)

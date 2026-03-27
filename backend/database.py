@@ -127,7 +127,8 @@ def init_db():
         "ALTER TABLE appointments ADD COLUMN commissionAmount INT DEFAULT 0 AFTER amountPaid",
         "ALTER TABLE appointments ADD COLUMN doctorPayoutAmount INT DEFAULT 0 AFTER commissionAmount",
         "ALTER TABLE appointments ADD COLUMN payoutStatus VARCHAR(50) DEFAULT 'pending' AFTER doctorPayoutAmount",
-        "ALTER TABLE appointments ADD COLUMN payoutId VARCHAR(255) AFTER payoutStatus"
+        "ALTER TABLE appointments ADD COLUMN payoutId VARCHAR(255) AFTER payoutStatus",
+        "ALTER TABLE appointments ADD COLUMN reminderSent BOOLEAN DEFAULT FALSE AFTER status"
     ]
     for task in migration_tasks:
         try:
