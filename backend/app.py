@@ -494,6 +494,10 @@ def register():
                 conn.close()
                 app.logger.info("AUTH: Database connection closed for registration")
 
+    except Exception as e:
+        app.logger.error(f"AUTH: Registration outer error: {e}")
+        return signed_json_response({"message": f"Registration failed: {str(e)}"}, 500)
+
 
 @app.route('/api/auth/login', methods=['POST'])
 @app.route('/api/login', methods=['POST'])  # backward compat

@@ -241,7 +241,7 @@ export default function Login() {
                     setVerificationMode('registry');
                     throw new Error('Please verify your account. We sent a code to your email.');
                 }
-                throw new Error(json.message || 'Login failed. Please check your credentials.');
+                throw new Error(json.data?.message || json.message || 'Login failed. Please check your credentials.');
             }
 
             const responseData = json.data || {};
