@@ -555,11 +555,9 @@ def login():
                 app.logger.info(f"LOGIN: No account found for {email}")
                 return signed_json_response({"message": "Invalid email or password."}, 401)
 
-            # bcrypt check in Gevent-friendly thread
+            # bcrypt check (synchronous; ~50ms block is safe and avoids Gevent Hub deadlocks)
             t_b_start = time.time()
-            pw_ok = gevent.get_hub().threadpool.spawn(
-                bcrypt.check_password_hash, user['password'], password
-            ).get()
+            pw_ok = bcrypt.check_password_hash(user['password'], password)
             t_b_end = time.time()
             app.logger.info(f"AUTH TIMING: Bcrypt check took {t_b_end - t_b_start:.3f}s")
 
