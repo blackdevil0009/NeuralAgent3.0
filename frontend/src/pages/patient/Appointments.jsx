@@ -90,7 +90,11 @@ export default function Appointments() {
         fetchDoctors();
     }, []);
 
-    const filtered = filter === 'All' ? appointments : appointments.filter(a => a.status === filter);
+    const filtered = appointments.filter(a => {
+        if (filter === 'All') return true;
+        if (filter === 'Upcoming') return a.status === 'Scheduled' || a.status === 'Upcoming';
+        return a.status === filter;
+    });
 
     const handleCancel = async (id) => {
         try {

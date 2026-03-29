@@ -50,28 +50,46 @@ export default function DoctorInbox() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
-        fetch(`${API_BASE_URL}/api/appointments?role=doctor`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-            .then(res => res.json())
-            .then(res => {
-                const appts = res.data?.appointments || [];
+        Promise.all([
+            fetch(`${API_BASE_URL}/api/appointments?role=doctor`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_BASE_URL}/api/messages`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ])
+            .then(([resAppts, resMsgs]) => Promise.all([resAppts.json(), resMsgs.json()]))
+            .then(([jsonAppts, jsonMsgs]) => {
+                const appts = jsonAppts.data?.appointments || [];
+                const msgs = jsonMsgs.data || [];
+                
                 const map = {};
+                
+                // Map appointed patients first
                 appts.forEach(a => {
                     if (!map[a.patientId] || new Date(a.appointmentDate) > new Date(map[a.patientId].appointmentDate)) {
-                        map[a.patientId] = a;
+                        map[a.patientId] = {
+                            id: a.patientId,
+                            name: a.patientName || 'Patient',
+                            avatar: '👨',
+                            lastMsg: `${a.type || 'Appointment'} — ${a.appointmentDate || ''}`,
+                            time: a.appointmentDate || 'Scheduled',
+                            online: a.status === 'Scheduled'
+                        };
                     }
                 });
                 
-                const convos = Object.values(map).map(p => ({
-                    id: p.patientId,
-                    name: p.patientName,
-                    avatar: '👨',
-                    lastMsg: `${p.type || 'Appointment'} — ${p.appointmentDate || ''}`,
-                    time: p.appointmentDate || 'Scheduled',
-                    online: p.status === 'Scheduled'
-                }));
+                // Overlay legacy chatted patients silently
+                msgs.forEach(m => {
+                    if (m.peerId && !map[m.peerId]) {
+                        map[m.peerId] = {
+                            id: m.peerId,
+                            name: m.peerName || 'Patient',
+                            avatar: '👨',
+                            lastMsg: 'Past Conversation',
+                            time: 'History',
+                            online: false
+                        };
+                    }
+                });
                 
+                const convos = Object.values(map);
                 setConversations(convos);
                 if (convos.length > 0) setSelectedConvo(convos[0]);
             });
