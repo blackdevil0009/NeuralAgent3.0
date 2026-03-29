@@ -12,7 +12,7 @@ import datetime
 import secrets
 import functools
 import traceback
-from utils.email_utils import send_verification_email
+from utils.email_utils import send_verification_email, send_reset_email
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization", "X-HMAC-Signature", "X-Timestamp"]}})
@@ -862,6 +862,90 @@ def get_message_history(other_id):
             })
             
         return signed_json_response({"messages": messages}, 200)
+    finally:
+        if conn: conn.close()
+
+# ==========================================================
+# FORGOT & RESET PASSWORD
+# ==========================================================
+
+@app.route('/api/forgot-password', methods=['POST', 'OPTIONS'])
+def forgot_password():
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    data = request.get_json()
+    email = data.get('email')
+    if not email:
+        return signed_json_response({"error": "Email is required"}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        if not user:
+            # Prevent email enumeration
+            return signed_json_response({"message": "If that email is registered, a reset link has been sent."}, 200)
+            
+        reset_token = secrets.token_urlsafe(32)
+        
+        # Ensure resetToken columns exist
+        try:
+            cur.execute("UPDATE users SET resetToken = %s, resetTokenExpiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = %s", (reset_token, user['id']))
+        except:
+            cur.execute("ALTER TABLE users ADD COLUMN resetToken VARCHAR(255) NULL")
+            cur.execute("ALTER TABLE users ADD COLUMN resetTokenExpiry DATETIME NULL")
+            cur.execute("UPDATE users SET resetToken = %s, resetTokenExpiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = %s", (reset_token, user['id']))
+            
+        conn.commit()
+        
+        reset_link = f"https://vaidyamedx.in/reset-password?token={reset_token}"
+        send_reset_email(email, reset_link, reset_token)
+        
+        return signed_json_response({"message": "If that email is registered, a reset link has been sent."}, 200)
+    except Exception as e:
+        app.logger.error(f"Forgot PW Error: {e}")
+        return signed_json_response({"error": "Server error"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/reset-password', methods=['POST', 'OPTIONS'])
+def reset_password():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('password')
+    
+    if not token or not new_password:
+        return signed_json_response({"error": "Token and new password are required"}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("SELECT id FROM users WHERE resetToken = %s AND resetTokenExpiry > NOW()", (token,))
+        user = cur.fetchone()
+        
+        if not user:
+            return signed_json_response({"error": "Invalid or expired reset token"}, 400)
+            
+        hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        
+        cur.execute("UPDATE users SET password = %s, resetToken = NULL, resetTokenExpiry = NULL WHERE id = %s", (hashed_password, user['id']))
+        conn.commit()
+        
+        return signed_json_response({"message": "Password has been successfully reset"}, 200)
+    except Exception as e:
+        app.logger.error(f"Reset PW Error: {e}")
+        return signed_json_response({"error": "Server error"}, 500)
     finally:
         if conn: conn.close()
 

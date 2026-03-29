@@ -1,8 +1,7 @@
 import requests
+import time
 
 url_reg = "https://api.vaidyamedx.in/api/auth/register"
-url_log = "https://api.vaidyamedx.in/api/auth/login"
-
 data = {
     "fullName": "Test User",
     "email": "testagent2026x@example.com",
@@ -17,19 +16,16 @@ data = {
     "role": "patient",
     "termsAgreed": True
 }
-
 headers = {
     "Content-Type": "application/json",
     "X-HMAC-Signature": "DEV_BYPASS",
     "X-Timestamp": "9999999999"
 }
 
-print("Registering...")
-r1 = requests.post(url_reg, json=data, headers=headers)
-print("Status:", r1.status_code)
-print("Response:", r1.text)
-
-print("\nLogging in...")
-r2 = requests.post(url_log, json={"email": "testagent2026x@example.com", "password": "Password@123", "role": "patient"}, headers=headers)
-print("Status:", r2.status_code)
-print("Response:", r2.text)
+try:
+    print("Sending POST...")
+    r = requests.post(url_reg, json=data, headers=headers, timeout=10)
+    print("Status:", r.status_code)
+    print("Response:", r.text)
+except Exception as e:
+    print("Error:", e)
