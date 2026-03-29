@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../../utils/config';
+import { generateRSAKeyPair, hybridEncrypt, hybridDecrypt } from '../../utils/crypto';
 
 // ── ICE Configuration with STUN + public TURN fallbacks ──────────────────────
 const ICE_SERVERS = {
@@ -73,6 +74,9 @@ export default function DoctorVideoCall() {
     const localVideoRef  = useRef(null);
     const remoteVideoRef = useRef(null);
     const remoteStreamRef = useRef(null);
+    const peerKeyRef = useRef(null);
+    const privKeyRef = useRef(null);
+    const pubKeyRef = useRef(null);
 
     // Attach stream safely when phase switches to live
     useEffect(() => {
@@ -133,6 +137,32 @@ export default function DoctorVideoCall() {
         let mounted = true;
         const init = async () => {
             try {
+                let priv = localStorage.getItem('rsaPrivateKey');
+                let pub = localStorage.getItem('rsaPublicKey');
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                
+                if (!priv || !pub) {
+                    const keys = await generateRSAKeyPair();
+                    priv = keys.privateKey; pub = keys.publicKey;
+                    localStorage.setItem('rsaPrivateKey', priv);
+                    localStorage.setItem('rsaPublicKey', pub);
+                    if (token) {
+                        fetch(`${API_BASE_URL}/api/v2/keys/upload`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ publicKey: pub })
+                        }).catch(e => {});
+                    }
+                }
+                privKeyRef.current = priv;
+                pubKeyRef.current = pub;
+
+                if (patientId && token) {
+                    fetch(`${API_BASE_URL}/api/v2/keys/${patientId}`, { headers: { 'Authorization': `Bearer ${token}` }})
+                        .then(r => r.json())
+                        .then(j => { if (j.publicKey) peerKeyRef.current = j.publicKey; })
+                        .catch(e => {});
+                }
+
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -256,7 +286,14 @@ export default function DoctorVideoCall() {
             socket.on('new_ice_candidate', async (candidate) => { await addCandidate(candidate); });
 
             socket.on('peer_left', () => { if (phase !== 'ended') endSession(); });
-            socket.on('call_chat_msg', (msg) => setMessages(p => [...p, msg]));
+            socket.on('call_chat_msg', (data) => {
+                if (data.securePayload && privKeyRef.current) {
+                    const dec = hybridDecrypt(data.securePayload, privKeyRef.current);
+                    if (dec) setMessages(p => [...p, JSON.parse(dec)]);
+                } else if (data.message) {
+                    setMessages(p => [...p, data.message]);
+                }
+            });
 
             setPhase('live');
         } catch (err) {
@@ -316,7 +353,13 @@ export default function DoctorVideoCall() {
         if (!chatInput.trim() || !socketRef.current) return;
         const msg = { text: chatInput, sender: 'Doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(p => [...p, { ...msg, self: true }]);
-        socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
+
+        if (peerKeyRef.current && pubKeyRef.current) {
+            const securePayload = hybridEncrypt(JSON.stringify({ ...msg, self: false }), peerKeyRef.current, pubKeyRef.current);
+            socketRef.current.emit('call_chat_msg', { room: roomId, securePayload });
+        } else {
+            socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
+        }
         setChatInput('');
     };
 

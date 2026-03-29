@@ -715,5 +715,155 @@ def report_emergency():
     finally:
         if conn: conn.close()
 
+# ==========================================================
+# SECURE P2P MESSAGING (E2E RSA+AES ENCRYPTED)
+# ==========================================================
+
+@app.route('/api/v2/keys/upload', methods=['POST'])
+@jwt_required()
+def upload_public_key():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    public_key = data.get('publicKey')
+    
+    if not public_key:
+        return signed_json_response({"error": "Missing publicKey"}, 400)
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor()
+        
+        try:
+            cur.execute("UPDATE users SET rsaPublicKey = %s WHERE id = %s", (public_key, user_id))
+        except:
+            # Dynamic migration if field is missing conceptually
+            cur.execute("ALTER TABLE users ADD COLUMN rsaPublicKey TEXT")
+            cur.execute("UPDATE users SET rsaPublicKey = %s WHERE id = %s", (public_key, user_id))
+            
+        conn.commit()
+        return signed_json_response({"message": "Public key updated successfully"}, 200)
+    except Exception as e:
+        if conn: conn.rollback()
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/v2/keys/<target_id>', methods=['GET'])
+@jwt_required()
+def get_public_key(target_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("SELECT rsaPublicKey FROM users WHERE id = %s", (target_id,))
+        row = cur.fetchone()
+        if row and row.get('rsaPublicKey') and row['rsaPublicKey'] != 'NO_RSA_YET':
+            return signed_json_response({"publicKey": row['rsaPublicKey']}, 200)
+            
+        return signed_json_response({"error": "User has no public key yet"}, 404)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/v2/messages/send', methods=['POST'])
+@jwt_required()
+def send_message():
+    sender_id = get_jwt_identity()
+    data = request.get_json()
+    receiver_id = data.get('receiverId')
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor()
+        
+        # Ensure E2E table exists
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS messages_e2e (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                senderId INT,
+                receiverId INT,
+                encryptedAesKeySender TEXT,
+                encryptedAesKeyReceiver TEXT,
+                iv TEXT,
+                ciphertext TEXT,
+                tag TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cur.execute('''
+            INSERT INTO messages_e2e (senderId, receiverId, encryptedAesKeySender, encryptedAesKeyReceiver, iv, ciphertext, tag)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            sender_id, receiver_id, 
+            data.get('encryptedAesKey_sender'), data.get('encryptedAesKey_receiver'), 
+            data.get('iv'), data.get('ciphertext'), data.get('tag')
+        ))
+        msg_id = cur.lastrowid
+        conn.commit()
+        return signed_json_response({"messageId": msg_id, "status": "sent"}, 200)
+    except Exception as e:
+        app.logger.error(f"E2E Send Error: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"error": "Send failed"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/v2/messages/history/<other_id>', methods=['GET'])
+@jwt_required()
+def get_message_history(other_id):
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS messages_e2e (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                senderId INT,
+                receiverId INT,
+                encryptedAesKeySender TEXT,
+                encryptedAesKeyReceiver TEXT,
+                iv TEXT,
+                ciphertext TEXT,
+                tag TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cur.execute('''
+            SELECT * FROM messages_e2e 
+            WHERE (senderId = %s AND receiverId = %s) OR (senderId = %s AND receiverId = %s)
+            ORDER BY timestamp ASC
+        ''', (user_id, other_id, other_id, user_id))
+        rows = cur.fetchall()
+        
+        messages = []
+        for r in rows:
+            # Identify which AES key belongs to the requester
+            my_key = r['encryptedAesKeySender'] if str(r['senderId']) == str(user_id) else r['encryptedAesKeyReceiver']
+            
+            messages.append({
+                "id": r['id'],
+                "senderId": r['senderId'],
+                "receiverId": r['receiverId'],
+                "timestamp": str(r['timestamp']),
+                "encryptedAesKey": my_key,
+                "iv": r['iv'],
+                "ciphertext": r['ciphertext'],
+                "tag": r['tag']
+            })
+            
+        return signed_json_response({"messages": messages}, 200)
+    finally:
+        if conn: conn.close()
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True, host='0.0.0.0')

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
+import { generateRSAKeyPair, hybridEncrypt, hybridDecrypt } from '../../utils/crypto';
 
 // Mock data removed
 const MOCK_REPORTS = [
@@ -18,6 +19,31 @@ export default function DoctorInbox() {
     const [inputText, setInputText] = useState('');
     const [activeReportOverlay, setActiveReportOverlay] = useState(null);
     const [inboxTab, setInboxTab] = useState('active'); // 'active' | 'history'
+
+    // Initialize E2E RSA Keys
+    useEffect(() => {
+        const initCrypto = async () => {
+            let priv = localStorage.getItem('rsaPrivateKey');
+            let pub = localStorage.getItem('rsaPublicKey');
+            if (!priv || !pub) {
+                try {
+                    const keys = await generateRSAKeyPair();
+                    localStorage.setItem('rsaPrivateKey', keys.privateKey);
+                    localStorage.setItem('rsaPublicKey', keys.publicKey);
+                    
+                    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                    if (token) {
+                        await fetch(`${API_BASE_URL}/api/v2/keys/upload`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ publicKey: keys.publicKey })
+                        });
+                    }
+                } catch(e) { console.error("Crypto init error", e); }
+            }
+        };
+        initCrypto();
+    }, []);
 
     /* Fetch only appointed patients */
     useEffect(() => {
@@ -55,11 +81,21 @@ export default function DoctorInbox() {
                 .then(res => res.json())
                 .then(res => {
                     if (res.data && res.data.messages) {
-                        const formattedMsgs = res.data.messages.map(m => ({
-                            sender: m.senderId === selectedConvo.id ? 'patient' : 'doctor',
-                            text: m.content,
-                            time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }));
+                        const privKey = localStorage.getItem('rsaPrivateKey');
+                        const formattedMsgs = res.data.messages.map(m => {
+                            let decryptedText = "[E2E Decryption Failed]";
+                            if (privKey && m.ciphertext) {
+                                const decrypted = hybridDecrypt(m, privKey);
+                                if (decrypted) decryptedText = decrypted;
+                            } else if (m.content) {
+                                decryptedText = m.content;
+                            }
+                            return {
+                                sender: m.senderId === selectedConvo.id ? 'patient' : 'doctor',
+                                text: decryptedText,
+                                time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            };
+                        });
                         setMessages(prev => ({ ...prev, [selectedConvo.id]: formattedMsgs }));
                     }
                 });
@@ -81,8 +117,34 @@ export default function DoctorInbox() {
         if (!inputText.trim()) return;
 
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!selectedConvo) return;
-        const msgData = { receiverId: selectedConvo.id, content: inputText };
+        const privKey = localStorage.getItem('rsaPrivateKey');
+        const pubKey = localStorage.getItem('rsaPublicKey');
+        
+        if (!selectedConvo || !privKey || !pubKey) {
+            console.error("Crypto keys not ready or no convo");
+            return;
+        }
+
+        let msgData;
+        try {
+            const keyRes = await fetch(`${API_BASE_URL}/api/v2/keys/${selectedConvo.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const keyJson = await keyRes.json();
+            if (!keyJson.publicKey) throw new Error("Patient has not initialized secure chat");
+            
+            const encryptedBundle = hybridEncrypt(inputText, keyJson.publicKey, pubKey);
+            if (!encryptedBundle) throw new Error("Encryption failed");
+
+            msgData = { 
+                receiverId: selectedConvo.id, 
+                ...encryptedBundle
+            };
+        } catch (e) {
+            console.error('E2E Encryption Error', e);
+            return;
+        }
+
         const timestamp = Math.floor(Date.now() / 1000).toString();
 
         // Optimistic UI Update
