@@ -436,6 +436,15 @@ def book_appointment():
     doctor_id = data.get('doctorId')
     appt_date = data.get('date')
     appt_time = data.get('time')
+    
+    if appt_time:
+        try:
+            # Mutate 12h AM/PM strings directly into strictly enforced MySQL 24h TIME schema natively.
+            dt_parsed = datetime.datetime.strptime(appt_time.strip(), "%I:%M %p")
+            appt_time = dt_parsed.strftime("%H:%M:00")
+        except ValueError:
+            pass # Keep natively if already in 24h format
+            
     appt_type = data.get('type', 'Video Call')
     amount_paid = data.get('amountPaid', 0)
     notes = data.get('notes', '')
