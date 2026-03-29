@@ -36,7 +36,7 @@ export default function DoctorLayout() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const role = localStorage.getItem('role') || sessionStorage.getItem('role');
         
-        if (!token || role !== 'doctor') {
+        if (!token || token === 'undefined' || role !== 'doctor') {
             navigate('/login');
             return;
         }

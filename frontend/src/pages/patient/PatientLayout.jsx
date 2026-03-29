@@ -67,7 +67,7 @@ export default function PatientLayout() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const role = localStorage.getItem('role') || sessionStorage.getItem('role');
         
-        if (!token || role !== 'patient') {
+        if (!token || token === 'undefined' || role !== 'patient') {
             navigate('/login');
             return;
         }
