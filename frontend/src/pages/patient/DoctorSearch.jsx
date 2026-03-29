@@ -87,19 +87,7 @@ export default function DoctorSearch() {
                (activeFilter === 'All' || spec.includes(filt));
     });
 
-    const loadRazorpayScript = () => {
-        return new Promise((resolve) => {
-            if (window.Razorpay) {
-                resolve(true);
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-            script.onload = () => resolve(true);
-            script.onerror = () => resolve(false);
-            document.body.appendChild(script);
-        });
-    };
+    // Removed Razorpay load script logic since appointments are temporarily free.
 
     const handleBookSubmit = async () => {
         if (!aptDate || !aptTime) { handleError('Please select date and time'); return; }
@@ -113,15 +101,8 @@ export default function DoctorSearch() {
 
         setSubmitting(true);
         try {
-            const hasScript = await loadRazorpayScript();
-            if (!hasScript) {
-                handleError('Failed to load payment gateway. Please check your connection.');
-                setSubmitting(false);
-                return;
-            }
-
-            // 1. Create Razorpay Order
-            const orderRes = await fetch(`${API_BASE_URL}/api/payments/create-order`, {
+            // BYPASS RAZORPAY AND DIRECTLY BOOK A FREE APPOINTMENT
+            const bookRes = await fetch(`${API_BASE_URL}/api/appointments/book`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json', 
@@ -129,87 +110,30 @@ export default function DoctorSearch() {
                     'X-HMAC-Signature': 'DEV_BYPASS',
                     'X-Timestamp': Math.floor(Date.now() / 1000).toString()
                 },
-                body: JSON.stringify({ doctorId: bookingDoc.id })
+                body: JSON.stringify({
+                    doctorId: bookingDoc.id,
+                    date: aptDate,
+                    time: formattedTime,
+                    type: aptType,
+                    amountPaid: 0,
+                    notes: aptNotes,
+                    razorpayPaymentId: 'FREE_APPT',
+                    razorpayOrderId: 'FREE_ORDER'
+                })
             });
-            const orderJson = await orderRes.json();
+            const bookJson = await bookRes.json();
             
-            if (!orderRes.ok) {
-                // The backend now returns { error: "...", details: "..." }
-                handleError(orderJson.details || orderJson.data?.error || orderJson.error || 'Failed to initialize payment order');
-                setSubmitting(false);
-                return;
+            if (bookRes.ok) {
+                setBooked(true);
+                const newAppt = { doctorId: bookingDoc.id, status: 'Scheduled', type: aptType, appointmentDate: aptDate, appointmentTime: formattedTime };
+                setAppointmentMap(prev => ({ ...prev, [String(bookingDoc.id)]: newAppt }));
+                handleSuccess(`Appointment booked securely with Dr. ${bookingDoc.name}.`);
+            } else {
+                handleError(bookJson.details || bookJson.data?.error || bookJson.error || bookJson.data?.message || 'Booking failed');
             }
-            
-            const { order_id, amount, key_id, currency } = orderJson.data;
-            
-            // 2. Open Razorpay Checkout
-            const options = {
-                key: key_id,
-                amount: amount,
-                currency: currency,
-                name: "VaidyaMed-X Consultation",
-                description: `Appointment with Dr. ${bookingDoc.name}`,
-                order_id: order_id,
-                handler: async function (response) {
-                    try {
-                        // 3. Verify Payment & Confirm Booking
-                        const verifyRes = await fetch(`${API_BASE_URL}/api/payments/verify`, {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json', 
-                                'Authorization': `Bearer ${getToken()}`,
-                                'X-HMAC-Signature': 'DEV_BYPASS',
-                                'X-Timestamp': Math.floor(Date.now() / 1000).toString()
-                            },
-                            body: JSON.stringify({
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_signature: response.razorpay_signature,
-                                doctorId: bookingDoc.id,
-                                date: aptDate,
-                                time: formattedTime,
-                                type: aptType,
-                                notes: aptNotes
-                            })
-                        });
-                        const verifyJson = await verifyRes.json();
-                        if (verifyRes.ok) {
-                            setBooked(true);
-                            // Update local appointment map so buttons unlock immediately
-                            const newAppt = { doctorId: bookingDoc.id, status: 'Scheduled', type: aptType, appointmentDate: aptDate, appointmentTime: formattedTime };
-                            setAppointmentMap(prev => ({ ...prev, [String(bookingDoc.id)]: newAppt }));
-                            handleSuccess(`Payment successful! Appointment booked with Dr. ${bookingDoc.name}.`);
-                        } else {
-                            handleError(verifyJson.details || verifyJson.data?.error || verifyJson.error || 'Payment verification failed');
-                        }
-                    } catch (err) {
-                        handleError(`Verification error: ${err.message}`);
-                    } finally {
-                        setSubmitting(false);
-                    }
-                },
-                prefill: {
-                    name: "Patient", 
-                    email: "patient@vaidyamedx.in",
-                    contact: "9999999999"
-                },
-                theme: { color: "#2d6a4f" },
-                modal: {
-                    ondismiss: function() {
-                        setSubmitting(false);
-                        handleError('Payment cancelled by user.');
-                    }
-                }
-            };
-            const rzp = new window.Razorpay(options);
-            rzp.on('payment.failed', function (response){
-                setSubmitting(false);
-                handleError(response.error.description || 'Payment failed.');
-            });
-            rzp.open();
-            
         } catch (err) {
-            handleError(`Order error: ${err.message || 'Connection failed'}`);
+            handleError(`Booking error: ${err.message || 'Connection failed'}`);
+        } finally {
             setSubmitting(false);
         }
     };
@@ -455,7 +379,7 @@ export default function DoctorSearch() {
                                     <button className="pd-btn pd-btn-primary"
                                         style={{ flex: 1, justifyContent: 'center' }}
                                         onClick={handleBookSubmit} disabled={submitting}>
-                                        {submitting ? '⏳ Processing Payment…' : `💳 Pay ₹${bookingDoc.fee || 500} & Book Slot`}
+                                        {submitting ? '⏳ Booking Appointment…' : `📅 Confirm & Book Free Slot`}
                                     </button>
                                     <button className="pd-btn pd-btn-outline" onClick={() => setBookingDoc(null)}>Cancel</button>
                                 </div>
