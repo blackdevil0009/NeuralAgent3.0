@@ -770,7 +770,7 @@ def get_public_key(target_id):
 
 @app.route('/api/v2/messages/send', methods=['POST'])
 @jwt_required()
-def send_message():
+def send_e2e_message():
     sender_id = get_jwt_identity()
     data = request.get_json()
     receiver_id = data.get('receiverId')
