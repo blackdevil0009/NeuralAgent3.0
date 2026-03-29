@@ -50,23 +50,30 @@ export default function DoctorInbox() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
-        fetch(`${API_BASE_URL}/api/doctors/my-patients`, {
+        fetch(`${API_BASE_URL}/api/appointments?role=doctor`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
             .then(res => {
-                if (res.data && res.data.patients) {
-                    const convos = res.data.patients.map(p => ({
-                        id: p.id,
-                        name: p.fullName,
-                        avatar: '👨',
-                        lastMsg: `${p.type || 'Appointment'} — ${p.appointmentDate || ''}`,
-                        time: p.appointmentDate || 'Scheduled',
-                        online: p.status === 'Scheduled'
-                    }));
-                    setConversations(convos);
-                    if (convos.length > 0) setSelectedConvo(convos[0]);
-                }
+                const appts = res.data?.appointments || [];
+                const map = {};
+                appts.forEach(a => {
+                    if (!map[a.patientId] || new Date(a.appointmentDate) > new Date(map[a.patientId].appointmentDate)) {
+                        map[a.patientId] = a;
+                    }
+                });
+                
+                const convos = Object.values(map).map(p => ({
+                    id: p.patientId,
+                    name: p.patientName,
+                    avatar: '👨',
+                    lastMsg: `${p.type || 'Appointment'} — ${p.appointmentDate || ''}`,
+                    time: p.appointmentDate || 'Scheduled',
+                    online: p.status === 'Scheduled'
+                }));
+                
+                setConversations(convos);
+                if (convos.length > 0) setSelectedConvo(convos[0]);
             });
     }, []);
 

@@ -845,7 +845,26 @@ def get_message_history(other_id):
         ''', (user_id, other_id, other_id, user_id))
         rows = cur.fetchall()
         
+        cur.execute('''
+            SELECT id, senderId, receiverId, timestamp, encryptedContext as content 
+            FROM messages 
+            WHERE (senderId = %s AND receiverId = %s) OR (senderId = %s AND receiverId = %s)
+            ORDER BY timestamp ASC
+        ''', (user_id, other_id, other_id, user_id))
+        legacy_rows = cur.fetchall()
+        
         messages = []
+        
+        # Inject old legacy messages into the E2E history feed
+        for r in legacy_rows:
+            messages.append({
+                "id": f"legacy_{r['id']}",
+                "senderId": r['senderId'],
+                "receiverId": r['receiverId'],
+                "timestamp": str(r['timestamp']),
+                "content": r['content']
+            })
+            
         for r in rows:
             # Identify which AES key belongs to the requester
             my_key = r['encryptedAesKeySender'] if str(r['senderId']) == str(user_id) else r['encryptedAesKeyReceiver']
@@ -860,6 +879,9 @@ def get_message_history(other_id):
                 "ciphertext": r['ciphertext'],
                 "tag": r['tag']
             })
+            
+        # Re-sort combined list natively to ensure sequential frontend display
+        messages.sort(key=lambda x: x['timestamp'])
             
         return signed_json_response({"messages": messages}, 200)
     finally:
