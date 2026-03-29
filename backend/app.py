@@ -165,19 +165,17 @@ def login():
             from utils.email_utils import _send_email_common
             _send_email_common(email, "VaidyaMed-X: 2FA Login Code", email_body)
             
-            return signed_json_response({"data": {"status": "2fa_required", "message": "OTP sent to your email."}}, 200)
+            return signed_json_response({"status": "2fa_required", "message": "OTP sent to your email."}, 200)
             
         token = create_access_token(identity=str(user['id']))
         return signed_json_response({
-            "data": {
-                "token": token,
-                "role": user['role'],
-                "user": {
-                    "id": user['id'],
-                    "name": user['fullName'],
-                    "email": user['email'],
-                    "mobile": user['mobile']
-                }
+            "token": token,
+            "role": user['role'],
+            "user": {
+                "id": user['id'],
+                "name": user['fullName'],
+                "email": user['email'],
+                "mobile": user['mobile']
             }
         }, 200)
         
@@ -279,12 +277,10 @@ def verify_2fa_otp():
         if 'otpExpiry' in user: user['otpExpiry'] = str(user['otpExpiry'])
         
         return signed_json_response({
-            "data": {
-                "message": "2FA Verified successfully",
-                "token": access_token,
-                "role": user['role'],
-                "user": user
-            }
+            "message": "2FA Verified successfully",
+            "token": access_token,
+            "role": user['role'],
+            "user": user
         }, 200)
     except Exception as e:
         app.logger.error(f"2FA Verify Error: {e}")
@@ -315,7 +311,7 @@ def verify_registration_otp():
         cur.execute("UPDATE users SET isVerified = 1, otpCode = NULL WHERE id = %s", (user['id'],))
         conn.commit()
         
-        return signed_json_response({"data": {"message": "Email Verified"}}, 200)
+        return signed_json_response({"message": "Email Verified"}, 200)
     except Exception as e:
         app.logger.error(f"Verify Reg OTP Error: {e}")
         return signed_json_response({"error": "Failed to verify email"}, 500)
@@ -552,7 +548,7 @@ def get_doctors():
 @jwt_required(optional=True)
 def get_notifications():
     """Empty notifications to stop frontend 404 polling errors."""
-    return signed_json_response({"data": []}, 200)
+    return signed_json_response([], 200)
 
 # --- PROFILE AND EMERGENCIES ROUTES ---
 
@@ -613,7 +609,7 @@ def handle_user_profile():
             
         details = cur.fetchone() or {}
         user_data.update(details)
-        return signed_json_response({"data": user_data}, 200)
+        return signed_json_response(user_data, 200)
     except Exception as e:
         app.logger.error(f"Profile Handler Error: {e}")
         if conn: conn.rollback()
@@ -653,7 +649,7 @@ def get_my_emergencies():
                 "status": e.get('status', 'Active')
             })
             
-        return signed_json_response({"data": {"emergencies": mapped_emgs}}, 200)
+        return signed_json_response({"emergencies": mapped_emgs}, 200)
     except Exception as e:
         app.logger.error(f"Emergencies Fetch Error: {e}")
         return signed_json_response({"message": "Failed to fetch emergencies"}, 500)
@@ -665,19 +661,17 @@ def get_my_emergencies():
 def get_dashboard_data():
     """Provide dashboard metrics (vitals, symptoms, activity) to prevent 404s on HealthDashboard.jsx."""
     return signed_json_response({
-        "data": {
-            "vitals": [
-                {"label": "Heart Rate", "value": "72", "unit": "bpm", "icon": "❤️", "dir": "up", "change": "Stable", "color": "red"},
-                {"label": "Blood Pressure", "value": "120/80", "unit": "mmHg", "icon": "🩸", "dir": "up", "change": "Normal", "color": "blue"},
-                {"label": "Oxygen", "value": "98", "unit": "%", "icon": "💨", "dir": "up", "change": "Optimal", "color": "green"}
-            ],
-            "symptoms": [
-                {"symptom": "Healthy", "severity": "None"}
-            ],
-            "activity": [
-                {"title": "Profile Verified", "time": "Just now", "dot": "#52b788"}
-            ]
-        }
+        "vitals": [
+            {"label": "Heart Rate", "value": "72", "unit": "bpm", "icon": "❤️", "dir": "up", "change": "Stable", "color": "red"},
+            {"label": "Blood Pressure", "value": "120/80", "unit": "mmHg", "icon": "🩸", "dir": "up", "change": "Normal", "color": "blue"},
+            {"label": "Oxygen", "value": "98", "unit": "%", "icon": "💨", "dir": "up", "change": "Optimal", "color": "green"}
+        ],
+        "symptoms": [
+            {"symptom": "Healthy", "severity": "None"}
+        ],
+        "activity": [
+            {"title": "Profile Verified", "time": "Just now", "dot": "#52b788"}
+        ]
     }, 200)
 
 @app.route('/api/emergencies', methods=['POST'])
@@ -713,7 +707,7 @@ def report_emergency():
         emg_id = cur.lastrowid
         conn.commit()
         
-        return signed_json_response({"data": {"emergency": {"id": f"EM-{emg_id}"}}}, 201)
+        return signed_json_response({"emergency": {"id": f"EM-{emg_id}"}}, 201)
     except Exception as e:
         app.logger.error(f"Emergency Report Error: {e}")
         if conn: conn.rollback()
