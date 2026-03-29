@@ -456,14 +456,29 @@ def book_appointment():
         if not conn: return signed_json_response({"message": "DB error"}, 500)
         cur = conn.cursor()
         
-        cur.execute('''
-            INSERT INTO appointments (
-                patientId, doctorId, appointmentDate, appointmentTime, type, 
-                amountPaid, commissionAmount, doctorPayoutAmount, 
-                paymentId, orderId, notes, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (user_id, doctor_id, appt_date, appt_time, appt_type, 
-              amount_paid, commission, payout, rzp_payment_id, rzp_order_id, notes, 'Scheduled'))
+        try:
+            cur.execute('''
+                INSERT INTO appointments (
+                    patientId, doctorId, appointmentDate, appointmentTime, type, 
+                    amountPaid, commissionAmount, doctorPayoutAmount, 
+                    paymentId, orderId, notes, status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (user_id, doctor_id, appt_date, appt_time, appt_type, 
+                  amount_paid, commission, payout, rzp_payment_id, rzp_order_id, notes, 'Scheduled'))
+        except Exception as insert_err:
+            if 'commissionAmount' in str(insert_err) or 'Unknown column' in str(insert_err):
+                cur.execute("ALTER TABLE appointments ADD COLUMN commissionAmount INT DEFAULT 0")
+                cur.execute("ALTER TABLE appointments ADD COLUMN doctorPayoutAmount INT DEFAULT 0")
+                cur.execute('''
+                    INSERT INTO appointments (
+                        patientId, doctorId, appointmentDate, appointmentTime, type, 
+                        amountPaid, commissionAmount, doctorPayoutAmount, 
+                        paymentId, orderId, notes, status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (user_id, doctor_id, appt_date, appt_time, appt_type, 
+                      amount_paid, commission, payout, rzp_payment_id, rzp_order_id, notes, 'Scheduled'))
+            else:
+                raise insert_err
         
         conn.commit()
         return signed_json_response({"message": "Appointment booked successfully!"}, 201)

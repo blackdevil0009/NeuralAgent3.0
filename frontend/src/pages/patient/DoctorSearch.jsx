@@ -124,10 +124,8 @@ export default function DoctorSearch() {
             const bookJson = await bookRes.json();
             
             if (bookRes.ok) {
-                setBooked(true);
-                const newAppt = { doctorId: bookingDoc.id, status: 'Scheduled', type: aptType, appointmentDate: aptDate, appointmentTime: formattedTime };
-                setAppointmentMap(prev => ({ ...prev, [String(bookingDoc.id)]: newAppt }));
-                handleSuccess(`Appointment booked securely with Dr. ${bookingDoc.name}.`);
+                handleSuccess(`Appointment booked securely. Please navigate to the Chat to talk with Dr. ${bookingDoc.name}`);
+                navigate('/patient/appointments');
             } else {
                 handleError(bookJson.details || bookJson.data?.error || bookJson.error || bookJson.data?.message || 'Booking failed');
             }

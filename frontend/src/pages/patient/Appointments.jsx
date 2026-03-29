@@ -274,18 +274,19 @@ export default function Appointments() {
                                 <span className={`pd-pill ${STATUS_PILL[a.status] || 'pd-pill-blue'}`}>{a.status}</span>
                                 {isUpcoming && (
                                     <>
-                                        {a.type === 'Video Call' ? (
-                                            <button className="pd-btn pd-btn-primary pd-btn-sm"
-                                                onClick={() => navigate(`/patient/vcall?doctor=${a.doctorId}&appt=${a.id}&instant=true`)}>
-                                                📹 Join Video Call
+                                        <button className="pd-btn pd-btn-primary pd-btn-sm"
+                                            onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>
+                                            💬 Open Chat
+                                        </button>
+                                        {a.type === 'Video Call' && (
+                                            <button className="pd-btn pd-btn-outline pd-btn-sm"
+                                                onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}
+                                                title="Please wait here. The doctor will initiate the video call.">
+                                                📹 Video Call (Wait in Chat)
                                             </button>
-                                        ) : a.type === 'Chat' || a.type === 'Chat Consultation' ? (
-                                            <button className="pd-btn pd-btn-primary pd-btn-sm"
-                                                onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>
-                                                💬 Join Chat
-                                            </button>
-                                        ) : (
-                                            <button className="pd-btn pd-btn-primary pd-btn-sm">📍 Directions</button>
+                                        )}
+                                        {a.type === 'Offline / In-Clinic' && (
+                                            <button className="pd-btn pd-btn-outline pd-btn-sm">📍 Directions</button>
                                         )}
                                         <button className="pd-btn pd-btn-danger pd-btn-sm"
                                             onClick={() => setCancelId(a.id)}>✕ Cancel</button>
