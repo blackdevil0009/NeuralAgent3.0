@@ -52,7 +52,7 @@ export default function PatientProfile() {
 
     useEffect(() => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) { navigate('/login'); return; }
+        if (!token || token === 'undefined') { navigate('/login'); return; }
 
         const fetchProfile = async () => {
             try {
