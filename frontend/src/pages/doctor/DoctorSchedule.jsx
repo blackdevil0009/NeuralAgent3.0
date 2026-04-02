@@ -50,22 +50,38 @@ export default function DoctorSchedule() {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ status: 'Confirmed' })
             });
-            if (res.ok) {
-                handleSuccess('Appointment confirmed.');
-                fetchAppointments(); // Refresh list
-            } else {
-                const json = await res.json();
-                handleError(json.data?.error || 'Failed to update status');
-            }
-        } catch (err) {
-            handleError(err, 'System error updating appointment');
-        }
+            if (res.ok) { handleSuccess('Appointment confirmed.'); fetchAppointments(); }
+            else { const j = await res.json(); handleError(j.data?.message || 'Failed to update status'); }
+        } catch (err) { handleError(err, 'System error updating appointment'); }
+    };
+
+    const handleMarkComplete = async (id) => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ status: 'Completed' })
+            });
+            if (res.ok) { handleSuccess('Appointment marked as completed.'); fetchAppointments(); }
+            else { const j = await res.json(); handleError(j.data?.message || 'Failed to mark complete'); }
+        } catch (err) { handleError(err, 'Error marking complete'); }
+    };
+
+    const handleMarkNoShow = async (id) => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ status: 'No-Show' })
+            });
+            if (res.ok) { handleSuccess('Appointment marked as No-Show.'); fetchAppointments(); }
+            else { const j = await res.json(); handleError(j.data?.message || 'Failed to mark no-show'); }
+        } catch (err) { handleError(err, 'Error marking no-show'); }
     };
 
     const renderToday = () => {
@@ -116,9 +132,15 @@ export default function DoctorSchedule() {
                                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: colors.text, opacity: 0.8 }}>{appt.status}</span>
                                 </div>
                             </div>
-                            <div style={{ marginTop: 'auto', display: 'flex', gap: 12 }}>
+                            <div style={{ marginTop: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                 {appt.status === 'Scheduled' && (
                                     <button onClick={() => handleConfirm(appt.id)} style={{ background: colors.text, border: 'none', color: '#fff', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', padding: '4px 10px', borderRadius: 4 }}>Confirm</button>
+                                )}
+                                {(appt.status === 'Scheduled' || appt.status === 'Confirmed') && (
+                                    <button onClick={() => handleMarkComplete(appt.id)} style={{ background: '#15803d', border: 'none', color: '#fff', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', padding: '4px 10px', borderRadius: 4 }}>✅ Complete</button>
+                                )}
+                                {(appt.status === 'Scheduled' || appt.status === 'Confirmed') && (
+                                    <button onClick={() => handleMarkNoShow(appt.id)} style={{ background: '#b45309', border: 'none', color: '#fff', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', padding: '4px 10px', borderRadius: 4 }}>😐 No-Show</button>
                                 )}
                                 <button onClick={() => navigate(`/doctor/vcall?patient=${appt.patientId}&name=${encodeURIComponent(appt.patientName)}&appt=${appt.id}`)} style={{ background: 'none', border: 'none', color: colors.text, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}>📹 Join Call</button>
                                 <button onClick={() => setActiveIntervention({ type: 'file', patient: appt.patientName })} style={{ background: 'none', border: 'none', color: colors.text, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Patient File</button>

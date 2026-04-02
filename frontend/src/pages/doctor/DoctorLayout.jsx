@@ -8,7 +8,6 @@ const NAV = [
     { id: 'dashboard', label: 'Patient Management', icon: '📋', path: '/doctor/dashboard' },
     { id: 'schedule', label: 'My Schedule', icon: '📅', path: '/doctor/schedule' },
     { id: 'inbox', label: 'Message Center', icon: '💬', path: '/doctor/inbox', badge: 2 },
-    { id: 'ai', label: 'AI Clinical Assistant', icon: '🤖', path: '/doctor/ai' },
     { id: 'emergency', label: 'Emergency Center', icon: '🚨', path: '/doctor/emergency', badge: 'Active' },
     { id: 'profile', label: 'Professional Profile', icon: '👨‍⚕️', path: '/doctor/profile' },
 ];

@@ -6,8 +6,10 @@ import { API_BASE_URL } from '../../utils/config';
 const STATUS_PILL = {
     Upcoming: 'pd-pill-blue',
     Scheduled: 'pd-pill-blue',
+    Confirmed: 'pd-pill-green',
     Completed: 'pd-pill-green',
     Cancelled: 'pd-pill-red',
+    'No-Show': 'pd-pill-red',
 };
 
 const STAR_LABELS = ['Terrible', 'Poor', 'Okay', 'Good', 'Excellent'];
