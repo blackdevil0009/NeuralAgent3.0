@@ -32,7 +32,6 @@ import DoctorLayout from './pages/doctor/DoctorLayout';
 import PatientManagement from './pages/doctor/PatientManagement';
 import DoctorSchedule from './pages/doctor/DoctorSchedule';
 import DoctorInbox from './pages/doctor/DoctorInbox';
-import DoctorAIAssistant from './pages/doctor/DoctorAIAssistant';
 import DoctorSecuritySettings from './pages/doctor/DoctorSecuritySettings';
 import EmergencyDashboard from './pages/doctor/EmergencyDashboard';
 import DoctorVideoCall from './pages/doctor/DoctorVideoCall';
@@ -85,7 +84,6 @@ function App() {
             <Route path="dashboard" element={<PatientManagement />} />
             <Route path="schedule" element={<DoctorSchedule />} />
             <Route path="inbox" element={<DoctorInbox />} />
-            <Route path="ai" element={<DoctorAIAssistant />} />
             <Route path="profile" element={<DoctorProfile />} />
             <Route path="vcall" element={<DoctorVideoCall />} />
             <Route path="settings/security" element={<DoctorSecuritySettings />} />

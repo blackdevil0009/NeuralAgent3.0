@@ -20,7 +20,6 @@ const PAGE_TITLES = {
     dashboard: 'Patient Management Dashboard',
     schedule: 'Daily Consultation Schedule',
     inbox: 'Clinical Message Center',
-    ai: 'AI Health Analyzer',
     profile: 'Medical Professional Profile',
     security: 'Security Settings',
 };
