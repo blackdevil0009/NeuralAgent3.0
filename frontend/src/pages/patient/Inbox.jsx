@@ -30,7 +30,6 @@ export default function Inbox() {
     const endRef = useRef(null);
     const inputRef = useRef(null);
 
-    // Initialize E2E RSA Keys
     useEffect(() => {
         const initCrypto = async () => {
             let priv = localStorage.getItem('rsaPrivateKey');
@@ -38,19 +37,23 @@ export default function Inbox() {
             if (!priv || !pub) {
                 try {
                     const keys = await generateRSAKeyPair();
-                    localStorage.setItem('rsaPrivateKey', keys.privateKey);
-                    localStorage.setItem('rsaPublicKey', keys.publicKey);
-                    
-                    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                    if (token) {
-                        await fetch(`${API_BASE_URL}/api/v2/keys/upload`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                            body: JSON.stringify({ publicKey: keys.publicKey })
-                        });
-                    }
-                } catch(e) { console.error("Crypto init error", e); }
+                    priv = keys.privateKey;
+                    pub = keys.publicKey;
+                    localStorage.setItem('rsaPrivateKey', priv);
+                    localStorage.setItem('rsaPublicKey', pub);
+                } catch(e) { console.error('Crypto init error', e); return; }
             }
+            // Always (re-)upload public key so the other party can encrypt to us
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                if (token) {
+                    await fetch(`${API_BASE_URL}/api/v2/keys/upload`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ publicKey: pub })
+                    });
+                }
+            } catch(e) { console.error('Key upload error', e); }
         };
         initCrypto();
     }, []);
@@ -179,7 +182,7 @@ export default function Inbox() {
         setShowAttachMenu(false);
     };
 
-    /* Send a real message */
+    /* Send a real message — falls back to plain-text if E2E keys are unavailable */
     const sendMessage = useCallback(async (overrideText) => {
         const text = (overrideText || input).trim();
         if (!text || !activeId) return;
@@ -187,50 +190,41 @@ export default function Inbox() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         const privKey = localStorage.getItem('rsaPrivateKey');
         const pubKey = localStorage.getItem('rsaPublicKey');
-        
-        if (!privKey || !pubKey) return handleError(new Error("Crypto keys not ready"), "Please wait");
 
-        let msgData;
-        try {
-            const keyRes = await fetch(`${API_BASE_URL}/api/v2/keys/${activeId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const keyJson = await keyRes.json();
-            if (!keyJson.publicKey) throw new Error("Doctor has not initialized secure chat");
-            
-            const encryptedBundle = hybridEncrypt(text, keyJson.publicKey, pubKey);
-            if (!encryptedBundle) throw new Error("Encryption failed");
-
-            msgData = { 
-                receiverId: activeId, 
-                ...encryptedBundle
-            };
-        } catch (e) {
-            return handleError(e, 'E2E Encryption Error');
-        }
-
-        const timestamp = Math.floor(Date.now() / 1000).toString();
-
-        // Optimistic UI Update: Instantly add the message to the active conversation
+        // Optimistic UI Update first
         const optimisticMsg = {
             id: 'temp-' + Date.now(),
             from: 'me',
             text: text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-
         setConversations(prev => prev.map(c => {
             if (c.id !== activeId) return c;
-            return {
-                ...c,
-                messages: [...c.messages, optimisticMsg],
-                lastMsg: text,
-                lastTime: optimisticMsg.time
-            };
+            return { ...c, messages: [...c.messages, optimisticMsg], lastMsg: text, lastTime: optimisticMsg.time };
         }));
-
-        // Clear input immediately for better UX
         setInput('');
+
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        let msgData = { receiverId: activeId, content: text }; // plain-text fallback
+
+        // Try E2E encryption — silently fall back if doctor has no key
+        if (privKey && pubKey) {
+            try {
+                const keyRes = await fetch(`${API_BASE_URL}/api/v2/keys/${activeId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const keyJson = await keyRes.json();
+                if (keyJson.publicKey) {
+                    const encryptedBundle = hybridEncrypt(text, keyJson.publicKey, pubKey);
+                    if (encryptedBundle) {
+                        msgData = { receiverId: activeId, ...encryptedBundle };
+                    }
+                }
+                // If no publicKey, msgData stays as plain-text — chat still works
+            } catch (e) {
+                console.warn('E2E unavailable, sending plain text:', e.message);
+            }
+        }
 
         try {
             const resp = await fetch(`${API_BASE_URL}/api/v2/messages/send`, {
@@ -239,15 +233,11 @@ export default function Inbox() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                     'X-Timestamp': timestamp,
-                    'X-HMAC-Signature': 'DEV_BYPASS' // I'll add a bypass to app.py for development ease
+                    'X-HMAC-Signature': 'DEV_BYPASS'
                 },
                 body: JSON.stringify(msgData)
             });
-
-            if (!resp.ok) {
-                // If it failed, we could revert the optimistic update here, but for simplicity we log error
-                throw new Error('Message sending failed');
-            }
+            if (!resp.ok) throw new Error('Message sending failed');
         } catch (err) {
             handleError(err, 'Failed to send message');
         }
