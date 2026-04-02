@@ -110,21 +110,11 @@ export default function DoctorInbox() {
                 .then(res => res.json())
                 .then(res => {
                     if (res.data && res.data.messages) {
-                        const privKey = localStorage.getItem('rsaPrivateKey');
-                        const formattedMsgs = res.data.messages.map(m => {
-                            let decryptedText = "[E2E Decryption Failed]";
-                            if (privKey && m.ciphertext) {
-                                const decrypted = hybridDecrypt(m, privKey);
-                                if (decrypted) decryptedText = decrypted;
-                            } else if (m.content) {
-                                decryptedText = m.content;
-                            }
-                            return {
-                                sender: m.senderId === selectedConvo.id ? 'patient' : 'doctor',
-                                text: decryptedText,
-                                time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            };
-                        });
+                        const formattedMsgs = res.data.messages.map(m => ({
+                            sender: String(m.senderId) === String(selectedConvo.id) ? 'patient' : 'doctor',
+                            text: m.content || '[Message]',
+                            time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }));
                         setMessages(prev => ({ ...prev, [selectedConvo.id]: formattedMsgs }));
                     }
                 });
@@ -146,11 +136,8 @@ export default function DoctorInbox() {
         if (!inputText.trim() || !selectedConvo) return;
 
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const privKey = localStorage.getItem('rsaPrivateKey');
-        const pubKey = localStorage.getItem('rsaPublicKey');
-        const timestamp = Math.floor(Date.now() / 1000).toString();
 
-        // Optimistic UI Update first
+        // Optimistic UI Update
         const optimisticMsg = {
             sender: 'doctor',
             id: 'temp-' + Date.now(),
@@ -164,34 +151,16 @@ export default function DoctorInbox() {
         const textToSend = inputText;
         setInputText('');
 
-        let msgData = { receiverId: selectedConvo.id, content: textToSend }; // plain-text fallback
-
-        // Try E2E — silently fall back if patient has no key
-        if (privKey && pubKey) {
-            try {
-                const keyRes = await fetch(`${API_BASE_URL}/api/v2/keys/${selectedConvo.id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const keyJson = await keyRes.json();
-                if (keyJson.publicKey) {
-                    const encryptedBundle = hybridEncrypt(textToSend, keyJson.publicKey, pubKey);
-                    if (encryptedBundle) msgData = { receiverId: selectedConvo.id, ...encryptedBundle };
-                }
-            } catch (e) {
-                console.warn('E2E unavailable, sending plain text:', e.message);
-            }
-        }
-
         try {
             await fetch(`${API_BASE_URL}/api/v2/messages/send`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
-                    'X-Timestamp': timestamp,
+                    'X-Timestamp': Math.floor(Date.now() / 1000).toString(),
                     'X-HMAC-Signature': 'DEV_BYPASS'
                 },
-                body: JSON.stringify(msgData)
+                body: JSON.stringify({ receiverId: selectedConvo.id, content: textToSend })
             });
         } catch (err) {
             console.error('Send error:', err);

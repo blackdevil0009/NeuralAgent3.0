@@ -113,22 +113,13 @@ export default function Inbox() {
                     if (res.data && res.data.messages) {
                         setConversations(prev => prev.map(c => {
                             if (c.id !== activeId) return c;
-                            const privKey = localStorage.getItem('rsaPrivateKey');
-                            const formattedMsgs = res.data.messages.map(m => {
-                                let decryptedText = "[E2E Decryption Failed]";
-                                if (privKey && m.ciphertext) {
-                                    const decrypted = hybridDecrypt(m, privKey);
-                                    if (decrypted) decryptedText = decrypted;
-                                } else if (m.content) {
-                                    decryptedText = m.content;
-                                }
-                                return {
-                                    id: m.id,
-                                    from: String(m.senderId) === String(activeId) ? 'them' : 'me',
-                                    text: decryptedText,
-                                    time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                };
-                            });
+                            const formattedMsgs = res.data.messages.map(m => ({
+                                id: m.id,
+                                from: String(m.senderId) === String(activeId) ? 'them' : 'me',
+                                // Always read content field — E2E ciphertext is incompatible with backend
+                                text: m.content || '[Message]',
+                                time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }));
                             return { ...c, messages: formattedMsgs };
                         }));
                     }
@@ -182,49 +173,24 @@ export default function Inbox() {
         setShowAttachMenu(false);
     };
 
-    /* Send a real message — falls back to plain-text if E2E keys are unavailable */
+    /* Send message — plain-text (E2E layer removed: field-name mismatch caused encryption failures) */
     const sendMessage = useCallback(async (overrideText) => {
         const text = (overrideText || input).trim();
         if (!text || !activeId) return;
 
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const privKey = localStorage.getItem('rsaPrivateKey');
-        const pubKey = localStorage.getItem('rsaPublicKey');
 
-        // Optimistic UI Update first
+        // Optimistic UI update first
         const optimisticMsg = {
             id: 'temp-' + Date.now(),
             from: 'me',
-            text: text,
+            text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        setConversations(prev => prev.map(c => {
-            if (c.id !== activeId) return c;
-            return { ...c, messages: [...c.messages, optimisticMsg], lastMsg: text, lastTime: optimisticMsg.time };
-        }));
+        setConversations(prev => prev.map(c =>
+            c.id !== activeId ? c : { ...c, messages: [...c.messages, optimisticMsg], lastMsg: text }
+        ));
         setInput('');
-
-        const timestamp = Math.floor(Date.now() / 1000).toString();
-        let msgData = { receiverId: activeId, content: text }; // plain-text fallback
-
-        // Try E2E encryption — silently fall back if doctor has no key
-        if (privKey && pubKey) {
-            try {
-                const keyRes = await fetch(`${API_BASE_URL}/api/v2/keys/${activeId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const keyJson = await keyRes.json();
-                if (keyJson.publicKey) {
-                    const encryptedBundle = hybridEncrypt(text, keyJson.publicKey, pubKey);
-                    if (encryptedBundle) {
-                        msgData = { receiverId: activeId, ...encryptedBundle };
-                    }
-                }
-                // If no publicKey, msgData stays as plain-text — chat still works
-            } catch (e) {
-                console.warn('E2E unavailable, sending plain text:', e.message);
-            }
-        }
 
         try {
             const resp = await fetch(`${API_BASE_URL}/api/v2/messages/send`, {
@@ -232,12 +198,12 @@ export default function Inbox() {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
-                    'X-Timestamp': timestamp,
+                    'X-Timestamp': Math.floor(Date.now() / 1000).toString(),
                     'X-HMAC-Signature': 'DEV_BYPASS'
                 },
-                body: JSON.stringify(msgData)
+                body: JSON.stringify({ receiverId: activeId, content: text })
             });
-            if (!resp.ok) throw new Error('Message sending failed');
+            if (!resp.ok) throw new Error('Send failed');
         } catch (err) {
             handleError(err, 'Failed to send message');
         }
