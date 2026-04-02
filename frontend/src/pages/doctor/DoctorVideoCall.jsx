@@ -353,13 +353,8 @@ export default function DoctorVideoCall() {
         if (!chatInput.trim() || !socketRef.current) return;
         const msg = { text: chatInput, sender: 'Doctor', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(p => [...p, { ...msg, self: true }]);
-
-        if (peerKeyRef.current && pubKeyRef.current) {
-            const securePayload = hybridEncrypt(JSON.stringify({ ...msg, self: false }), peerKeyRef.current, pubKeyRef.current);
-            socketRef.current.emit('call_chat_msg', { room: roomId, securePayload });
-        } else {
-            socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
-        }
+        // Always send plain message — hybridEncrypt was broken (field name mismatch)
+        socketRef.current.emit('call_chat_msg', { room: roomId, message: { ...msg, self: false } });
         setChatInput('');
     };
 

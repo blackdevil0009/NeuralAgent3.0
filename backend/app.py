@@ -922,21 +922,24 @@ def get_public_key(target_id):
 @jwt_required()
 def send_e2e_message():
     sender_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json() or {}
     receiver_id = data.get('receiverId')
-    
+    if not receiver_id:
+        return signed_json_response({"error": "receiverId required"}, 400)
+
     conn = None
     try:
         conn = get_db_connection()
         if not conn: return signed_json_response({"error": "DB error"}, 500)
         cur = conn.cursor()
-        
-        # Ensure E2E table exists
+
+        # Ensure E2E table exists with content column
         cur.execute('''
             CREATE TABLE IF NOT EXISTS messages_e2e (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 senderId INT,
                 receiverId INT,
+                content TEXT,
                 encryptedAesKeySender TEXT,
                 encryptedAesKeyReceiver TEXT,
                 iv TEXT,
@@ -945,13 +948,21 @@ def send_e2e_message():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
+        # Add content column if it doesn't exist yet (safe migration)
+        try:
+            cur.execute("ALTER TABLE messages_e2e ADD COLUMN content TEXT")
+        except Exception:
+            pass  # Column already exists
+
         cur.execute('''
-            INSERT INTO messages_e2e (senderId, receiverId, encryptedAesKeySender, encryptedAesKeyReceiver, iv, ciphertext, tag)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO messages_e2e
+                (senderId, receiverId, content, encryptedAesKeySender, encryptedAesKeyReceiver, iv, ciphertext, tag)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
-            sender_id, receiver_id, 
-            data.get('encryptedAesKey_sender'), data.get('encryptedAesKey_receiver'), 
+            sender_id, receiver_id,
+            data.get('content'),                    # plain-text for direct display
+            data.get('encryptedAesKey_sender'),
+            data.get('encryptedAesKey_receiver'),
             data.get('iv'), data.get('ciphertext'), data.get('tag')
         ))
         msg_id = cur.lastrowid
@@ -1016,18 +1027,17 @@ def get_message_history(other_id):
             })
             
         for r in rows:
-            # Identify which AES key belongs to the requester
-            my_key = r['encryptedAesKeySender'] if str(r['senderId']) == str(user_id) else r['encryptedAesKeyReceiver']
-            
             messages.append({
                 "id": r['id'],
                 "senderId": r['senderId'],
                 "receiverId": r['receiverId'],
                 "timestamp": str(r['timestamp']),
-                "encryptedAesKey": my_key,
-                "iv": r['iv'],
-                "ciphertext": r['ciphertext'],
-                "tag": r['tag']
+                # Always include content (plain text). Also pass E2E fields for future client-side decrypt.
+                "content": r.get('content') or None,
+                "encryptedAesKey": r['encryptedAesKeySender'] if str(r['senderId']) == str(user_id) else r['encryptedAesKeyReceiver'],
+                "iv": r.get('iv'),
+                "ciphertext": r.get('ciphertext'),
+                "tag": r.get('tag')
             })
             
         # Re-sort combined list natively to ensure sequential frontend display
