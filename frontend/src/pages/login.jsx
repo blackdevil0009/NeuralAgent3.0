@@ -236,12 +236,18 @@ export default function Login() {
 
             const json = await res.json();
             if (!res.ok) {
+                const msg = json.data?.message || json.message || 'Login failed.';
                 if (res.status === 403) {
+                    // Role mismatch: message contains 'No Doctor/Patient account'
+                    if (msg.toLowerCase().includes('no doctor') || msg.toLowerCase().includes('no patient')) {
+                        throw new Error(msg); // Show role mismatch clearly — no resend button
+                    }
+                    // Unverified account flow
                     setIsUnverified(true);
                     setVerificationMode('registry');
                     throw new Error('Please verify your account. We sent a code to your email.');
                 }
-                throw new Error(json.data?.message || json.message || 'Login failed. Please check your credentials.');
+                throw new Error(msg);
             }
 
             const responseData = json.data || {};

@@ -147,6 +147,14 @@ def login():
         
         if not user or not bcrypt.check_password_hash(user['password'], password):
             return signed_json_response({"message": "Invalid email or password."}, 401)
+        
+        # ── ROLE GUARD: reject cross-role login attempts ──────────────────
+        requested_role = (data.get('role') or '').strip().lower()
+        actual_role = (user.get('role') or '').strip().lower()
+        if requested_role and actual_role != requested_role:
+            return signed_json_response({
+                "message": f"No {requested_role.capitalize()} account found for this email. Please use the correct login tab."
+            }, 403)
             
         if not user.get('isVerified', 0):
             return signed_json_response({"message": "Please verify your email before logging in."}, 403)
@@ -541,15 +549,21 @@ def book_appointment():
 @app.route('/api/appointments', methods=['GET'])
 @jwt_required()
 def get_appointments():
-    """Retrieve all appointments for the logged-in user (as doctor or patient)."""
+    """Retrieve all appointments for the logged-in user. Role is read from DB, not trusted from client."""
     user_id = get_jwt_identity()
-    role = request.args.get('role', 'patient') # Default to patient view if unspecified
     
     conn = None
     try:
         conn = get_db_connection()
         if not conn: return signed_json_response({"message": "DB error"}, 500)
         cur = conn.cursor(dictionary=True)
+        
+        # Always determine role from the database — NEVER trust client query param
+        cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+        u = cur.fetchone()
+        if not u:
+            return signed_json_response({"message": "User not found"}, 404)
+        role = u['role']
         
         if role == 'doctor':
             cur.execute('''
@@ -572,12 +586,53 @@ def get_appointments():
         for appt in appointments:
             appt['appointmentDate'] = str(appt['appointmentDate'])
             appt['appointmentTime'] = str(appt['appointmentTime'])
-            appt['createdAt'] = str(appt['createdAt'])
+            if appt.get('createdAt'): appt['createdAt'] = str(appt['createdAt'])
             
-        return signed_json_response(appointments, 200)
+        return signed_json_response({"appointments": appointments}, 200)
     except Exception as e:
         app.logger.error(f"Appointments Fetch Error: {e}")
         return signed_json_response({"message": "Failed to fetch appointments."}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/appointments/<int:appt_id>', methods=['PUT'])
+@jwt_required()
+def update_appointment(appt_id):
+    """Update appointment status (cancel by patient, or status update by doctor)."""
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    new_status = data.get('status')
+    if not new_status:
+        return signed_json_response({"message": "Status is required"}, 400)
+
+    # Only allow known statuses
+    allowed = {'Cancelled', 'Completed', 'Confirmed', 'Scheduled', 'Upcoming', 'No-Show'}
+    if new_status not in allowed:
+        return signed_json_response({"message": f"Invalid status. Allowed: {', '.join(allowed)}"}, 400)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+
+        # Verify ownership: patient can cancel own appt, doctor can update their own
+        cur.execute("""
+            SELECT id, patientId, doctorId, status FROM appointments WHERE id = %s
+        """, (appt_id,))
+        appt = cur.fetchone()
+        if not appt:
+            return signed_json_response({"message": "Appointment not found"}, 404)
+        if str(appt['patientId']) != str(user_id) and str(appt['doctorId']) != str(user_id):
+            return signed_json_response({"message": "Unauthorized"}, 403)
+
+        cur.execute("UPDATE appointments SET status = %s WHERE id = %s", (new_status, appt_id))
+        conn.commit()
+        return signed_json_response({"message": f"Appointment status updated to {new_status}"}, 200)
+    except Exception as e:
+        app.logger.error(f"Appointment Update Error: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"message": "Failed to update appointment"}, 500)
     finally:
         if conn: conn.close()
 
@@ -612,7 +667,38 @@ def get_doctors():
 @jwt_required(optional=True)
 def get_notifications():
     """Empty notifications to stop frontend 404 polling errors."""
-    return signed_json_response([], 200)
+    return signed_json_response({"notifications": []}, 200)
+
+@app.route('/api/doctors/search', methods=['GET'])
+@jwt_required()
+def search_doctors():
+    """Search doctors by name or specialization."""
+    q = request.args.get('q', '').strip()
+    if not q:
+        return signed_json_response({"doctors": []}, 200)
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"message": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        pattern = f"%{q}%"
+        cur.execute('''
+            SELECT u.id, u.fullName as name, u.email, u.mobile,
+                   d.specialization as spec, d.degree, d.experience,
+                   d.consultantFee, d.hospital, d.clinic_location, d.workingHours
+            FROM users u
+            JOIN doctor_details d ON u.id = d.userId
+            WHERE u.role = 'doctor'
+              AND (u.fullName LIKE %s OR d.specialization LIKE %s)
+            LIMIT 10
+        ''', (pattern, pattern))
+        doctors = cur.fetchall()
+        return signed_json_response({"doctors": doctors}, 200)
+    except Exception as e:
+        app.logger.error(f"Doctor Search Error: {e}")
+        return signed_json_response({"message": "Search failed"}, 500)
+    finally:
+        if conn: conn.close()
 
 # --- PROFILE AND EMERGENCIES ROUTES ---
 
