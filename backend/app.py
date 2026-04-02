@@ -260,11 +260,11 @@ def verify_2fa_otp():
         if not conn: return signed_json_response({"error": "DB error"}, 500)
         cur = conn.cursor(dictionary=True)
         
-        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT * FROM users WHERE email = %s AND otpExpiry > NOW()", (email,))
         user = cur.fetchone()
         
         if not user or str(user.get('otpCode')) != str(otp):
-            return signed_json_response({"error": "Invalid or expired OTP"}, 401)
+            return signed_json_response({"error": "Invalid or expired OTP. Please request a new code."}, 401)
             
         cur.execute("UPDATE users SET otpCode = NULL WHERE id = %s", (user['id'],))
         conn.commit()
@@ -302,11 +302,11 @@ def verify_registration_otp():
         if not conn: return signed_json_response({"error": "DB error"}, 500)
         cur = conn.cursor(dictionary=True)
         
-        cur.execute("SELECT id, otpCode FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, otpCode FROM users WHERE email = %s AND otpExpiry > NOW()", (email,))
         user = cur.fetchone()
         
         if not user or str(user.get('otpCode')) != str(otp):
-            return signed_json_response({"error": "Invalid or expired OTP"}, 400)
+            return signed_json_response({"error": "Invalid or expired OTP. Please request a new code."}, 400)
             
         cur.execute("UPDATE users SET isVerified = 1, otpCode = NULL WHERE id = %s", (user['id'],))
         conn.commit()
@@ -315,6 +315,46 @@ def verify_registration_otp():
     except Exception as e:
         app.logger.error(f"Verify Reg OTP Error: {e}")
         return signed_json_response({"error": "Failed to verify email"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/auth/resend-verification', methods=['POST'])
+def resend_verification():
+    """Resend OTP verification code for unverified users."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').lower().strip()
+    if not email:
+        return signed_json_response({"error": "Email is required"}, 400)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute("SELECT id, isVerified FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+
+        # Always return success to prevent email enumeration
+        if not user or user.get('isVerified'):
+            return signed_json_response({"message": "If that email is pending verification, a new code has been sent."}, 200)
+
+        new_otp = str(secrets.randbelow(900000) + 100000)
+        cur.execute("""
+            UPDATE users SET otpCode = %s, otpExpiry = DATE_ADD(NOW(), INTERVAL 10 MINUTE)
+            WHERE id = %s
+        """, (new_otp, user['id']))
+        conn.commit()
+
+        # Send new OTP email
+        verification_link = f"{os.environ.get('FRONTEND_URL', 'https://vaidyamedx.in')}/verify-email"
+        send_verification_email(email, verification_link, new_otp)
+
+        return signed_json_response({"message": "A new verification code has been sent to your email."}, 200)
+    except Exception as e:
+        app.logger.error(f"Resend Verification Error: {e}")
+        return signed_json_response({"error": "Failed to resend verification code"}, 500)
     finally:
         if conn: conn.close()
 

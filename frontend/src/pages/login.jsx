@@ -251,14 +251,15 @@ export default function Login() {
                 return;
             }
 
-            /* Persist token */
+            /* Persist token — always store server-returned role */
+            const serverRole = responseData.role;
             const store = rememberMe ? localStorage : sessionStorage;
             store.setItem('token', responseData.token);
-            store.setItem('role', responseData.role || role);
+            store.setItem('role', serverRole || role);
             if (responseData.user) store.setItem('user', JSON.stringify(responseData.user));
 
-            /* Route based on role */
-            if (responseData.role === 'doctor' || role === 'doctor') {
+            /* Route strictly by server-returned role */
+            if (serverRole === 'doctor') {
                 navigate('/doctor');
             } else {
                 navigate('/patient');
@@ -299,13 +300,14 @@ export default function Login() {
                 return;
             }
 
-            /* 2FA Success - Persist token */
+            /* 2FA Success - Persist token & use server-returned role for routing */
+            const serverRole = responseData.user?.role || responseData.role || role;
             const store = rememberMe ? localStorage : sessionStorage;
             store.setItem('token', responseData.token);
-            store.setItem('role', role);
+            store.setItem('role', serverRole);
             if (responseData.user) store.setItem('user', JSON.stringify(responseData.user));
 
-            if (role === 'doctor') navigate('/doctor');
+            if (serverRole === 'doctor') navigate('/doctor');
             else navigate('/patient');
 
         } catch (err) {
