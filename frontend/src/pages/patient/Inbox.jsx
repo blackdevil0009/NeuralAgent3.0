@@ -176,19 +176,46 @@ export default function Inbox() {
     /* Send message — plain-text (E2E layer removed: field-name mismatch caused encryption failures) */
     const sendMessage = useCallback(async (overrideText) => {
         const text = (overrideText || input).trim();
-        if (!text || !activeId) return;
+        if ((!text && !attachPreview) || !activeId) return;
 
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        let finalText = text;
+
+        if (attachPreview && attachPreview.file) {
+            const formData = new FormData();
+            formData.append('file', attachPreview.file);
+            try {
+                const uploadRes = await fetch(`${API_BASE_URL}/api/messages/upload`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const uploadJson = await uploadRes.json();
+                if (uploadRes.ok) {
+                    const uploadData = uploadJson.data || uploadJson;
+                    const fileUrl = uploadData.url;
+                    const tag = attachPreview.isImg ? `[IMAGE] ${fileUrl}` : `[DOCUMENT] ${fileUrl}`;
+                    finalText = finalText ? `${finalText}\n${tag}` : tag;
+                } else {
+                    handleError(new Error(uploadJson.error || 'Upload failed'), 'Attachment upload failed');
+                    return;
+                }
+            } catch(e) {
+                handleError(e, 'Attachment upload error');
+                return;
+            }
+            setAttachPreview(null);
+        }
 
         // Optimistic UI update first
         const optimisticMsg = {
             id: 'temp-' + Date.now(),
             from: 'me',
-            text,
+            text: finalText,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setConversations(prev => prev.map(c =>
-            c.id !== activeId ? c : { ...c, messages: [...c.messages, optimisticMsg], lastMsg: text }
+            c.id !== activeId ? c : { ...c, messages: [...c.messages, optimisticMsg], lastMsg: finalText.split('\n')[0] }
         ));
         setInput('');
 
@@ -201,20 +228,20 @@ export default function Inbox() {
                     'X-Timestamp': Math.floor(Date.now() / 1000).toString(),
                     'X-HMAC-Signature': 'DEV_BYPASS'
                 },
-                body: JSON.stringify({ receiverId: activeId, content: text })
+                body: JSON.stringify({ receiverId: activeId, content: finalText })
             });
             if (!resp.ok) throw new Error('Send failed');
         } catch (err) {
             handleError(err, 'Failed to send message');
         }
-    }, [input, activeId]);
+    }, [input, activeId, attachPreview]);
 
-    /* ── Attach file ── */
     const handleFile = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const isImg = file.type.startsWith('image/');
         setAttachPreview({
+            file,
             name: file.name,
             size: (file.size / 1024).toFixed(0) + ' KB',
             icon: isImg ? '🖼️' : file.type === 'application/pdf' ? '📄' : '📎',
@@ -389,7 +416,19 @@ export default function Inbox() {
                             <div className="inbox-msg-col">
                                 {/* Text bubble */}
                                 {m.text && (
-                                    <div className={`inbox-bubble ${m.from}`}>{m.text}</div>
+                                    <div className={`inbox-bubble ${m.from}`}>
+                                        {m.text.split('\n').map((line, i) => {
+                                            if (line.startsWith('[IMAGE] ')) {
+                                                const url = line.replace('[IMAGE] ', '').trim();
+                                                return <img key={i} src={url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }} />;
+                                            }
+                                            if (line.startsWith('[DOCUMENT] ')) {
+                                                const url = line.replace('[DOCUMENT] ', '').trim();
+                                                return <a key={i} href={url} target="_blank" rel="noreferrer" style={{ color: m.from === 'me' ? '#fff' : '#2d6a4f', textDecoration: 'underline', display: 'block', marginTop: 4, fontWeight: 'bold' }}>📄 View Document</a>;
+                                            }
+                                            return <div key={i}>{line}</div>;
+                                        })}
+                                    </div>
                                 )}
                                 <div className="inbox-msg-time">
                                     {m.time} {m.from === 'me' && <span className="inbox-read-tick">✓✓</span>}

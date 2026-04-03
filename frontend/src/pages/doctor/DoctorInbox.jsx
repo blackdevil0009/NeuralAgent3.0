@@ -264,7 +264,17 @@ export default function DoctorInbox() {
                                 fontSize: '0.9rem',
                                 position: 'relative'
                             }}>
-                                {msg.text}
+                                {msg.text.split('\n').map((line, j) => {
+                                    if (line.startsWith('[IMAGE] ')) {
+                                        const url = line.replace('[IMAGE] ', '').trim();
+                                        return <img key={j} src={url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }} />;
+                                    }
+                                    if (line.startsWith('[DOCUMENT] ')) {
+                                        const url = line.replace('[DOCUMENT] ', '').trim();
+                                        return <a key={j} href={url} target="_blank" rel="noreferrer" style={{ color: msg.sender === 'doctor' ? '#fff' : '#2d6a4f', textDecoration: 'underline', display: 'block', marginTop: 4, fontWeight: 'bold' }}>📄 View Document</a>;
+                                    }
+                                    return <div key={j}>{line}</div>;
+                                })}
                                 <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: 4, textAlign: msg.sender === 'doctor' ? 'right' : 'left' }}>{msg.time}</div>
                             </div>
                         ))}

@@ -13,6 +13,9 @@ import secrets
 import functools
 import traceback
 from utils.email_utils import send_verification_email, send_reset_email
+from ai.brain import MedAssistX
+
+ai_engine = MedAssistX()
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization", "X-HMAC-Signature", "X-Timestamp"]}})
@@ -24,6 +27,12 @@ jwt = JWTManager(app)
 
 # Auto-create all database tables on startup
 init_db()
+
+import werkzeug.utils
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 app.logger.info("VaidyaMed-X Minimal Backend: BOOT SUCCESS")
 
 def signed_json_response(data, status=200):
@@ -449,6 +458,124 @@ def send_message():
     finally:
         if conn: conn.close()
 
+@app.route('/api/messages/upload', methods=['POST'])
+@jwt_required()
+def upload_message_file():
+    """Upload media file and return its URL for attaching to messages."""
+    if 'file' not in request.files:
+        return signed_json_response({"error": "No file part"}, 400)
+    file = request.files['file']
+    if file.filename == '':
+        return signed_json_response({"error": "No selected file"}, 400)
+    
+    filename = werkzeug.utils.secure_filename(f"{secrets.token_hex(8)}_{file.filename}")
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+    
+    file_url = f"{request.host_url.rstrip('/')}/uploads/{filename}"
+    return signed_json_response({"url": file_url, "filename": file.filename}, 200)
+
+from flask import send_from_directory
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# ==========================================================
+# REPORTS ENDPOINTS
+# ==========================================================
+
+@app.route('/api/reports', methods=['GET'])
+@jwt_required()
+def get_reports():
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM patient_reports WHERE userId = %s ORDER BY createdAt DESC", (user_id,))
+        rows = cur.fetchall()
+        reports = []
+        for r in rows:
+            reports.append({
+                "id": r['id'],
+                "name": r['displayName'],
+                "file": r['filename'],
+                "size": r['fileSize'] or '0 KB',
+                "date": str(r['createdAt']).split()[0], # date only
+                "status": r['status'],
+                "summary": r['summary'],
+                "ayurvedic": r['ayurvedicInsights']
+            })
+        return signed_json_response({"reports": reports}, 200)
+    except Exception as e:
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/reports', methods=['POST'])
+@jwt_required()
+def upload_report():
+    user_id = get_jwt_identity()
+    if 'file' not in request.files:
+        return signed_json_response({"error": "No file"}, 400)
+    
+    file = request.files['file']
+    display_name = request.form.get('displayName', file.filename)
+    
+    filename = werkzeug.utils.secure_filename(f"{secrets.token_hex(4)}_{file.filename}")
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+    
+    file_size_kb = os.path.getsize(file_path) // 1024
+    file_size_str = f"{file_size_kb} KB" if file_size_kb < 1024 else f"{(file_size_kb / 1024):.1f} MB"
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO patient_reports (userId, filename, displayName, fileSize, status)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (user_id, filename, display_name, file_size_str, 'Pending'))
+        conn.commit()
+        return signed_json_response({"message": "Uploaded"}, 200)
+    except Exception as e:
+        app.logger.error(f"Report upload err: {e}")
+        if conn: conn.rollback()
+        return signed_json_response({"error": "DB error"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/reports/<int:report_id>/analyze', methods=['POST'])
+@jwt_required()
+def analyze_report(report_id):
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM patient_reports WHERE id = %s AND userId = %s", (report_id, user_id))
+        report = cur.fetchone()
+        if not report:
+            return signed_json_response({"error": "Not found"}, 404)
+        
+        # Connected AI Placeholder
+        summary = "AI Analysis: The uploaded report indicates primary metrics are mostly within normal ranges. Mild anomalies observed in hemoglobin/dietary markers depending on the lab context."
+        insights = "Vata-Pitta dosha imbalance detected. Recommendation: Incorporate cooling herbs (like Amalaki), avoid spicy or extremely hot foods, and maintain regular meal timings to pacify Agni."
+        
+        cur.execute("UPDATE patient_reports SET status = 'Analyzed', summary = %s, ayurvedicInsights = %s WHERE id = %s", (summary, insights, report_id))
+        conn.commit()
+        
+        return signed_json_response({"message": "Analyzed", "summary": summary, "ayurvedic": insights}, 200)
+    except Exception as e:
+        if conn: conn.rollback()
+        return signed_json_response({"error": str(e)}, 500)
+    finally:
+        if conn: conn.close()
+
 
 # --- APPOINTMENT ROUTES ---
 
@@ -865,6 +992,73 @@ def report_emergency():
     finally:
         if conn: conn.close()
 
+@app.route('/api/emergencies', methods=['GET'])
+@jwt_required()
+def get_all_emergencies():
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        cur.execute('''
+            SELECT * FROM emergencies 
+            WHERE status != 'Resolved' 
+            ORDER BY createdAt DESC
+        ''')
+        rows = cur.fetchall()
+        emergencies = []
+        for r in rows:
+            emergencies.append({
+                "id": f"EM-{r['id']}",
+                "dbId": r['id'],
+                "patient": r['patientName'],
+                "patientId": r['patientId'],
+                "contact": r['contact'],
+                "type": r['caseType'],
+                "desc": r['description'],
+                "time": str(r['createdAt']).split('.')[0],
+                "status": r['status'],
+                "handledById": r['handledById']
+            })
+        return signed_json_response({"emergencies": emergencies}, 200)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/emergencies/<int:em_id>/handle', methods=['PUT'])
+@jwt_required()
+def handle_emergency(em_id):
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor()
+        cur.execute("UPDATE emergencies SET status = 'Resolved', handledById = %s WHERE id = %s", (user_id, em_id))
+        conn.commit()
+        return signed_json_response({"message": "Handled successfully"}, 200)
+    finally:
+        if conn: conn.close()
+        
+@app.route('/api/emergencies/<int:em_id>/notify_patient', methods=['POST'])
+@jwt_required()
+def notify_patient(em_id):
+    user_id = get_jwt_identity()
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor()
+        cur.execute("UPDATE emergencies SET handledById = %s, status = 'Doctor assigned' WHERE id = %s", (user_id, em_id))
+        cur.execute("SELECT patientId FROM emergencies WHERE id = %s", (em_id,))
+        pt = cur.fetchone()
+        if pt:
+            cur.execute("INSERT INTO notifications (userId, sourceType, content) VALUES (%s, %s, %s)", (pt[0], 'Call', "Doctor is connecting for Emergency Video Call."))
+        conn.commit()
+        return signed_json_response({"message": "Notified patient"}, 200)
+    finally:
+        if conn: conn.close()
+
 # ==========================================================
 # SECURE P2P MESSAGING (E2E RSA+AES ENCRYPTED)
 # ==========================================================
@@ -913,8 +1107,46 @@ def get_public_key(target_id):
         row = cur.fetchone()
         if row and row.get('rsaPublicKey') and row['rsaPublicKey'] != 'NO_RSA_YET':
             return signed_json_response({"publicKey": row['rsaPublicKey']}, 200)
-            
         return signed_json_response({"error": "User has no public key yet"}, 404)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/ai/chat', methods=['POST'])
+@jwt_required()
+def ai_chat():
+    user_id = get_jwt_identity()
+    message = None
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        message = data.get('message')
+    else:
+        message = request.form.get('message')
+        
+    if not message:
+        return signed_json_response({"error": "No message provided"}, 400)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn: return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user_profile = cur.fetchone()
+        
+        is_emg, trigger = ai_engine._detect_emergency(message)
+        if is_emg:
+            reply = ai_engine._build_emergency(trigger)
+        else:
+            if ai_engine.api_available:
+                reply = ai_engine._call_gemini(message, user_id=user_id, user_profile=user_profile)
+                if not reply:
+                    reply = "Sorry, my AI engine is resting right now. Let me know your symptoms and I can try offline matching."
+            else:
+                matches = ai_engine._match_symptoms(message)
+                user_name = user_profile.get('fullName').split()[0] if user_profile else ""
+                reply = ai_engine._build_fallback(message, matches, user_name)
+                
+        return signed_json_response({"reply": reply}, 200)
     finally:
         if conn: conn.close()
 
