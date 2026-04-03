@@ -777,13 +777,14 @@ body {
     pointer-events: none;
 }
 
-.na-team-emoji {
-    font-size: 2.4rem;
-    line-height: 1;
+/* Real photo — fills circle perfectly */
+.na-team-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    border-radius: 50%;
     display: block;
-    /* Force consistent emoji rendering across OS */
-    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.20));
 }
 
 .na-team-name {
@@ -1182,8 +1183,10 @@ body {
         grid-template-columns: 1fr 1fr;
     }
 
-    .na-team-grid {
-        grid-template-columns: 1fr 1fr;
+    /* team: 3 per row on tablet via flex card width */
+    .na-team-card {
+        flex: 0 0 160px;
+        max-width: 180px;
     }
 
     .na-feat-grid {
@@ -1219,8 +1222,14 @@ body {
         grid-template-columns: 1fr;
     }
 
-    .na-team-grid {
-        grid-template-columns: 1fr 1fr;
+    /* team: 2 per row on small phones */
+    .na-team-card {
+        flex: 0 0 140px;
+        max-width: 160px;
+    }
+    .na-team-avatar {
+        width: 72px;
+        height: 72px;
     }
 
     .na-feat-grid {
