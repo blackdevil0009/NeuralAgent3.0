@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================
-# VaidyaMed-X Full Deployment Script (ONE-SHOT)
-# Run as root on your VPS
+# VaidyaMed-X Full Deployment Script (Native Git Execution)
+# Run as root on your VPS inside ~/NeuralAgent3.0
 # ============================================================
 set -e
-BACKEND_DIR="/opt/backend"
+BACKEND_DIR=$(dirname "$(realpath "$0")")
 DOMAIN="api.vaidyamedx.in"
 EMAIL="blackdevil0009@gmail.com"
 
@@ -37,16 +37,6 @@ apt-get update -qq
 apt-get install -y python3-venv python3-pip mysql-server nginx certbot python3-certbot-nginx unzip ufw -qq
 echo "✅ Packages installed"
 
-# ── STEP 3: SETUP BACKEND FILES ──────────────────────────
-echo "[3/9] Setting up backend directory..."
-mkdir -p "$BACKEND_DIR"
-if [ -f "/tmp/backend.zip" ]; then
-    rm -rf "$BACKEND_DIR"/*.py "$BACKEND_DIR"/*.txt "$BACKEND_DIR"/*.sh "$BACKEND_DIR"/*.json
-    unzip -o /tmp/backend.zip -d "$BACKEND_DIR" -x "*/venv/*" "*/uploads/*" "*.pyc"
-    echo "✅ Backend files extracted"
-else
-    echo "⚠️  No /tmp/backend.zip found. Using existing files in $BACKEND_DIR"
-fi
 
 # ── STEP 4: PYTHON VENV & DEPS ───────────────────────────
 echo "[4/9] Setting up Python virtualenv and dependencies..."
