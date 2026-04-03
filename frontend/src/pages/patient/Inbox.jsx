@@ -175,7 +175,7 @@ export default function Inbox() {
 
     /* Send message — plain-text (E2E layer removed: field-name mismatch caused encryption failures) */
     const sendMessage = useCallback(async (overrideText) => {
-        const text = (overrideText || input).trim();
+        const text = (typeof overrideText === 'string' ? overrideText : input).trim();
         if ((!text && !attachPreview) || !activeId) return;
 
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
