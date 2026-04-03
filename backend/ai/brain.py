@@ -521,8 +521,7 @@ class MedAssistX:
                 import google.generativeai as genai
                 genai.configure(api_key=api_key)
                 self.client = genai.GenerativeModel(
-                    GEMINI_MODEL,
-                    system_instruction=BASE_SYSTEM_PROMPT
+                    GEMINI_MODEL
                 )
                 self.api_available = True
                 print("✚ VaidyaMed-X initialized with Gemini API ✓")
@@ -726,6 +725,9 @@ class MedAssistX:
 
             final_prompt = profile_context + prompt if profile_context else prompt
 
+            if not history:
+                final_prompt = f"SYSTEM PROMPT: {BASE_SYSTEM_PROMPT}\n\nUSER QUERY: {final_prompt}"
+
             # 5. Start Chat Session
             chat = self.client.start_chat(history=history)
             response = chat.send_message(
@@ -747,7 +749,7 @@ class MedAssistX:
             import traceback
             traceback.print_exc()
             print(f"Gemini API Error: {e}")
-            return None
+            return f"Sorry, my AI engine is resting right now. (Diagnostic Error: {e})"
 
     # ─── Fallback Response Builders ────────────────────────────────────
 
