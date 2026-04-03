@@ -8,10 +8,11 @@ const VALUES = [
 ];
 
 const TEAM = [
-    { emoji: '👨‍⚕️', name: 'Govind Sharma', role: 'Founder & CEO', bg: '#e8f5ee' },
-    { emoji: '👩‍💻', name: 'Mohammad Ayan Husain', role: 'AI Research Lead', bg: '#fff8e7' },
-    { emoji: '👩‍💻', name: 'Mohd Azad and Abhishek Kumar', role: 'Frontend Developer', bg: '#f0eaff' },
-    { emoji: '👩‍💼', name: 'Vanshika Yadav', role: 'Product & Strategy', bg: '#fde8e8' },
+    { emoji: '👨‍💼', name: 'Govind Sharma',        role: 'Founder & CEO · AI & Backend Developer', bg: '#e8f5ee', avatarGrad: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)' },
+    { emoji: '👨‍🔬', name: 'Mohammad Ayan Husain', role: 'AI Research Lead',                    bg: '#fff8e7', avatarGrad: 'linear-gradient(135deg, #b8860b 0%, #e9c46a 100%)' },
+    { emoji: '👨‍💻', name: 'Mohd Azad',             role: 'Frontend Developer',                  bg: '#f0eaff', avatarGrad: 'linear-gradient(135deg, #5b21b6 0%, #a78bfa 100%)' },
+    { emoji: '🧑‍🔬', name: 'Abhishek Kumar',         role: 'AI Research Lead',                    bg: '#fff8e7', avatarGrad: 'linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)' },
+    { emoji: '👩‍💼', name: 'Nandani Singh',          role: 'Product & Strategy',                  bg: '#fff0f5', avatarGrad: 'linear-gradient(135deg, #9d174d 0%, #f472b6 100%)' },
 ];
 
 export default function About() {
@@ -69,7 +70,9 @@ export default function About() {
                 <div className="na-team-grid">
                     {TEAM.map(m => (
                         <div className="na-team-card" key={m.name} style={{ '--card-bg': m.bg }}>
-                            <div className="na-team-avatar">{m.emoji}</div>
+                            <div className="na-team-avatar" style={{ background: m.avatarGrad }}>
+                                <span className="na-team-emoji">{m.emoji}</span>
+                            </div>
                             <h4 className="na-team-name">{m.name}</h4>
                             <p className="na-team-role">{m.role}</p>
                         </div>
