@@ -88,9 +88,9 @@ def register():
         cur = conn.cursor()
         verification_otp = str(secrets.randbelow(900000) + 100000)
         cur.execute('''
-            INSERT INTO users (fullName, email, password, role, mobile, verificationToken, otpCode, otpExpiry, rsaPublicKey, rsaPrivateKeyEncrypted)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, DATE_ADD(NOW(), INTERVAL 1 HOUR), %s, %s)
-        ''', (full_name, email, hashed_password, role, mobile, verification_token, verification_otp, "NO_RSA_YET", "NO_RSA_YET"))
+            INSERT INTO users (fullName, email, password, role, mobile, verificationToken, otpCode, otpExpiry, rsaPublicKey, rsaPrivateKeyEncrypted, dob, gender, address, city, state, pincode)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, DATE_ADD(NOW(), INTERVAL 1 HOUR), %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (full_name, email, hashed_password, role, mobile, verification_token, verification_otp, "NO_RSA_YET", "NO_RSA_YET", data.get('dob'), data.get('gender'), data.get('address'), data.get('city'), data.get('state'), data.get('pincode')))
         
         user_id = cur.lastrowid
         
@@ -889,9 +889,9 @@ def handle_user_profile():
             data = request.get_json(silent=True) or {}
             # Base users update
             cur.execute('''
-                UPDATE users SET fullName=%s, dob=%s, gender=%s, blood_group=%s
+                UPDATE users SET fullName=%s, dob=%s, gender=%s, blood_group=%s, address=%s, city=%s, state=%s, pincode=%s
                 WHERE id=%s
-            ''', (data.get('name'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), user_id))
+            ''', (data.get('name'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), data.get('address'), data.get('city'), data.get('state'), data.get('pin') or data.get('pincode'), user_id))
             
             # Check user role
             cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
@@ -917,6 +917,7 @@ def handle_user_profile():
         # Key mapping to match React frontend hooks perfectly
         user_data['name'] = user_data.get('fullName', '')
         user_data['bloodGroup'] = user_data.get('blood_group', 'Unknown')
+        user_data['pin'] = user_data.get('pincode', '')
         
         if 'password' in user_data: del user_data['password']
         if 'rsaPrivateKeyEncrypted' in user_data: del user_data['rsaPrivateKeyEncrypted']
@@ -929,6 +930,8 @@ def handle_user_profile():
             cur.execute("SELECT * FROM patient_details WHERE userId = %s", (user_id,))
             
         details = cur.fetchone() or {}
+        # Remove null values from details to prevent overwriting populated users table values
+        details = {k: v for k, v in details.items() if v is not None}
         user_data.update(details)
         return signed_json_response(user_data, 200)
     except Exception as e:
