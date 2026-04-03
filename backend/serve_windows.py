@@ -1,7 +1,6 @@
 import os
 import logging
-from waitress import serve
-from app import app
+from app import app, socketio
 from database import init_db
 
 # Configure structured production logging
@@ -13,7 +12,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('waitress')
+logger = logging.getLogger('socketio_server')
 logger.setLevel(logging.INFO)
 
 if __name__ == '__main__':
@@ -24,10 +23,10 @@ if __name__ == '__main__':
     os.environ['FLASK_ENV'] = 'production'
     
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f"Starting VaidyaMed-X Production Server (Windows) on port {port} using Waitress...")
+    logger.info(f"Starting VaidyaMed-X Server (Windows) on port {port} using Flask-SocketIO...")
     
     try:
-        # Run with waitress (production grade WSGI for Windows)
-        serve(app, host='0.0.0.0', port=port, threads=4)
+        # Run with socketio (supports WebSockets)
+        socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
     except Exception as e:
         logger.error(f"Server crashed: {e}")
