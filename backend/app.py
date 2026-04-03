@@ -474,12 +474,10 @@ def get_messages():
     finally:
         if conn: conn.close()
 
-@app.route('/api/v2/messages/send', methods=['POST'])
 @app.route('/api/messages/send', methods=['POST'])
 @require_hmac
 @jwt_required(optional=True)
 def send_message():
-    """Send a message to a peer synchronously."""
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
     receiver_id = data.get('receiverId')
@@ -503,75 +501,6 @@ def send_message():
         app.logger.error(f"Message Send Error: {e}")
         if conn: conn.rollback()
         return signed_json_response({"message": "Failed to send message"}, 500)
-    finally:
-        if conn: conn.close()
-
-@app.route('/api/v2/messages/history/<int:peer_id>', methods=['GET'])
-@jwt_required()
-def get_message_history(peer_id):
-    user_id = get_jwt_identity()
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn: return signed_json_response({"message": "DB error"}, 500)
-        cur = conn.cursor(dictionary=True)
-        cur.execute('''
-            SELECT * FROM messages 
-            WHERE (senderId = %s AND receiverId = %s) 
-               OR (senderId = %s AND receiverId = %s)
-            ORDER BY timestamp ASC
-        ''', (user_id, peer_id, peer_id, user_id))
-        rows = cur.fetchall()
-        
-        messages = []
-        for r in rows:
-            messages.append({
-                "id": r['id'],
-                "senderId": r['senderId'],
-                "receiverId": r['receiverId'],
-                "content": r.get('encryptedContext') or r.get('content') or '[Message]',
-                "timestamp": str(r['timestamp']),
-                "isDoctorResponded": r.get('isDoctorResponded', False)
-            })
-        return signed_json_response({"messages": messages}, 200)
-    except Exception as e:
-        app.logger.error(f"Message History Error: {e}")
-        return signed_json_response({"message": "Failed to fetch history"}, 500)
-    finally:
-        if conn: conn.close()
-
-@app.route('/api/v2/keys/upload', methods=['POST'])
-@jwt_required()
-def upload_public_key():
-    user_id = get_jwt_identity()
-    data = request.get_json(silent=True) or {}
-    pub_key = data.get('publicKey')
-    if not pub_key:
-         return signed_json_response({"message": "Key missing"}, 400)
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn: return signed_json_response({"message": "DB error"}, 500)
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET rsaPublicKey = %s WHERE id = %s", (pub_key, user_id))
-        conn.commit()
-        return signed_json_response({"message": "Key uploaded"}, 200)
-    finally:
-        if conn: conn.close()
-        
-@app.route('/api/v2/keys/<int:peer_id>', methods=['GET'])
-@jwt_required()
-def get_public_key(peer_id):
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn: return signed_json_response({"message": "DB error"}, 500)
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT rsaPublicKey FROM users WHERE id = %s", (peer_id,))
-        user = cur.fetchone()
-        if not user:
-             return signed_json_response({"message": "User not found"}, 404)
-        return signed_json_response({"publicKey": user.get('rsaPublicKey')}, 200)
     finally:
         if conn: conn.close()
 
