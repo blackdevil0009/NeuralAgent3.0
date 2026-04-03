@@ -92,7 +92,7 @@ User=root
 WorkingDirectory=$BACKEND_DIR
 EnvironmentFile=$BACKEND_DIR/.env
 Environment=PATH=$BACKEND_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$BACKEND_DIR/venv/bin/gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 --threads 100 --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
+ExecStart=$BACKEND_DIR/venv/bin/gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 --worker-connections 1000 --bind 127.0.0.1:5000 --timeout 120 --log-level info app:app
 Restart=always
 RestartSec=5
 StandardOutput=journal

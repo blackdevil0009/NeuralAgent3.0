@@ -1,3 +1,5 @@
+import gevent.monkey
+gevent.monkey.patch_all()
 import os
 from dotenv import load_dotenv
 load_dotenv()
