@@ -193,9 +193,11 @@ export default function Login() {
     /* field-level errors */
     const [errors, setErrors] = useState({});
 
-    /* UI success message passed from registration */
+    /* UI success message passed from registration or VerifyEmail redirect */
     const regSuccess = location.state?.registered
         ? location.state?.message || '🎉 Registration successful!'
+        : location.state?.verified
+        ? location.state?.message || '✅ Email verified! You can now log in.'
         : '';
 
     // If registered from registration.jsx, we might want to show OTP screen immediately
@@ -324,6 +326,37 @@ export default function Login() {
         }
     };
 
+    /* ── Resend OTP (for both registry & 2fa modes) ── */
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const [resendMsg, setResendMsg] = useState('');
+
+    React.useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+        return () => clearTimeout(t);
+    }, [resendCooldown]);
+
+    const handleResendOtp = async () => {
+        if (resendCooldown > 0) return;
+        setResendMsg('');
+        try {
+            const endpoint = verificationMode === '2fa'
+                ? '/api/auth/resend-2fa-otp'
+                : '/api/auth/resend-verification';
+            const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const json = await res.json();
+            const payload = json.data || json;
+            setResendMsg(payload.message || 'A new code has been sent to your email.');
+            setResendCooldown(60);
+        } catch (_) {
+            setResendMsg('Failed to resend code. Please try again.');
+        }
+    };
+
     /* ── Field change helpers ── */
     const handleEmailChange = (e) => {
         setEmail(e.target.value);
@@ -422,11 +455,17 @@ export default function Login() {
 
                             {errorMsg && <div className="login-error-banner">⚠️ {errorMsg}</div>}
 
+                            {resendMsg && (
+                                <div className="login-success-banner" style={{ marginBottom: 12 }}>
+                                    📩 {resendMsg}
+                                </div>
+                            )}
+
                             <div className="form-group">
                                 <label>Verification Code</label>
                                 <input
                                     type="text" inputMode="numeric" pattern="[0-9]*" maxLength="6" value={otp}
-                                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                                    onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setResendMsg(''); }}
                                     autoComplete="one-time-code"
                                     style={{ fontSize: '1.8rem', textAlign: 'center', letterSpacing: '8px', fontWeight: 'bold' }}
                                     autoFocus
@@ -434,11 +473,31 @@ export default function Login() {
                             </div>
 
                             <button type="submit" className="btn-login" disabled={loading}>
-                                {loading ? 'Verifying...' : (verificationMode === '2fa' ? 'Verify & Continue' : 'Verify & Activate')}
+                                {loading ? 'Verifying...' : (verificationMode === '2fa' ? 'Verify & Continue 🛡️' : 'Verify & Activate ✅')}
                             </button>
 
-                            <button type="button" className="back-btn" onClick={() => { setVerificationMode('none'); setErrorMsg(''); setIsUnverified(false); }} 
-                                style={{ background: 'none', border: 'none', color: '#666', marginTop: 15, cursor: 'pointer', textDecoration: 'underline' }}>
+                            {/* Resend OTP button with cooldown */}
+                            <div style={{ textAlign: 'center', marginTop: 14 }}>
+                                <span style={{ fontSize: '0.85rem', color: '#666' }}>Didn't get a code? </span>
+                                <button
+                                    type="button"
+                                    onClick={handleResendOtp}
+                                    disabled={resendCooldown > 0}
+                                    style={{
+                                        background: 'none', border: 'none', cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                                        color: resendCooldown > 0 ? '#aaa' : '#2d6a4f', fontWeight: 600,
+                                        fontSize: '0.85rem', textDecoration: 'underline', padding: 0,
+                                    }}
+                                >
+                                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => { setVerificationMode('none'); setErrorMsg(''); setIsUnverified(false); setResendMsg(''); setResendCooldown(0); }}
+                                style={{ background: 'none', border: 'none', color: '#666', marginTop: 14, cursor: 'pointer', textDecoration: 'underline', display: 'block', margin: '14px auto 0' }}
+                            >
                                 ← Back to Login
                             </button>
                         </div>

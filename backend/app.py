@@ -204,6 +204,7 @@ def login():
 
 @app.route('/api/auth/verify-email', methods=['GET'])
 def verify_email():
+    """Verify email via token link. Returns JSON — frontend handles redirect to /login."""
     token = request.args.get('token')
     if not token:
         return signed_json_response({"error": "Missing verification token"}, 400)
@@ -214,19 +215,22 @@ def verify_email():
         if not conn:
             return signed_json_response({"error": "Database connection failed"}, 500)
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id FROM users WHERE verificationToken = %s", (token,))
+        cur.execute("SELECT id, isVerified FROM users WHERE verificationToken = %s", (token,))
         user = cur.fetchone()
         
         if not user:
-            return "<h1>Invalid Link</h1><p>This verification link is invalid or has already been used.</p>"
+            return signed_json_response({"error": "This verification link is invalid or has already been used."}, 400)
+
+        if user.get('isVerified'):
+            return signed_json_response({"message": "Email already verified. Please log in."}, 200)
             
         cur.execute("UPDATE users SET isVerified = 1, verificationToken = NULL WHERE id = %s", (user['id'],))
         conn.commit()
-        return "<h1>Email Verified!</h1><p>Your email has been successfully verified. You can now close this tab and log in.</p>"
+        return signed_json_response({"message": "Email verified successfully! You can now log in."}, 200)
         
     except Exception as e:
         app.logger.error(f"Verify Error: {e}")
-        return "<h1>Error</h1><p>Internal Server Error during verification.</p>"
+        return signed_json_response({"error": "Internal server error during verification."}, 500)
     finally:
         if conn: conn.close()
 
@@ -372,6 +376,46 @@ def resend_verification():
     except Exception as e:
         app.logger.error(f"Resend Verification Error: {e}")
         return signed_json_response({"error": "Failed to resend verification code"}, 500)
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/auth/resend-2fa-otp', methods=['POST'])
+def resend_2fa_otp():
+    """Resend 2FA OTP during login flow (when user is on 2FA verification screen)."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').lower().strip()
+    if not email:
+        return signed_json_response({"error": "Email is required"}, 400)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return signed_json_response({"error": "DB error"}, 500)
+        cur = conn.cursor(dictionary=True)
+
+        cur.execute("SELECT id, twoFactorEnabled, isVerified FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+
+        # Always return success to prevent email enumeration
+        if not user or not user.get('twoFactorEnabled') or not user.get('isVerified'):
+            return signed_json_response({"message": "If that account has 2FA enabled, a new code has been sent."}, 200)
+
+        new_otp = str(secrets.randbelow(900000) + 100000)
+        cur.execute("""
+            UPDATE users SET otpCode = %s, otpExpiry = DATE_ADD(NOW(), INTERVAL 10 MINUTE)
+            WHERE id = %s
+        """, (new_otp, user['id']))
+        conn.commit()
+
+        email_body = f"Your new VaidyaMed-X 2FA Login Code is: {new_otp}\nIt expires in 10 minutes.\n\nIf you did not request this, please change your password immediately."
+        from utils.email_utils import _send_email_common
+        _send_email_common(email, "VaidyaMed-X: New 2FA Login Code", email_body)
+
+        return signed_json_response({"message": "A new 2FA code has been sent to your email."}, 200)
+    except Exception as e:
+        app.logger.error(f"Resend 2FA OTP Error: {e}")
+        return signed_json_response({"error": "Failed to resend 2FA code"}, 500)
     finally:
         if conn: conn.close()
 

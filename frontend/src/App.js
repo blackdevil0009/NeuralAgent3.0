@@ -9,6 +9,7 @@ import Home from './pages/home';
 import Login from './pages/login';
 import Registration from './pages/registration';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import DoctorProfile from './pages/doctor_profile';
 import VaidyaMedDashboard from './pages/vaidyamed_dashboard';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -59,6 +60,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsCondition />} />
 
