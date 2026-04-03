@@ -1146,7 +1146,7 @@ def ai_chat():
                 user_name = user_profile.get('fullName').split()[0] if user_profile else ""
                 reply = ai_engine._build_fallback(message, matches, user_name)
                 
-        return signed_json_response({"reply": reply}, 200)
+        return signed_json_response({"response": reply}, 200)
     finally:
         if conn: conn.close()
 
