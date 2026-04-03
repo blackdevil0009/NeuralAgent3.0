@@ -8,6 +8,8 @@ import time
 import json
 import math
 from collections import OrderedDict
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 
 # Adjust path to import database connection if called from backend directory
 import sys
