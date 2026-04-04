@@ -8,7 +8,26 @@ User=root
 Group=root
 WorkingDirectory=/opt/backend
 Environment="PATH=/opt/backend/venv/bin"
-ExecStart=/opt/backend/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
+
+# ── Database credentials (NOT in .env — injected securely here) ──
+Environment="DB_HOST=127.0.0.1"
+Environment="DB_USER=root"
+Environment="DB_PASSWORD=Devil@2007%"
+Environment="DB_NAME=neuralagent_db"
+
+# ── Authentication secrets ────────────────────────────────────────
+Environment="JWT_SECRET_KEY=neural-agent-secret-2026"
+Environment="HMAC_SECRET=neural-agent-hmac-key-2026"
+Environment="AES_SECRET=neural-agent-aes-key-2026"
+
+ExecStart=/opt/backend/venv/bin/gunicorn \
+    --worker-class gevent \
+    --workers 1 \
+    --bind 0.0.0.0:5000 \
+    --timeout 120 \
+    --reuse-port \
+    app:app
+
 Restart=always
 RestartSec=5
 StandardOutput=journal
