@@ -8,11 +8,11 @@ const VALUES = [
 ];
 
 const TEAM = [
-    { img: '/Govind Sharma.jpeg',        name: 'Govind Sharma',        role: 'Founder & CEO · AI & Backend Developer', bg: '#e8f5ee', avatarGrad: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)' },
-    { img: '/MohammadAyan Husain.jpeg',  name: 'Mohammad Ayan Husain', role: 'AI Research Lead',                    bg: '#fff8e7', avatarGrad: 'linear-gradient(135deg, #b8860b 0%, #e9c46a 100%)' },
-    { img: '/Mohd Azad.jpeg',            name: 'Mohd Azad',            role: 'Frontend Developer',                  bg: '#f0eaff', avatarGrad: 'linear-gradient(135deg, #5b21b6 0%, #a78bfa 100%)' },
-    { img: '/Abhishek Kumar.jpeg',       name: 'Abhishek Kumar',       role: 'AI Research Lead',                    bg: '#fff8e7', avatarGrad: 'linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)' },
-    { img: '/Nandani Singh.jpeg',        name: 'Nandani Singh',        role: 'Product & Strategy',                  bg: '#fff0f5', avatarGrad: 'linear-gradient(135deg, #9d174d 0%, #f472b6 100%)' },
+    { img: '/Govind Sharma.jpeg', name: 'Govind Sharma', role: 'Founder & CEO · AI & Backend Developer', bg: '#e8f5ee', avatarGrad: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)' },
+    { img: '/MohammadAyan Husain.jpeg', name: 'Mohammad Ayan Husain', role: 'AI Research Lead', bg: '#fff8e7', avatarGrad: 'linear-gradient(135deg, #b8860b 0%, #e9c46a 100%)' },
+    { img: '/Mohd Azad.jpeg', name: 'Mohd Azad', role: 'Frontend Developer', bg: '#f0eaff', avatarGrad: 'linear-gradient(135deg, #5b21b6 0%, #a78bfa 100%)' },
+    { img: '/Abhishek Kumar.jpeg', name: 'Abhishek Kumar', role: 'AI Research Lead', bg: '#fff8e7', avatarGrad: 'linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)' },
+    { img: '/Nandani Singh.jpeg', name: 'Nandini Singh', role: 'Product & Strategy', bg: '#fff0f5', avatarGrad: 'linear-gradient(135deg, #9d174d 0%, #f472b6 100%)' },
 ];
 
 export default function About() {

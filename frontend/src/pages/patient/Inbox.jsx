@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { handleError } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
+import { io } from 'socket.io-client';
 import { generateRSAKeyPair, hybridEncrypt, hybridDecrypt } from '../../utils/crypto';
 
 const getAutoReply = () => ""; // Disabled
@@ -105,7 +106,7 @@ export default function Inbox() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
         const fetchHistory = () => {
-            fetch(`${API_BASE_URL}/api/v2/messages/history/${activeId}`, {
+            fetch(`${API_BASE_URL}/api/v2/messages/history/${activeId}?t=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
                 .then(res => res.json())
@@ -127,8 +128,35 @@ export default function Inbox() {
         };
 
         fetchHistory();
-        const interval = setInterval(fetchHistory, 5000); // Poll every 5s for manual replies
-        return () => clearInterval(interval);
+
+        let userId = null;
+        if (token) {
+            try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+        }
+
+        const socket = io(API_BASE_URL, { transports: ['websocket', 'polling'] });
+        socket.on('connect', () => {
+            if (userId) socket.emit('join_inbox', { userId });
+        });
+
+        socket.on('new_inbox_msg', (msg) => {
+            if (String(msg.senderId) === String(activeId) || String(msg.receiverId) === String(activeId)) {
+                setConversations(prev => prev.map(c => {
+                    if (c.id !== activeId) return c;
+                    const newMsg = {
+                        id: msg.id,
+                        from: String(msg.senderId) === String(activeId) ? 'them' : 'me',
+                        text: msg.content || '[Message]',
+                        time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    };
+                    const exists = c.messages.some(m => m.id === newMsg.id || (m.text === newMsg.text && m.from === newMsg.from));
+                    if (exists) return c;
+                    return { ...c, messages: [...c.messages, newMsg] };
+                }));
+            }
+        });
+
+        return () => socket.disconnect();
     }, [activeId]);
 
     // Auto-scroll to bottom when messages change

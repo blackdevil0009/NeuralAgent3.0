@@ -1301,6 +1301,19 @@ def send_e2e_message():
         ))
         msg_id = cur.lastrowid
         conn.commit()
+        
+        # Real-time inbox push
+        try:
+            socketio.emit('new_inbox_msg', {
+                "id": msg_id,
+                "senderId": sender_id,
+                "receiverId": receiver_id,
+                "content": data.get('content'),
+                "timestamp": str(datetime.now())
+            }, room=f"user_{receiver_id}")
+        except Exception as e:
+            app.logger.warning(f"Socket emit failed: {e}")
+
         return signed_json_response({"messageId": msg_id, "status": "sent"}, 200)
     except Exception as e:
         app.logger.error(f"E2E Send Error: {e}")
@@ -1510,6 +1523,12 @@ def handle_new_ice_candidate(data):
     room = data.get('room')
     if room:
         emit('new_ice_candidate', data.get('candidate'), room=room, include_self=False)
+
+@socketio.on('join_inbox')
+def handle_join_inbox(data):
+    user_id = data.get('userId')
+    if user_id:
+        join_room(f"user_{user_id}")
 
 @socketio.on('call_chat_msg')
 def handle_call_chat_msg(data):

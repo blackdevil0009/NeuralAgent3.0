@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
+import { io } from 'socket.io-client';
 import { generateRSAKeyPair, hybridEncrypt, hybridDecrypt } from '../../utils/crypto';
 
 // Mock data removed
@@ -104,13 +105,14 @@ export default function DoctorInbox() {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
         const fetchHistory = () => {
-            fetch(`${API_BASE_URL}/api/v2/messages/history/${selectedConvo.id}`, {
+            fetch(`${API_BASE_URL}/api/v2/messages/history/${selectedConvo.id}?t=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
                 .then(res => res.json())
                 .then(res => {
                     if (res.data && res.data.messages) {
                         const formattedMsgs = res.data.messages.map(m => ({
+                            id: m.id,
                             sender: String(m.senderId) === String(selectedConvo.id) ? 'patient' : 'doctor',
                             text: m.content || '[Message]',
                             time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -121,8 +123,34 @@ export default function DoctorInbox() {
         };
 
         fetchHistory();
-        const interval = setInterval(fetchHistory, 5000);
-        return () => clearInterval(interval);
+        
+        let userId = null;
+        if (token) {
+            try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+        }
+
+        const socket = io(API_BASE_URL, { transports: ['websocket', 'polling'] });
+        socket.on('connect', () => {
+            if (userId) socket.emit('join_inbox', { userId });
+        });
+
+        socket.on('new_inbox_msg', (msg) => {
+            if (String(msg.senderId) === String(selectedConvo.id) || String(msg.receiverId) === String(selectedConvo.id)) {
+                const newMsg = {
+                    id: msg.id,
+                    sender: String(msg.senderId) === String(selectedConvo.id) ? 'patient' : 'doctor',
+                    text: msg.content || '[Message]',
+                    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                setMessages(prev => {
+                    const existing = prev[selectedConvo.id] || [];
+                    if (existing.some(m => m.id === newMsg.id || (m.text === newMsg.text && m.sender === newMsg.sender))) return prev;
+                    return { ...prev, [selectedConvo.id]: [...existing, newMsg] };
+                });
+            }
+        });
+
+        return () => socket.disconnect();
     }, [selectedConvo]);
 
     // Auto-scroll when messages update
