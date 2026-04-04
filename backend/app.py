@@ -28,7 +28,7 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=30)
 jwt = JWTManager(app)
 
 from flask_socketio import SocketIO, join_room, leave_room, emit
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # Auto-create all database tables on startup
 init_db()
