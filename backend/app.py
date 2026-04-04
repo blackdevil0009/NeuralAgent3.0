@@ -509,22 +509,34 @@ def send_message():
     finally:
         if conn: conn.close()
 
-@app.route('/api/messages/upload', methods=['POST'])
+@app.route('/api/messages/upload', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def upload_message_file():
     """Upload media file and return its URL for attaching to messages."""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     if 'file' not in request.files:
         return signed_json_response({"error": "No file part"}, 400)
+    
     file = request.files['file']
     if file.filename == '':
         return signed_json_response({"error": "No selected file"}, 400)
     
-    filename = werkzeug.utils.secure_filename(f"{secrets.token_hex(8)}_{file.filename}")
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-    
-    file_url = f"{request.host_url.rstrip('/')}/uploads/{filename}"
-    return signed_json_response({"url": file_url, "filename": file.filename}, 200)
+    if file:
+        filename = secure_filename(file.filename)
+        # Use token prefix for uniqueness
+        safe_name = f"{secrets.token_hex(8)}_{filename}"
+        
+        folder = app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER)
+        os.makedirs(folder, exist_ok=True)
+        
+        file_path = os.path.join(folder, safe_name)
+        file.save(file_path)
+        
+        # Use host_url to ensure it works across different domains
+        file_url = f"{request.host_url.rstrip('/')}/uploads/{safe_name}"
+        return signed_json_response({"url": file_url, "filename": file.filename}, 200)
 
 from flask import send_from_directory
 @app.route('/uploads/<path:filename>')
@@ -1321,36 +1333,6 @@ def send_e2e_message():
         return signed_json_response({"error": "Send failed"}, 500)
     finally:
         if conn: conn.close()
-
-import werkzeug
-from werkzeug.utils import secure_filename
-
-@app.route('/api/messages/upload', methods=['POST', 'OPTIONS'])
-@jwt_required()
-def upload_message_file():
-    if request.method == 'OPTIONS':
-        return '', 200
-        
-    if 'file' not in request.files:
-        return signed_json_response({"error": "No file part"}, 400)
-    
-    file = request.files['file']
-    if file.filename == '':
-        return signed_json_response({"error": "No selected file"}, 400)
-        
-    if file:
-        filename = secure_filename(file.filename)
-        # Ensure timestamp to avoid overwrites
-        timestamp = int(datetime.timestamp(datetime.now()))
-        safe_name = f"{timestamp}_{filename}"
-        
-        os.makedirs(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER), exist_ok=True)
-        filepath = os.path.join(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER), safe_name)
-        file.save(filepath)
-        
-        file_url = f"{request.host_url}static/uploads/{safe_name}"
-        
-        return signed_json_response({"url": file_url}, 200)
 
 @app.route('/api/v2/messages/history/<other_id>', methods=['GET'])
 @jwt_required()
