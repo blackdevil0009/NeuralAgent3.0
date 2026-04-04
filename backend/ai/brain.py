@@ -9,7 +9,7 @@ import json
 import math
 from collections import OrderedDict
 import warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 # Adjust path to import database connection if called from backend directory
 import sys
@@ -22,7 +22,7 @@ except ImportError:
 # ─── Gemini API Integration ─────────────────────────────────────────────
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyByDFMLB2rbTpgKm9MIjZtbUpVizfIgOJI")
-GEMINI_MODEL = "gemini-pro"
+GEMINI_MODEL = "gemini-2.0-flash"
 
 # ─── System Prompt ──────────────────────────────────────────────────────
 
@@ -515,19 +515,17 @@ class MedAssistX:
         self.client = None
 
         api_key = GEMINI_API_KEY
-        print("DEBUG API KEY:", repr(api_key))
         if api_key and api_key != "your_gemini_api_key_here":
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=api_key)
-                self.client = genai.GenerativeModel(
-                    GEMINI_MODEL
-                )
+                from google import genai
+                self.genai_client = genai.Client(api_key=api_key)
                 self.api_available = True
-                print("✚ VaidyaMed-X initialized with Gemini API ✓")
+                print("✚ VaidyaMed-X initialized with Gemini API (google.genai) ✓")
             except Exception as e:
                 print(f"[-] VaidyaMed-X: Gemini init failed ({type(e).__name__}: {e}), using fallback engine")
+                self.genai_client = None
         else:
+            self.genai_client = None
             print("[i] VaidyaMed-X initialized (offline mode — set GEMINI_API_KEY for AI responses)")
 
     def _detect_emergency(self, text):
@@ -646,16 +644,14 @@ class MedAssistX:
 
     def _embed_text(self, text):
         """Generate vector embedding using Gemini."""
-        if not self.api_available:
+        if not self.api_available or not self.genai_client:
             return None
         try:
-            import google.generativeai as genai
-            result = genai.embed_content(
+            result = self.genai_client.models.embed_content(
                 model="models/text-embedding-004",
-                content=text,
-                task_type="retrieval_query",
+                contents=text,
             )
-            return result['embedding']
+            return result.embeddings[0].values
         except Exception as e:
             print(f"Embedding error: {e}")
             return None
@@ -699,7 +695,7 @@ class MedAssistX:
 
     def _call_gemini(self, user_input, user_id=None, user_profile=None):
         """Call Gemini API with Memory, User Profile Context, and RAG."""
-        if not self.api_available or not self.client:
+        if not self.api_available or not self.genai_client:
             return None
 
         # 1. Retrieve RAG Context
@@ -711,10 +707,9 @@ class MedAssistX:
             prompt = f"{context}\n\n---USER QUERY---\n{user_input}"
 
         try:
-            # 3. Retrieve conversation history
-            history = self._retrieve_history(user_id) if user_id else []
+            from google.genai import types as genai_types
 
-            # 4. Build a system context injection with user profile info
+            # 3. Build system instruction
             profile_context = ""
             if user_profile:
                 name = user_profile.get('fullName', '').split()[0] if user_profile.get('fullName') else ''
@@ -723,18 +718,35 @@ class MedAssistX:
                 if name:
                     profile_context = f"[CONTEXT: You are talking to {name}, a {gender} {role}. You already know their name is {name}. Address them warmly by name naturally during conversation.]\n\n"
 
-            final_prompt = profile_context + prompt if profile_context else prompt
+            system_instruction = BASE_SYSTEM_PROMPT
+            if profile_context:
+                system_instruction = profile_context + system_instruction
 
-            if not history:
-                final_prompt = f"SYSTEM PROMPT: {BASE_SYSTEM_PROMPT}\n\nUSER QUERY: {final_prompt}"
+            final_prompt = prompt
 
-            # 5. Start Chat Session
-            chat = self.client.start_chat(history=history)
-            response = chat.send_message(
-                final_prompt,
-                generation_config=dict(
+            # 4. Retrieve conversation history and build contents list
+            history = self._retrieve_history(user_id) if user_id else []
+            contents = []
+            for h in history:
+                role_mapped = "user" if h["role"] == "user" else "model"
+                contents.append(genai_types.Content(
+                    role=role_mapped,
+                    parts=[genai_types.Part(text=h["parts"][0])]
+                ))
+            # Append current user message
+            contents.append(genai_types.Content(
+                role="user",
+                parts=[genai_types.Part(text=final_prompt)]
+            ))
+
+            # 5. Generate response
+            response = self.genai_client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=contents,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=system_instruction,
                     temperature=0.72,
-                    max_output_tokens=1000
+                    max_output_tokens=1000,
                 )
             )
             content = response.text

@@ -23,7 +23,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization", "X-HMAC-Signature", "X-Timestamp"]}})
 app.config['BCRYPT_LOG_ROUNDS'] = 8
 bcrypt = Bcrypt(app)
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'neural-agent-secret-2026')
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'vaidyamedx-neural-agent-secret-key-2026!!')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=30)
 jwt = JWTManager(app)
 

@@ -10,7 +10,7 @@ cryptography
 pydantic
 requests
 gunicorn
-google-generativeai
+google-genai
 gevent
 gevent-websocket
 python-socketio

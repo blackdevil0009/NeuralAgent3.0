@@ -16,7 +16,7 @@ Environment="DB_PASSWORD=Devil@2007%"
 Environment="DB_NAME=neuralagent_db"
 
 # ── Authentication secrets ────────────────────────────────────────
-Environment="JWT_SECRET_KEY=neural-agent-secret-2026"
+Environment="JWT_SECRET_KEY=vaidyamedx-neural-agent-secret-key-2026!!"
 Environment="HMAC_SECRET=neural-agent-hmac-key-2026"
 Environment="AES_SECRET=neural-agent-aes-key-2026"
 
