@@ -70,7 +70,10 @@ def ping():
 @app.route('/api/auth/register', methods=['POST'])
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.get_json(silent=True) or {}
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    else:
+        data = request.form.to_dict()
     
     full_name = (data.get('fullName') or '').strip()
     email = (data.get('email') or '').strip().lower()
@@ -891,17 +894,30 @@ def handle_user_profile():
         if request.method == 'PUT':
             # Handle profile updates securely (ignoring sensitive fields)
             data = request.get_json(silent=True) or {}
+            
+            cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+            existing = cur.fetchone()
+            if not existing: return signed_json_response({"message": "User not found"}, 404)
+            
+            # Safely merge form data with existing data to prevent nuking fields omitted by the frontend
+            new_name = data.get('name') if data.get('name') is not None else existing['fullName']
+            new_dob = data.get('dob') if data.get('dob') is not None else existing['dob']
+            new_gender = data.get('gender') if data.get('gender') is not None else existing['gender']
+            new_bg = data.get('bloodGroup') if data.get('bloodGroup') is not None else existing['blood_group']
+            new_address = data.get('address') if data.get('address') is not None else existing['address']
+            new_city = data.get('city') if data.get('city') is not None else existing['city']
+            new_state = data.get('state') if data.get('state') is not None else existing['state']
+            
+            pin_val = data.get('pin') if data.get('pin') is not None else data.get('pincode')
+            new_pin = pin_val if pin_val is not None else existing['pincode']
+
             # Base users update
             cur.execute('''
                 UPDATE users SET fullName=%s, dob=%s, gender=%s, blood_group=%s, address=%s, city=%s, state=%s, pincode=%s
                 WHERE id=%s
-            ''', (data.get('name'), data.get('dob'), data.get('gender'), data.get('bloodGroup'), data.get('address'), data.get('city'), data.get('state'), data.get('pin') or data.get('pincode'), user_id))
+            ''', (new_name, new_dob, new_gender, new_bg, new_address, new_city, new_state, new_pin, user_id))
             
-            # Check user role
-            cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
-            u = cur.fetchone()
-            
-            if u and u['role'] == 'patient':
+            if existing['role'] == 'patient':
                 cur.execute('''
                     INSERT INTO patient_details (userId, dosha, allergies, conditions, medications)
                     VALUES (%s, %s, %s, %s, %s)
@@ -911,6 +927,39 @@ def handle_user_profile():
                         conditions=VALUES(conditions), 
                         medications=VALUES(medications)
                 ''', (user_id, data.get('dosha'), data.get('allergies'), data.get('conditions'), data.get('medications')))
+            elif existing['role'] == 'doctor':
+                # Preserve existing doctor details if a field is not provided
+                cur.execute("SELECT * FROM doctor_details WHERE userId = %s", (user_id,))
+                ex_doc = cur.fetchone() or {}
+                
+                cur.execute('''
+                    INSERT INTO doctor_details (
+                        userId, degree, position, specialization, experience, hospital, clinic_location, regNumber, consultantFee, workingHours,
+                        upiId, bankAccountDetails, bankAccountName, bankAccountNumber, bankIfsc
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        degree=VALUES(degree), position=VALUES(position), specialization=VALUES(specialization),
+                        experience=VALUES(experience), hospital=VALUES(hospital), clinic_location=VALUES(clinic_location),
+                        regNumber=VALUES(regNumber), consultantFee=VALUES(consultantFee), workingHours=VALUES(workingHours),
+                        upiId=VALUES(upiId), bankAccountDetails=VALUES(bankAccountDetails), bankAccountName=VALUES(bankAccountName),
+                        bankAccountNumber=VALUES(bankAccountNumber), bankIfsc=VALUES(bankIfsc)
+                ''', (
+                    user_id,
+                    data.get('degree') if 'degree' in data else ex_doc.get('degree'),
+                    data.get('position') if 'position' in data else ex_doc.get('position'),
+                    data.get('specialization') if 'specialization' in data else ex_doc.get('specialization'),
+                    data.get('experience') if 'experience' in data else ex_doc.get('experience'),
+                    data.get('hospital') if 'hospital' in data else ex_doc.get('hospital'),
+                    data.get('clinicLocation') if 'clinicLocation' in data else ex_doc.get('clinic_location'),
+                    data.get('regNumber') if 'regNumber' in data else ex_doc.get('regNumber'),
+                    int(data.get('consultantFee')) if data.get('consultantFee') is not None else ex_doc.get('consultantFee'),
+                    data.get('workingHours') if 'workingHours' in data else ex_doc.get('workingHours'),
+                    data.get('upiId') if 'upiId' in data else ex_doc.get('upiId'),
+                    data.get('bankAccountDetails') if 'bankAccountDetails' in data else ex_doc.get('bankAccountDetails'),
+                    data.get('bankAccountName') if 'bankAccountName' in data else ex_doc.get('bankAccountName'),
+                    data.get('bankAccountNumber') if 'bankAccountNumber' in data else ex_doc.get('bankAccountNumber'),
+                    data.get('bankIfsc') if 'bankIfsc' in data else ex_doc.get('bankIfsc')
+                ))
             conn.commit()
             
         # Get base user details
@@ -927,6 +976,7 @@ def handle_user_profile():
         if 'rsaPrivateKeyEncrypted' in user_data: del user_data['rsaPrivateKeyEncrypted']
         if 'createdAt' in user_data: user_data['createdAt'] = str(user_data['createdAt'])
         if 'otpExpiry' in user_data: user_data['otpExpiry'] = str(user_data['otpExpiry'])
+        if user_data.get('dob'): user_data['dob'] = str(user_data['dob'])
         
         if user_data.get('role') == 'doctor':
             cur.execute("SELECT * FROM doctor_details WHERE userId = %s", (user_id,))
