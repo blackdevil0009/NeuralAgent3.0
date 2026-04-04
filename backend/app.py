@@ -907,15 +907,16 @@ def handle_user_profile():
             new_address = data.get('address') if data.get('address') is not None else existing['address']
             new_city = data.get('city') if data.get('city') is not None else existing['city']
             new_state = data.get('state') if data.get('state') is not None else existing['state']
+            new_mobile = data.get('mobile') if data.get('mobile') is not None else existing['mobile']
             
             pin_val = data.get('pin') if data.get('pin') is not None else data.get('pincode')
             new_pin = pin_val if pin_val is not None else existing['pincode']
 
             # Base users update
             cur.execute('''
-                UPDATE users SET fullName=%s, dob=%s, gender=%s, blood_group=%s, address=%s, city=%s, state=%s, pincode=%s
+                UPDATE users SET fullName=%s, mobile=%s, dob=%s, gender=%s, blood_group=%s, address=%s, city=%s, state=%s, pincode=%s
                 WHERE id=%s
-            ''', (new_name, new_dob, new_gender, new_bg, new_address, new_city, new_state, new_pin, user_id))
+            ''', (new_name, new_mobile, new_dob, new_gender, new_bg, new_address, new_city, new_state, new_pin, user_id))
             
             if existing['role'] == 'patient':
                 cur.execute('''
