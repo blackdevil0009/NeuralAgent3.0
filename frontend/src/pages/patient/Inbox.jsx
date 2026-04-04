@@ -134,7 +134,7 @@ export default function Inbox() {
             try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
         }
 
-        const socket = io(API_BASE_URL, { transports: ['websocket', 'polling'] });
+        const socket = io(API_BASE_URL, { transports: ['websocket'] });
         socket.on('connect', () => {
             if (userId) socket.emit('join_inbox', { userId });
         });

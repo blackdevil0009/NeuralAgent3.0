@@ -20,6 +20,8 @@ export default function DoctorInbox() {
     const [inputText, setInputText] = useState('');
     const [activeReportOverlay, setActiveReportOverlay] = useState(null);
     const [inboxTab, setInboxTab] = useState('active'); // 'active' | 'history'
+    const [attachPreview, setAttachPreview] = useState(null);
+    const fileInputRef = React.useRef(null);
 
     // Initialize E2E RSA Keys — always re-upload to ensure DB has our key
     useEffect(() => {
@@ -129,7 +131,7 @@ export default function DoctorInbox() {
             try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
         }
 
-        const socket = io(API_BASE_URL, { transports: ['websocket', 'polling'] });
+        const socket = io(API_BASE_URL, { transports: ['websocket'] });
         socket.on('connect', () => {
             if (userId) socket.emit('join_inbox', { userId });
         });
@@ -160,23 +162,65 @@ export default function DoctorInbox() {
         }
     }, [messages, selectedConvo]);
 
-    const handleSendMessage = async () => {
-        if (!inputText.trim() || !selectedConvo) return;
+    const handleFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const isImg = file.type.startsWith('image/');
+        setAttachPreview({
+            file,
+            name: file.name,
+            size: (file.size / 1024).toFixed(0) + ' KB',
+            icon: isImg ? '🖼️' : file.type === 'application/pdf' ? '📄' : '📎',
+            isImg,
+            url: isImg ? URL.createObjectURL(file) : null,
+        });
+        e.target.value = '';
+    };
 
+    const handleSendMessage = async () => {
+        if ((!inputText.trim() && !attachPreview) || !selectedConvo) return;
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+        let finalText = inputText.trim();
+
+        if (attachPreview) {
+            try {
+                const formData = new FormData();
+                formData.append('file', attachPreview.file);
+                const uploadRes = await fetch(`${API_BASE_URL}/api/messages/upload`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const uploadJson = await uploadRes.json();
+                if (uploadRes.ok) {
+                    const uploadData = uploadJson.data || uploadJson;
+                    const fileUrl = uploadData.url;
+                    const tag = attachPreview.isImg ? `[IMAGE] ${fileUrl}` : `[DOCUMENT] ${fileUrl}`;
+                    finalText = finalText ? `${finalText}\n${tag}` : tag;
+                } else {
+                    console.error('Upload failed', uploadJson.error);
+                    return;
+                }
+            } catch(e) {
+                console.error('Attachment upload error', e);
+                return;
+            }
+            setAttachPreview(null);
+        }
 
         // Optimistic UI Update
         const optimisticMsg = {
             sender: 'doctor',
             id: 'temp-' + Date.now(),
-            text: inputText,
+            text: finalText,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => ({
             ...prev,
             [selectedConvo.id]: [...(prev[selectedConvo.id] || []), optimisticMsg]
         }));
-        const textToSend = inputText;
+        
         setInputText('');
 
         try {
@@ -188,7 +232,7 @@ export default function DoctorInbox() {
                     'X-Timestamp': Math.floor(Date.now() / 1000).toString(),
                     'X-HMAC-Signature': 'DEV_BYPASS'
                 },
-                body: JSON.stringify({ receiverId: selectedConvo.id, content: textToSend })
+                body: JSON.stringify({ receiverId: selectedConvo.id, content: finalText })
             });
         } catch (err) {
             console.error('Send error:', err);
@@ -325,22 +369,35 @@ export default function DoctorInbox() {
                         </div>
                     </div>
                 ) : (
-                <div style={{ padding: '20px 24px', borderTop: '1px solid var(--doc-border)' }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                        <button style={{ background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer' }}>📎</button>
-                        <input
-                            type="text"
-                            placeholder="Type clinical advice or prescribed medications..."
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            style={{
-                                flex: 1, padding: '12px 18px', borderRadius: 12, border: '1px solid var(--doc-border)', background: '#f8f9f8'
-                            }}
-                        />
-                        <button className="dd-btn dd-btn-primary" onClick={handleSendMessage}>Send Advice</button>
-                    </div>
-                </div>
+                    <>
+                        {attachPreview && (
+                            <div style={{ padding: '10px 20px', background: '#f8f9fa', borderTop: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ fontSize: '1.5rem' }}>{attachPreview.icon}</div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{attachPreview.name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#666' }}>{attachPreview.size}</div>
+                                </div>
+                                <button onClick={() => setAttachPreview(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+                            </div>
+                        )}
+                        <div style={{ padding: '20px 24px', borderTop: '1px solid var(--doc-border)' }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer' }}>📎</button>
+                                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,application/pdf" onChange={handleFile} />
+                                <input
+                                    type="text"
+                                    placeholder="Type clinical advice or prescribed medications..."
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    style={{
+                                        flex: 1, padding: '12px 18px', borderRadius: 12, border: '1px solid var(--doc-border)', background: '#f8f9f8'
+                                    }}
+                                />
+                                <button className="dd-btn dd-btn-primary" onClick={handleSendMessage}>Send Advice</button>
+                            </div>
+                        </div>
+                    </>
                 )}
 
             </div>

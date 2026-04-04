@@ -191,7 +191,7 @@ export default function VideoCall() {
 
         // Use WebSocket transport (fast!) with polling fallback
         const socket = io(API_BASE_URL, {
-            transports: ['websocket', 'polling'],
+            transports: ['websocket'],
             reconnection: true,
             reconnectionAttempts: 7,
             reconnectionDelay: 1000,

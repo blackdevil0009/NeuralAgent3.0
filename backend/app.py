@@ -1322,6 +1322,36 @@ def send_e2e_message():
     finally:
         if conn: conn.close()
 
+import werkzeug
+from werkzeug.utils import secure_filename
+
+@app.route('/api/messages/upload', methods=['POST', 'OPTIONS'])
+@jwt_required()
+def upload_message_file():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    if 'file' not in request.files:
+        return signed_json_response({"error": "No file part"}, 400)
+    
+    file = request.files['file']
+    if file.filename == '':
+        return signed_json_response({"error": "No selected file"}, 400)
+        
+    if file:
+        filename = secure_filename(file.filename)
+        # Ensure timestamp to avoid overwrites
+        timestamp = int(datetime.timestamp(datetime.now()))
+        safe_name = f"{timestamp}_{filename}"
+        
+        os.makedirs(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER), exist_ok=True)
+        filepath = os.path.join(app.config.get('UPLOAD_FOLDER', UPLOAD_FOLDER), safe_name)
+        file.save(filepath)
+        
+        file_url = f"{request.host_url}static/uploads/{safe_name}"
+        
+        return signed_json_response({"url": file_url}, 200)
+
 @app.route('/api/v2/messages/history/<other_id>', methods=['GET'])
 @jwt_required()
 def get_message_history(other_id):
