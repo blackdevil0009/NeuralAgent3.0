@@ -21,7 +21,7 @@ Environment="HMAC_SECRET=neural-agent-hmac-key-2026"
 Environment="AES_SECRET=neural-agent-aes-key-2026"
 
 ExecStart=/root/NeuralAgent3.0/backend/venv/bin/gunicorn \
-    --worker-class gevent \
+    --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
     --workers 1 \
     --bind 0.0.0.0:5000 \
     --timeout 120 \

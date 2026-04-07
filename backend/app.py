@@ -1321,7 +1321,7 @@ def send_e2e_message():
                 "senderId": sender_id,
                 "receiverId": receiver_id,
                 "content": data.get('content'),
-                "timestamp": str(datetime.now())
+                "timestamp": str(datetime.datetime.now())
             }, room=f"user_{receiver_id}")
         except Exception as e:
             app.logger.warning(f"Socket emit failed: {e}")
