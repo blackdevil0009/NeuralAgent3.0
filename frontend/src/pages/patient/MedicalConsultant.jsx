@@ -32,6 +32,10 @@ export default function MedicalConsultant() {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const json = await res.json();
+                if (res.status === 401) {
+                    navigate('/login');
+                    return;
+                }
                 if (res.ok) {
                     setDoctors(json.data?.doctors || []);
                 }
@@ -63,13 +67,18 @@ export default function MedicalConsultant() {
                     notes: aptNotes
                 })
             });
+            if (res.status === 401) {
+                handleError('Session expired. Please log in again.');
+                navigate('/login');
+                return;
+            }
             if (res.ok) {
                 handleSuccess('Appointment booked successfully!');
                 setSelected(null);
                 navigate('/patient/appointments');
             } else {
                 const json = await res.json();
-                handleError(json.data?.error || 'Booking failed');
+                handleError(json.data?.error || json.error || 'Booking failed');
             }
         } catch (err) {
             handleError(err, 'Connection error. Please try again.');
@@ -193,28 +202,28 @@ export default function MedicalConsultant() {
                             Book with {selected.name}
                         </h3>
                         <div className="pd-form-group">
-                            <label>Type</label>
-                            <select className="pd-select" value={aptType} onChange={e => setAptType(e.target.value)}>
+                            <label htmlFor="apt-type">Type</label>
+                            <select id="apt-type" name="apt-type" className="pd-select" value={aptType} onChange={e => setAptType(e.target.value)}>
                                 <option>Video Call</option>
                                 <option>Chat Consultation</option>
                             </select>
                         </div>
                         <div className="pd-form-group">
-                            <label>Date</label>
-                            <input type="date" className="pd-input"
+                            <label htmlFor="apt-date">Date</label>
+                            <input type="date" id="apt-date" name="apt-date" className="pd-input"
                                 min={new Date().toISOString().split('T')[0]}
                                 value={aptDate} onChange={e => setAptDate(e.target.value)} />
                         </div>
                         <div className="pd-form-group">
-                            <label>Time Slot</label>
-                            <select className="pd-select" value={aptTime} onChange={e => setAptTime(e.target.value)}>
+                            <label htmlFor="apt-time">Time Slot</label>
+                            <select id="apt-time" name="apt-time" className="pd-select" value={aptTime} onChange={e => setAptTime(e.target.value)}>
                                 <option>10:00 AM</option><option>11:00 AM</option>
                                 <option>02:00 PM</option><option>04:00 PM</option>
                             </select>
                         </div>
                         <div className="pd-form-group">
-                            <label>Chief Complaint</label>
-                            <textarea className="pd-textarea"
+                            <label htmlFor="apt-notes">Chief Complaint</label>
+                            <textarea id="apt-notes" name="apt-notes" className="pd-textarea"
                                 placeholder="Describe your main concern…"
                                 rows={3} value={aptNotes} onChange={e => setAptNotes(e.target.value)} />
                         </div>

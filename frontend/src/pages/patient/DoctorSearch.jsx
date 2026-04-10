@@ -54,10 +54,18 @@ export default function DoctorSearch() {
 
         const cityParam = locationQuery ? `&city=${encodeURIComponent(locationQuery)}` : '';
         const fetchDoctors = fetch(`${API_BASE_URL}/api/doctors?${cityParam}`, { headers })
-            .then(r => r.json()).then(j => j.data?.doctors || []).catch(() => []);
+            .then(async r => {
+                const j = await r.json();
+                if (r.status === 401) { navigate('/login'); return []; }
+                return j.data?.doctors || [];
+            }).catch(() => []);
 
         const fetchAppointments = fetch(`${API_BASE_URL}/api/appointments`, { headers })
-            .then(r => r.json()).then(j => j.data?.appointments || []).catch(() => []);
+            .then(async r => {
+                const j = await r.json();
+                if (r.status === 401) { navigate('/login'); return []; }
+                return j.data?.appointments || [];
+            }).catch(() => []);
 
         Promise.all([fetchDoctors, fetchAppointments])
             .then(([docs, appts]) => {
@@ -102,7 +110,7 @@ export default function DoctorSearch() {
         setSubmitting(true);
         try {
             // BYPASS RAZORPAY AND DIRECTLY BOOK A FREE APPOINTMENT
-            const bookRes = await fetch(`${API_BASE_URL}/api/appointments/book`, {
+            const bookRes = await fetch(`${API_BASE_URL}/api/appointments`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json', 
@@ -123,6 +131,12 @@ export default function DoctorSearch() {
             });
             const bookJson = await bookRes.json();
             
+            if (bookRes.status === 401) {
+                handleError('Session expired. Please log in again.');
+                navigate('/login');
+                return;
+            }
+
             if (bookRes.ok) {
                 handleSuccess(`Appointment booked securely. Please navigate to the Chat to talk with Dr. ${bookingDoc.name}`);
                 navigate('/patient/appointments');
@@ -148,12 +162,12 @@ export default function DoctorSearch() {
 
             {/* Search Row */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                <input type="text" className="pd-input"
+                <input type="text" id="doctor-query" name="doctor-query" className="pd-input"
                     placeholder="🔍  Search by name, specialization, symptom…"
                     value={query} onChange={e => setQuery(e.target.value)}
                     style={{ borderRadius: 50, padding: '12px 20px', flex: 2 }}
                 />
-                <input type="text" className="pd-input"
+                <input type="text" id="location-query" name="location-query" className="pd-input"
                     placeholder="📍  City or area (e.g. Lucknow)"
                     value={locationQuery} onChange={e => setLocationQuery(e.target.value)}
                     style={{ borderRadius: 50, padding: '12px 20px', flex: 1 }}
@@ -331,8 +345,8 @@ export default function DoctorSearch() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     {/* Consultation Type */}
                                     <div className="pd-form-group">
-                                        <label>Consultation Type</label>
-                                        <select className="pd-select" value={aptType} onChange={e => setAptType(e.target.value)}>
+                                        <label htmlFor="apt-type">Consultation Type</label>
+                                        <select id="apt-type" name="apt-type" className="pd-select" value={aptType} onChange={e => setAptType(e.target.value)}>
                                             <option value="Video Call">🎥 Video Call</option>
                                             <option value="Chat Consultation">💬 Chat Consultation</option>
                                             <option value="Offline / In-Clinic">🏥 Offline / In-Clinic</option>
@@ -347,16 +361,16 @@ export default function DoctorSearch() {
 
                                     {/* Date */}
                                     <div className="pd-form-group">
-                                        <label>Preferred Date</label>
-                                        <input type="date" className="pd-input"
+                                        <label htmlFor="apt-date">Preferred Date</label>
+                                        <input type="date" id="apt-date" name="apt-date" className="pd-input"
                                             min={new Date().toISOString().split('T')[0]}
                                             value={aptDate} onChange={e => setAptDate(e.target.value)} />
                                     </div>
 
                                     {/* Time */}
                                     <div className="pd-form-group">
-                                        <label>Preferred Time</label>
-                                        <input type="time" className="pd-input"
+                                        <label htmlFor="apt-time">Preferred Time</label>
+                                        <input type="time" id="apt-time" name="apt-time" className="pd-input"
                                             value={aptTime} onChange={e => setAptTime(e.target.value)} />
                                         {bookingDoc.workingHours && (
                                             <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 3 }}>
@@ -367,8 +381,8 @@ export default function DoctorSearch() {
 
                                     {/* Notes */}
                                     <div className="pd-form-group">
-                                        <label>Reason for visit / Symptoms</label>
-                                        <textarea className="pd-textarea"
+                                        <label htmlFor="apt-notes">Reason for visit / Symptoms</label>
+                                        <textarea id="apt-notes" name="apt-notes" className="pd-textarea"
                                             placeholder="Briefly describe your symptoms or reason for consultation…"
                                             rows={3} value={aptNotes} onChange={e => setAptNotes(e.target.value)} />
                                     </div>

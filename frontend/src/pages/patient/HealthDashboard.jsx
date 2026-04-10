@@ -10,6 +10,7 @@ export default function HealthDashboard() {
     const [vitals, setVitals] = useState([]);
     const [symptoms, setSymptoms] = useState([]);
     const [activity, setActivity] = useState([]);
+    const [activeEmergencies, setActiveEmergencies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [fetchingDash, setFetchingDash] = useState(true);
 
@@ -63,8 +64,25 @@ export default function HealthDashboard() {
             }
         };
 
+        const fetchEmergencies = async () => {
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/emergencies/my`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    const all = json.data?.emergencies || [];
+                    setActiveEmergencies(all.filter(e => e.status !== 'resolved'));
+                }
+            } catch (err) {
+                console.error("Failed to fetch active emergencies:", err);
+            }
+        };
+
         fetchUpcoming();
         fetchDashboardData();
+        fetchEmergencies();
     }, []);
 
     // Helper to format date
@@ -110,14 +128,50 @@ export default function HealthDashboard() {
                 </div>
             </div>
 
+            {/* Active Emergency Alerts */}
+            {activeEmergencies.length > 0 && (
+                <div style={{
+                    margin: '24px 0', padding: '20px 24px', borderRadius: 20,
+                    background: 'linear-gradient(135deg, #c0392b, #e74c3c)',
+                    color: '#fff', boxShadow: '0 10px 30px rgba(192,57,43,0.3)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    animation: 'pulse 2s infinite'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                        <div style={{ fontSize: '2.5rem' }}>🚨</div>
+                        <div>
+                            <div style={{ fontWeight: 800, fontSize: '1.2rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Active Emergency Alert
+                            </div>
+                            <div style={{ opacity: 0.9, fontSize: '0.95rem', marginTop: 4 }}>
+                                {activeEmergencies[0].status === 'pending' 
+                                    ? 'Broadcasting to all available senior consultants...' 
+                                    : 'A doctor is currently responding to your case.'}
+                            </div>
+                        </div>
+                    </div>
+                    <Link to="/patient/emergency" style={{ 
+                        background: '#fff', color: '#c0392b', padding: '10px 20px', 
+                        borderRadius: 50, fontWeight: 700, textDecoration: 'none',
+                        fontSize: '0.9rem', boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                    }}>
+                        View Details
+                    </Link>
+                </div>
+            )}
+
             {/* Vitals Grid */}
             <h3 className="pd-section-title">📊 Today's Vitals</h3>
             {fetchingDash ? (
                 <div style={{ padding: 40, textAlign: 'center', color: '#666' }}>⚡ Synchronizing health metrics…</div>
             ) : vitals.length === 0 ? (
                 <div className="pd-card" style={{ padding: 40, textAlign: 'center', color: '#888', marginBottom: 24 }}>
-                    <div style={{ fontSize: '2rem', marginBottom: 10 }}>📡</div>
-                    <p>No health metrics detected. Upload a medical report to sync your vitals.</p>
+                    <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>📡</div>
+                    <p style={{ fontWeight: 600, color: '#555' }}>No health metrics yet.</p>
+                    <p style={{ fontSize: '0.88rem', marginBottom: 16 }}>Upload a medical report and run AI analysis to sync your vitals here.</p>
+                    <Link to="/patient/reports" className="pd-btn pd-btn-primary" style={{ display: 'inline-flex' }}>
+                        📄 Upload a Report
+                    </Link>
                 </div>
             ) : (
                 <div className="pd-grid-3" style={{ marginBottom: 24 }}>
@@ -224,6 +278,13 @@ export default function HealthDashboard() {
                     </div>
                 </div>
             </div>
+            <style>{`
+                @keyframes pulse {
+                    0% { opacity: 0.9; transform: scale(1); }
+                    50% { opacity: 1; transform: scale(1.01); }
+                    100% { opacity: 0.9; transform: scale(1); }
+                }
+            `}</style>
         </div>
     );
 }

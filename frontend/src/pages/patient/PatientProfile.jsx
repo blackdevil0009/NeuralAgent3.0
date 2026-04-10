@@ -197,18 +197,18 @@ export default function PatientProfile() {
                             const val = profile[f.key];
                             return (
                                 <div className="pd-form-group" key={f.key}>
-                                    <label>{f.label}</label>
+                                    <label htmlFor={f.key}>{f.label}</label>
                                     {!isEditing ? (
                                         <div style={{ padding: '10px 15px', background: '#f9f9f9', borderRadius: '8px', color: val ? '#333' : '#aaa', minHeight: '42px', display: 'flex', alignItems: 'center', fontSize: '0.95rem' }}>
                                             {val || 'Not Added Yet'}
                                         </div>
                                     ) : (
                                         f.type === 'select' ? (
-                                            <select className="pd-select" value={val || ''} onChange={e => handleChange(f.key, e.target.value)} disabled={f.readOnly}>
+                                            <select id={f.key} name={f.key} className="pd-select" value={val || ''} onChange={e => handleChange(f.key, e.target.value)} disabled={f.readOnly}>
                                                 {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                                             </select>
                                         ) : (
-                                            <input type={f.type} className="pd-input" value={val || ''} onChange={e => handleChange(f.key, e.target.value)} placeholder={f.placeholder} readOnly={f.readOnly} disabled={f.readOnly} style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed', background: '#f0f0f0' } : {}} />
+                                            <input type={f.type} id={f.key} name={f.key} className="pd-input" value={val || ''} onChange={e => handleChange(f.key, e.target.value)} placeholder={f.placeholder} readOnly={f.readOnly} disabled={f.readOnly} style={f.readOnly ? { opacity: 0.65, cursor: 'not-allowed', background: '#f0f0f0' } : {}} />
                                         )
                                     )}
                                 </div>

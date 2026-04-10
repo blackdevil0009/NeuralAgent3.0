@@ -81,6 +81,7 @@ export default function Inbox() {
                 }
             });
             setAppointmentMap(map);
+            setAppointmentMap(map);
             const convos = docs
                 .filter(d => map[String(d.id)])
                 .map(d => ({
@@ -118,14 +119,17 @@ export default function Inbox() {
                 .then(res => res.json())
                 .then(res => {
                     if (res.data && res.data.messages) {
+                        let myId = null;
+                        if (token) {
+                            try { myId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+                        }
                         setConversations(prev => prev.map(c => {
                             if (c.id !== activeId) return c;
                             const formattedMsgs = res.data.messages.map(m => ({
                                 id: m.id,
-                                from: String(m.senderId) === String(activeId) ? 'them' : 'me',
-                                // Always read content field — E2E ciphertext is incompatible with backend
+                                from: String(m.sender_id) === String(myId) ? 'me' : 'them',
                                 text: m.content || '[Message]',
-                                time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                time: new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
                             }));
                             return { ...c, messages: formattedMsgs };
                         }));
@@ -140,20 +144,28 @@ export default function Inbox() {
             try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
         }
 
-        const socket = io(API_BASE_URL, { transports: ['websocket'] });
+        const socket = io(API_BASE_URL, { 
+            auth: { token },
+            transports: ['websocket'] 
+        });
         socket.on('connect', () => {
             if (userId) socket.emit('join_inbox', { userId });
         });
 
         socket.on('new_inbox_msg', (msg) => {
-            if (String(msg.senderId) === String(activeId) || String(msg.receiverId) === String(activeId)) {
+            const isRelevant = String(msg.sender_id) === String(activeId) || String(msg.receiver_id) === String(activeId);
+            if (isRelevant) {
+                let myId = null;
+                if (token) {
+                    try { myId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+                }
                 setConversations(prev => prev.map(c => {
                     if (c.id !== activeId) return c;
                     const newMsg = {
                         id: msg.id,
-                        from: String(msg.senderId) === String(activeId) ? 'them' : 'me',
+                        from: String(msg.sender_id) === String(myId) ? 'me' : 'them',
                         text: msg.content || '[Message]',
-                        time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        time: new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
                     };
                     const exists = c.messages.some(m => m.id === newMsg.id || (m.text === newMsg.text && m.from === newMsg.from));
                     if (exists) return c;
@@ -246,7 +258,7 @@ export default function Inbox() {
             id: 'temp-' + Date.now(),
             from: 'me',
             text: finalText,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
         };
         setConversations(prev => prev.map(c =>
             c.id !== activeId ? c : { ...c, messages: [...c.messages, optimisticMsg], lastMsg: finalText.split('\n')[0] }
@@ -466,7 +478,16 @@ export default function Inbox() {
                                         {m.text.split('\n').map((line, i) => {
                                             if (line.startsWith('[IMAGE] ')) {
                                                 const url = line.replace('[IMAGE] ', '').trim();
-                                                return <img key={i} src={url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }} />;
+                                                return <img
+                                                    key={i}
+                                                    src={url}
+                                                    alt="attachment"
+                                                    style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }}
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = 'https://img.icons8.com/color/96/file.png';
+                                                    }}
+                                                />;
                                             }
                                             if (line.startsWith('[DOCUMENT] ')) {
                                                 const url = line.replace('[DOCUMENT] ', '').trim();

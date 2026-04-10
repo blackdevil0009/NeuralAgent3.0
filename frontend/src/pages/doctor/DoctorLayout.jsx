@@ -8,8 +8,8 @@ const NAV = [
     { id: 'dashboard', label: 'Patient Management', icon: '📋', path: '/doctor/dashboard' },
     { id: 'schedule', label: 'My Schedule', icon: '📅', path: '/doctor/schedule' },
     { id: 'inbox', label: 'Message Center', icon: '💬', path: '/doctor/inbox', badge: 2 },
-    { id: 'emergency', label: 'Emergency Center', icon: '🚨', path: '/doctor/emergency', badge: 'Active' },
     { id: 'profile', label: 'Professional Profile', icon: '👨‍⚕️', path: '/doctor/profile' },
+    { id: 'emergency', label: 'Emergency Cases', icon: '🚨', path: '/doctor/emergency', badge: '!' },
 ];
 
 const SETTINGS_NAV = [
@@ -21,6 +21,7 @@ const PAGE_TITLES = {
     schedule: 'Daily Consultation Schedule',
     inbox: 'Clinical Message Center',
     profile: 'Medical Professional Profile',
+    emergency: 'Emergency Response Center',
     security: 'Security Settings',
 };
 
@@ -44,11 +45,28 @@ export default function DoctorLayout() {
             if (stored.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (stored.name.split(' ')[0]) }));
         } catch { }
 
-        // NOTE: WebSocket connection logic removed as backend migrated to purely REST.
-        // const socket = io(API_BASE_URL, { transports: ['polling'], upgrade: false });
-        // socket.on('new_emergency', (data) => { ... });
-        // return () => socket.disconnect();
-        return () => {};
+        const socket = io(API_BASE_URL, { 
+            transports: ['websocket', 'polling'], 
+            auth: { token }
+        });
+
+        socket.on('connect', () => console.log("Doctor Dashboard connected to real-time alerts."));
+
+        socket.on('new_emergency', (data) => {
+            console.log("CRITICAL EMERGENCY DETECTED:", data);
+            setGlobalAlert({
+                id: data.id,
+                patient: data.patientName || data.patient || 'Unknown Patient',
+                type: data.caseType || data.type || 'Immediate Attention Required'
+            });
+            
+            // Auto-clear alert if needed or keep until handled
+        });
+
+        return () => {
+            socket.off('new_emergency');
+            socket.disconnect();
+        };
     }, [navigate]);
 
     const currentPath = location.pathname;

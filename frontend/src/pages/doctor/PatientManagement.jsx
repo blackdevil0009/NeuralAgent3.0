@@ -45,9 +45,10 @@ export default function PatientManagement() {
             
             // Fetch medical details
             const fetchMedical = async () => {
+                if (!selectedPatient.userId) return;
                 try {
                     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                    const res = await fetch(`${API_BASE_URL}/api/patients/${selectedPatient.patientId}/medical`, {
+                    const res = await fetch(`${API_BASE_URL}/api/patients/${selectedPatient.userId}/medical`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (res.ok) {

@@ -61,8 +61,17 @@ export default function DoctorInbox() {
             fetch(`${API_BASE_URL}/api/appointments?role=doctor`, { headers: { 'Authorization': `Bearer ${token}` } }),
             fetch(`${API_BASE_URL}/api/messages`, { headers: { 'Authorization': `Bearer ${token}` } })
         ])
-            .then(([resAppts, resMsgs]) => Promise.all([resAppts.json(), resMsgs.json()]))
+            .then(async ([resAppts, resMsgs]) => {
+                const jAppts = await resAppts.json();
+                const jMsgs = await resMsgs.json();
+                if (resAppts.status === 401 || resMsgs.status === 401) {
+                    navigate('/login');
+                    return [null, null];
+                }
+                return [jAppts, jMsgs];
+            })
             .then(([jsonAppts, jsonMsgs]) => {
+                if (!jsonAppts || !jsonMsgs) return;
                 const appts = jsonAppts.data?.appointments || [];
                 const msgs = jsonMsgs.data || [];
                 
@@ -70,24 +79,31 @@ export default function DoctorInbox() {
                 
                 // Map appointed patients first
                 appts.forEach(a => {
-                    if (!map[a.patientId] || new Date(a.appointmentDate) > new Date(map[a.patientId].appointmentDate)) {
-                        map[a.patientId] = {
-                            id: a.patientId,
+                    const pId = a.userId; // Backend returns userId for the patient
+                    if (pId && (!map[pId] || new Date(a.appointmentDate) > new Date(map[pId].appointmentDate))) {
+                        map[pId] = {
+                            id: pId,
                             name: a.patientName || 'Patient',
                             avatar: '👨',
-                            lastMsg: `${a.type || 'Appointment'} — ${a.appointmentDate || ''}`,
+                            lastMsg: `${a.appointmentType || 'Appointment'} — ${a.appointmentDate || ''}`,
                             time: a.appointmentDate || 'Scheduled',
-                            online: a.status === 'Scheduled'
+                            online: a.status === 'confirmed' || a.status === 'booked'
                         };
                     }
                 });
                 
                 // Overlay legacy chatted patients silently
+                let doctorId = null;
+                if (token) {
+                    try { doctorId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+                }
+
                 msgs.forEach(m => {
-                    if (m.peerId && !map[m.peerId]) {
-                        map[m.peerId] = {
-                            id: m.peerId,
-                            name: m.peerName || 'Patient',
+                    const peerId = String(m.sender_id) === String(doctorId) ? m.receiver_id : m.sender_id;
+                    if (peerId && !map[peerId]) {
+                        map[peerId] = {
+                            id: peerId,
+                            name: m.sender_name || 'Patient',
                             avatar: '👨',
                             lastMsg: 'Past Conversation',
                             time: 'History',
@@ -103,21 +119,30 @@ export default function DoctorInbox() {
     }, []);
 
     useEffect(() => {
-        if (!selectedConvo) return;
+        if (!selectedConvo || !selectedConvo.id) return;
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
         const fetchHistory = () => {
             fetch(`${API_BASE_URL}/api/v2/messages/history/${selectedConvo.id}?t=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-                .then(res => res.json())
+                .then(async res => {
+                    const json = await res.json();
+                    if (res.status === 401) { navigate('/login'); return null; }
+                    return json;
+                })
                 .then(res => {
+                    if (!res) return;
                     if (res.data && res.data.messages) {
+                        let docIdFromToken = null;
+                        if (token) {
+                            try { docIdFromToken = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+                        }
                         const formattedMsgs = res.data.messages.map(m => ({
                             id: m.id,
-                            sender: String(m.senderId) === String(selectedConvo.id) ? 'patient' : 'doctor',
+                            sender: String(m.sender_id) === String(docIdFromToken) ? 'doctor' : 'patient',
                             text: m.content || '[Message]',
-                            time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            time: new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
                         }));
                         setMessages(prev => ({ ...prev, [selectedConvo.id]: formattedMsgs }));
                     }
@@ -131,18 +156,30 @@ export default function DoctorInbox() {
             try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
         }
 
-        const socket = io(API_BASE_URL, { transports: ['websocket'] });
+        const socket = io(API_BASE_URL, { 
+            auth: { token },
+            transports: ['websocket'] 
+        });
         socket.on('connect', () => {
             if (userId) socket.emit('join_inbox', { userId });
         });
 
         socket.on('new_inbox_msg', (msg) => {
-            if (String(msg.senderId) === String(selectedConvo.id) || String(msg.receiverId) === String(selectedConvo.id)) {
+            // Check if message belongs to current selected conversation
+            const isRelevant = String(msg.sender_id) === String(selectedConvo.id) || 
+                               String(msg.receiver_id) === String(selectedConvo.id);
+            
+            if (isRelevant) {
+                let docIdFromToken = null;
+                if (token) {
+                    try { docIdFromToken = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
+                }
+
                 const newMsg = {
                     id: msg.id,
-                    sender: String(msg.senderId) === String(selectedConvo.id) ? 'patient' : 'doctor',
+                    sender: String(msg.sender_id) === String(docIdFromToken) ? 'doctor' : 'patient',
                     text: msg.content || '[Message]',
-                    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
                 };
                 setMessages(prev => {
                     const existing = prev[selectedConvo.id] || [];
@@ -214,7 +251,7 @@ export default function DoctorInbox() {
             sender: 'doctor',
             id: 'temp-' + Date.now(),
             text: finalText,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
         };
         setMessages(prev => ({
             ...prev,
@@ -328,7 +365,7 @@ export default function DoctorInbox() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {selectedConvo && (messages[selectedConvo.id] || []).map((msg, i) => (
-                            <div key={i} style={{
+                            <div key={msg.id || i} style={{
                                 alignSelf: msg.sender === 'doctor' ? 'flex-end' : 'flex-start',
                                 maxWidth: '75%',
                                 padding: '12px 16px',

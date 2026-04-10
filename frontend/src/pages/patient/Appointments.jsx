@@ -59,6 +59,16 @@ export default function Appointments() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
+            if (res.status === 401) {
+                const errorCode = json.errors?.code || json.error;
+                if (errorCode === 'token_expired' || errorCode === 'unauthorized' || errorCode === 'missing_token') {
+                    handleError('Session expired. Please log in again.');
+                    sessionStorage.clear();
+                    localStorage.clear();
+                    navigate('/login');
+                    return;
+                }
+            }
             if (res.ok) {
                 setAppointments(json.data?.appointments || []);
             }
@@ -77,6 +87,13 @@ export default function Appointments() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
+            if (res.status === 401) {
+                const errorCode = json.errors?.code || json.error;
+                if (errorCode === 'token_expired' || errorCode === 'unauthorized' || errorCode === 'missing_token') {
+                    navigate('/login');
+                    return;
+                }
+            }
             if (res.ok) {
                 setDoctors(json.data?.doctors || []);
             }
@@ -284,6 +301,7 @@ export default function Appointments() {
                                             onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}>
                                             💬 Open Chat
                                         </button>
+                                        {/* 
                                         {a.type === 'Video Call' && (
                                             <button className="pd-btn pd-btn-outline pd-btn-sm"
                                                 onClick={() => navigate(`/patient/inbox?doctor=${a.doctorId}`)}
@@ -291,6 +309,7 @@ export default function Appointments() {
                                                 📹 Video Call (Wait in Chat)
                                             </button>
                                         )}
+                                        */}
                                         {a.type === 'Offline / In-Clinic' && (
                                             <button className="pd-btn pd-btn-outline pd-btn-sm">📍 Directions</button>
                                         )}
@@ -401,8 +420,8 @@ export default function Appointments() {
                                 )}
 
                                 <div className="pd-form-group" style={{ marginTop: 10 }}>
-                                    <label>Share your experience (optional)</label>
-                                    <textarea className="pd-textarea" rows={3}
+                                    <label htmlFor="feedback">Share your experience (optional)</label>
+                                    <textarea id="feedback" name="feedback" className="pd-textarea" rows={3}
                                         placeholder="What went well? What could be improved?"
                                         value={feedback} onChange={e => setFeedback(e.target.value)}
                                     />

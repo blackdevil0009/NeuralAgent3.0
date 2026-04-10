@@ -52,6 +52,16 @@ export default function PatientLayout() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const json = await res.json();
+            
+            if (res.status === 401) {
+                const errorCode = json.errors?.code || json.error;
+                if (errorCode === 'token_expired' || errorCode === 'unauthorized' || errorCode === 'missing_token') {
+                    console.warn('Session invalid or expired. Redirecting to login.');
+                    handleLogout();
+                    return;
+                }
+            }
+
             if (res.ok) {
                 const responseData = json.data || {};
                 const notifs = responseData.notifications || [];
@@ -225,6 +235,8 @@ export default function PatientLayout() {
                     <div className="pd-search-wrap">
                         <input
                             type="text"
+                            id="topbar-search"
+                            name="topbar-search"
                             className="pd-search"
                             placeholder="Search doctors, reports, medicines…"
                         />

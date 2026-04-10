@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { API_BASE_URL } from '../../utils/config';
 
 const CASE_TYPES = [
     { id: 'critical', label: '🔴 Critical (Life Threatening)', color: '#c0392b' },
@@ -21,7 +23,7 @@ export default function EmergencyCase() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const response = await fetch('https://api.vaidyamedx.in/api/emergencies', {
+            const response = await fetch(`${API_BASE_URL}/api/emergencies`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -59,17 +61,23 @@ export default function EmergencyCase() {
                     <p style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>Estimated Response Time: &lt; 5 minutes</p>
                 </div>
                 <button
-                    onClick={() => navigate('/patient/health')}
-                    style={{ padding: '12px 30px', borderRadius: 50, background: '#c0392b', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                    onClick={() => { setSubmitted(false); setExplanation(''); setCaseType(''); setContact(''); navigate('/patient/profile'); }}
+                    style={{ padding: '12px 30px', borderRadius: 50, background: '#c0392b', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', marginRight: 10 }}
                 >
-                    Back to Dashboard
+                    View Status in Profile
+                </button>
+                <button
+                    onClick={() => { setSubmitted(false); setExplanation(''); setCaseType(''); setContact(''); }}
+                    style={{ padding: '12px 30px', borderRadius: 50, background: '#f5f5f5', color: '#c0392b', border: '1px solid #c0392b', fontWeight: 600, cursor: 'pointer' }}
+                >
+                    Report Another
                 </button>
             </div>
         );
     }
 
     return (
-        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+        <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 60 }}>
             <div style={{ marginBottom: 30 }}>
                 <h1 style={{ fontFamily: 'Playfair Display, serif', color: '#c0392b', display: 'flex', alignItems: 'center', gap: 15 }}>
                     <span>🚨</span> Emergency Case Report
@@ -77,49 +85,49 @@ export default function EmergencyCase() {
                 <p style={{ color: '#666' }}>Fill this form only if you require immediate medical attention. High priority alerts will be sent to all doctors.</p>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ background: '#fff', padding: 30, borderRadius: 20, boxShadow: '0 4px 20px rgba(192,57,43,0.1)', border: '1px solid rgba(192,57,43,0.1)' }}>
-                <div style={{ marginBottom: 25 }}>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.95rem' }}>What is the emergency? (Brief Explanation)</label>
-                    <textarea
-                        required
-                        placeholder="Describe the symptoms, when they started, and current condition..."
-                        style={{ width: '100%', height: 120, padding: 15, borderRadius: 12, border: '1px solid #ddd', fontFamily: 'inherit', fontSize: '0.95rem', boxSizing: 'border-box' }}
-                        value={explanation}
-                        onChange={(e) => setExplanation(e.target.value)}
-                    />
-                </div>
-
-                <div style={{ marginBottom: 25 }}>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.95rem' }}>Case Type / Urgency</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {CASE_TYPES.map(type => (
-                            <label
-                                key={type.id}
-                                style={{
-                                    padding: '15px 20px', borderRadius: 12, border: '2px solid',
-                                    borderColor: caseType === type.id ? type.color : '#eee',
-                                    background: caseType === type.id ? `${type.color}08` : '#fff',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <input
-                                    type="radio"
-                                    name="caseType"
-                                    value={type.id}
-                                    required
-                                    style={{ width: 20, height: 20, accentColor: type.color }}
-                                    checked={caseType === type.id}
-                                    onChange={() => setCaseType(type.id)}
-                                />
-                                <span style={{ fontWeight: 600, color: type.color }}>{type.label}</span>
-                            </label>
-                        ))}
+            <div style={{ maxWidth: 600, margin: '0 auto' }}>
+                <form onSubmit={handleSubmit} style={{ background: '#fff', padding: 30, borderRadius: 20, boxShadow: '0 4px 20px rgba(192,57,43,0.1)', border: '1px solid rgba(192,57,43,0.1)' }}>
+                    <div style={{ marginBottom: 25 }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.95rem' }}>What is the emergency? (Brief Explanation)</label>
+                        <textarea
+                            required
+                            placeholder="Describe the symptoms, when they started, and current condition..."
+                            style={{ width: '100%', height: 120, padding: 15, borderRadius: 12, border: '1px solid #ddd', fontFamily: 'inherit', fontSize: '0.95rem', boxSizing: 'border-box' }}
+                            value={explanation}
+                            onChange={(e) => setExplanation(e.target.value)}
+                        />
                     </div>
-                </div>
 
-                <div style={{ display: 'flex', gap: 15, marginBottom: 25 }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ marginBottom: 25 }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.95rem' }}>Case Type / Urgency</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {CASE_TYPES.map(type => (
+                                <label
+                                    key={type.id}
+                                    style={{
+                                        padding: '12px 15px', borderRadius: 12, border: '2px solid',
+                                        borderColor: caseType === type.id ? type.color : '#eee',
+                                        background: caseType === type.id ? `${type.color}08` : '#fff',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+                                        transition: 'all 0.2s', fontSize: '0.9rem'
+                                    }}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="caseType"
+                                        value={type.id}
+                                        required
+                                        style={{ width: 18, height: 18, accentColor: type.color }}
+                                        checked={caseType === type.id}
+                                        onChange={() => setCaseType(type.id)}
+                                    />
+                                    <span style={{ fontWeight: 600, color: type.color }}>{type.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div style={{ marginBottom: 25 }}>
                         <label style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '0.9rem' }}>Contact Number</label>
                         <input
                             type="tel"
@@ -130,23 +138,20 @@ export default function EmergencyCase() {
                             style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }}
                         />
                     </div>
-                </div>
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    style={{
-                        width: '100%', padding: '16px', borderRadius: 12, background: '#c0392b', color: '#fff',
-                        border: 'none', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer',
-                        boxShadow: '0 4px 15px rgba(192,57,43,0.3)', transition: 'all 0.2s'
-                    }}
-                >
-                    {loading ? '📡 Broadcasting Alert...' : '🚀 Report Emergency Now'}
-                </button>
-                <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#888', marginTop: 15 }}>
-                    * Abusing this feature for non-emergencies may lead to account suspension.
-                </p>
-            </form>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        style={{
+                            width: '100%', padding: '16px', borderRadius: 12, background: '#c0392b', color: '#fff',
+                            border: 'none', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(192,57,43,0.3)', transition: 'all 0.2s'
+                        }}
+                    >
+                        {loading ? '📡 Broadcasting Alert...' : '🚀 Report Emergency Now'}
+                    </button>
+                </form>
+            </div>
         </div>
     );
 }

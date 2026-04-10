@@ -203,10 +203,11 @@ export default function AIAssistant() {
             const resData = await response.json();
             
             // Handle token expiration
-            if (resData.msg === "Token has expired" || resData.msg === "Missing Authorization Header" || resData.error === "Missing Authorization Header") {
+            const errorCode = resData.errors?.code || resData.error;
+            if (response.status === 401 || errorCode === 'token_expired' || errorCode === 'unauthorized' || errorCode === 'missing_token') {
                 alert("Your secure session has expired. Please log in again.");
-                localStorage.removeItem('token');
-                sessionStorage.removeItem('token');
+                localStorage.clear();
+                sessionStorage.clear();
                 window.location.href = '/login';
                 return;
             }
@@ -366,7 +367,7 @@ export default function AIAssistant() {
                         <button className="pd-chat-send" onClick={() => fileInputRef.current.click()} style={{ background: '#f1f1f1', color: '#666', borderRadius: '50%', width: 45, height: 45 }}>📎</button>
                         <button className="pd-chat-send" onClick={startCamera} style={{ background: '#f1f1f1', color: '#666', borderRadius: '50%', width: 45, height: 45 }}>📷</button>
 
-                        <textarea className="pd-chat-input" placeholder="Describe your symptoms to VaidyaMed-X..." value={input} onChange={e => setInput(e.target.value)} rows={1} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())} />
+                        <textarea id="ai-chat-input" name="ai-chat-input" className="pd-chat-input" placeholder="Describe your symptoms to VaidyaMed-X..." value={input} onChange={e => setInput(e.target.value)} rows={1} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())} />
 
                         <button className={`pd-chat-send ${isRecording ? 'recording-active' : ''}`} onClick={handleVoiceToggle} style={{ background: isRecording ? '#ff4757' : 'var(--green-mid)', border: 'none', borderRadius: '50%', width: 45, height: 45, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                             {isRecording ? '🛑' : '🎤'}

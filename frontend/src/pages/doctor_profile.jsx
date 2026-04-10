@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/config';
 import { handleSuccess, handleError } from '../utils/error_handlers';
 
@@ -88,6 +89,7 @@ export default function DoctorProfile() {
     const [ifscInfo, setIfscInfo] = useState(null);
     const [ifscLoading, setIfscLoading] = useState(false);
     const [upiValid, setUpiValid] = useState(null);
+    const navigate = useNavigate();
 
     const fetchProfile = () => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');

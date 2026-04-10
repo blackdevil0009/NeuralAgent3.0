@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
 
 export default function EmergencyDashboard() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const query = new URLSearchParams(location.search);
+    const activeIdParam = query.get('activeId');
+
     const [emergencies, setEmergencies] = useState([]);
     const [activeOverlay, setActiveOverlay] = useState(null);
     const [activeEmergency, setActiveEmergency] = useState(null);
@@ -15,13 +19,13 @@ export default function EmergencyDashboard() {
 
     const formatEmergency = (e) => ({
         id: e.id || `EM-${e.dbId}`,
-        dbId: e.dbId || e.id?.replace('EM-', ''),
-        patient: e.patient,
+        dbId: e.dbId || String(e.id || '').replace('EM-', ''),
+        patient: e.patientName || e.patient || 'Unknown Patient',
         patientId: e.patientId,
         contact: e.contact || 'Not on file',
-        type: e.type,
-        desc: e.desc,
-        time: e.time,
+        type: e.caseType || e.type || 'urgent',
+        desc: e.explanation || e.desc || 'No description provided',
+        time: e.time || e.createdAt,
     });
 
     useEffect(() => {
@@ -31,10 +35,25 @@ export default function EmergencyDashboard() {
                 const res = await fetch(`${API_BASE_URL}/api/emergencies`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                if (res.status === 401) {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    navigate('/login');
+                    return;
+                }
                 const json = await res.json();
                 if (res.ok) {
                     const data = json.data?.emergencies || json.emergencies || [];
-                    setEmergencies(data.map(formatEmergency));
+                    const formatted = data.map(formatEmergency);
+                    setEmergencies(formatted);
+
+                    // Auto-open target emergency if provided in URL
+                    if (activeIdParam) {
+                        const target = formatted.find(em => String(em.id) === String(activeIdParam) || String(em.dbId) === String(activeIdParam));
+                        if (target) {
+                            setTimeout(() => openHistory(target), 500); // Give it a slight delay to render
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("Failed to fetch emergencies", err);
@@ -50,6 +69,17 @@ export default function EmergencyDashboard() {
             transports: ['websocket', 'polling']
         });
         socketRef.current = socket;
+        
+        socket.on('connect_error', (err) => {
+            console.error("Socket connection error:", err.message);
+            if (err.message.includes('expired') || err.message.includes('auth')) {
+                socket.disconnect();
+                localStorage.clear();
+                sessionStorage.clear();
+                navigate('/login');
+            }
+        });
+
         socket.on('new_emergency', (newEm) => setEmergencies(prev => [formatEmergency(newEm), ...prev]));
         socket.on('emergency_handled', (data) => setEmergencies(prev => prev.filter(e => e.id !== data.id)));
         return () => socket.disconnect();
@@ -86,7 +116,7 @@ export default function EmergencyDashboard() {
         setActiveEmergency(e);
         setMedicalData(null);
         setActiveOverlay('history');
-        // Try to fetch patient's actual medical data
+        // Automatically fetch patient's medical data when opening overlay
         try {
             const res = await fetch(`${API_BASE_URL}/api/patients/${e.patientId}/medical`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -94,8 +124,12 @@ export default function EmergencyDashboard() {
             if (res.ok) {
                 const json = await res.json();
                 setMedicalData(json.data || json);
+            } else {
+                setMedicalData({ empty: true });
             }
-        } catch { /* show blank if fails */ }
+        } catch { 
+            setMedicalData({ empty: true });
+        }
     };
 
     const dialFamily = (contact) => {
@@ -142,13 +176,22 @@ export default function EmergencyDashboard() {
                                         <h2 style={{ margin: '15px 0 5px', color: 'var(--doc-green-deep)' }}>{e.patient}</h2>
                                         <div style={{ fontSize: '0.9rem', color: '#555' }}>📞 Contact: <strong>{e.contact}</strong></div>
                                     </div>
-                                    <button
-                                        className="dd-btn dd-btn-primary"
-                                        style={{ background: '#c0392b', color: '#fff', padding: '12px 24px', fontSize: '1rem' }}
-                                        onClick={() => initiateEmergencyCall(e)}
-                                    >
-                                        📞 Initiate Emergency Video Call
-                                    </button>
+                                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                            <button
+                                                className="dd-btn dd-btn-primary"
+                                                style={{ background: '#27ae60', color: '#fff', padding: '8px 16px', fontSize: '0.9rem', border: 'none' }}
+                                                onClick={() => dialFamily(e.contact)}
+                                            >
+                                                📞 Call Number
+                                            </button>
+                                            <button
+                                                className="dd-btn dd-btn-primary"
+                                                style={{ background: '#2980b9', color: '#fff', padding: '8px 16px', fontSize: '0.9rem', border: 'none' }}
+                                                onClick={() => navigate('/doctor/inbox?patient=' + e.patientId)}
+                                            >
+                                                💬 Chat Patient
+                                            </button>
+                                        </div>
                                 </div>
                             </div>
 
@@ -160,7 +203,6 @@ export default function EmergencyDashboard() {
                             <div style={{ padding: '15px 30px', background: '#fcfcfc', borderTop: '1px solid var(--doc-border)', display: 'flex', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', gap: 15 }}>
                                     <button className="dd-btn dd-btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => openHistory(e)}>📋 Medical History</button>
-                                    <button className="dd-btn dd-btn-outline" style={{ fontSize: '0.8rem' }} onClick={() => dialFamily(e.contact)}>📞 Contact Patient</button>
                                 </div>
                                 <button
                                     className="dd-btn dd-btn-outline"
@@ -215,7 +257,7 @@ export default function EmergencyDashboard() {
                                                 <p style={{ margin: 0, fontSize: '0.95rem' }}>{medicalData.dosha}</p>
                                             </div>
                                         )}
-                                        {!medicalData.conditions && !medicalData.medications && !medicalData.allergies && (
+                                        {!medicalData.conditions && !medicalData.medications && !medicalData.allergies && !medicalData.dosha && (
                                             <div style={{ textAlign: 'center', padding: '30px 0', color: '#aaa' }}>
                                                 <p>No medical history on file for this patient.</p>
                                             </div>
