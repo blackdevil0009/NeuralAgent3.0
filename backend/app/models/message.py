@@ -31,6 +31,11 @@ class Message(db.Model):
     appointment = db.relationship('Appointment', foreign_keys=[appointment_id])
 
     def to_dict(self):
+        ts = self.created_at.isoformat() if self.created_at else None
+        # Ensure UTC suffix 'Z' if missing (MySQL DATETIME might lose it)
+        if ts and not ts.endswith('Z') and '+00:00' not in ts:
+            ts += 'Z'
+            
         return {
             'id': self.id,
             'appointment_id': self.appointment_id,
@@ -39,6 +44,6 @@ class Message(db.Model):
             'content': self.content,
             'message_type': self.message_type,
             'is_read': self.is_read,
-            'timestamp': self.created_at.isoformat() if self.created_at else None,
+            'timestamp': ts,
             'sender_name': self.sender.name if self.sender else ''
         }

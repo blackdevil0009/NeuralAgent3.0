@@ -22,9 +22,16 @@ def book_appointment():
         return error_response("Only patients can book appointments.", 403)
 
     body = request.get_json(force=True, silent=True) or {}
-    doctor_id = body.get('doctor_id')
-    appointment_date = body.get('appointment_date')
-    appointment_time = body.get('appointment_time')
+    
+    # Accept both snake_case (legacy/internal) and camelCase (frontend)
+    doctor_id = body.get('doctorId') or body.get('doctor_id')
+    appointment_date = body.get('date') or body.get('appointment_date')
+    appointment_time = body.get('time') or body.get('appointment_time')
+    appointment_type = body.get('type') or body.get('appointment_type', 'Video Call')
+    notes = body.get('notes', '')
+    amount_paid = body.get('amountPaid') or body.get('amount_paid', 0)
+    razorpay_payment_id = body.get('razorpayPaymentId') or body.get('razorpay_payment_id')
+    razorpay_order_id = body.get('razorpayOrderId') or body.get('razorpay_order_id')
 
     if not doctor_id or not appointment_date or not appointment_time:
         return error_response("doctor_id, appointment_date, and appointment_time are required.", 400)
@@ -35,17 +42,39 @@ def book_appointment():
         return not_found_response("Doctor not found.")
 
     try:
+        # Expected formats: YYYY-MM-DD and HH:MM AM/PM or HH:MM
         app_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
-        app_time = datetime.strptime(appointment_time, '%H:%M').time()
-    except ValueError:
-        return error_response("Invalid date/time format. Use YYYY-MM-DD for date and HH:MM for time.", 400)
+        
+        # Handle "HH:MM AM/PM" format from frontend
+        try:
+            app_time = datetime.strptime(appointment_time, '%I:%M %p').time()
+        except ValueError:
+            app_time = datetime.strptime(appointment_time, '%H:%M').time()
+            
+    except ValueError as e:
+        return error_response(f"Invalid date/time format. {str(e)}", 400)
+
+    # ── SLOT COLLISION CHECK ──
+    existing = Appointment.query.filter_by(
+        doctor_id=doctor_id,
+        appointment_date=app_date,
+        appointment_time=app_time
+    ).filter(Appointment.status != 'cancelled').first()
+
+    if existing:
+        return error_response("This doctor is already booked for this specific time slot. Please choose another time.", 400)
 
     appointment = Appointment(
         user_id=user_id,
         doctor_id=doctor_id,
         appointment_date=app_date,
         appointment_time=app_time,
-        status='pending'
+        appointment_type=appointment_type,
+        notes=notes,
+        amount_paid=amount_paid,
+        razorpay_payment_id=razorpay_payment_id,
+        razorpay_order_id=razorpay_order_id,
+        status='booked'
     )
     
     db.session.add(appointment)

@@ -8,4 +8,6 @@ from .user          import User
 from .otp           import Otp
 from .password_reset import PasswordReset
 from .appointment import Appointment
-from .message import Message
+from .message     import Message
+from .emergency   import Emergency
+from .medical_report import MedicalReport

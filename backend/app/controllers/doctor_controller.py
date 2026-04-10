@@ -93,18 +93,22 @@ def get_doctors():
     query = User.query.filter_by(role='doctor', is_active=True)
 
     # Filtering
-    specialization = request.args.get('specialization')
+    specialization = request.args.get('specialization') or request.args.get('spec')
     if specialization:
         query = query.filter(User.specialization.ilike(f'%{specialization}%'))
 
-    location = request.args.get('location')
+    location = request.args.get('location') or request.args.get('city')
     if location:
-        query = query.filter(User.city.ilike(f'%{location}%'))
+        # Check both city and specialized clinic location
+        query = query.filter(
+            (User.city.ilike(f'%{location}%')) | 
+            (User.clinic_location.ilike(f'%{location}%'))
+        )
 
     experience = request.args.get('experience')
     if experience:
         try:
-            # simple filter, assumes experience is stored as years string e.g., "5"
+            # Assumes experience is stored as a number string or similar
             exp_val = int(experience)
             query = query.filter(db.cast(User.experience, db.Integer) >= exp_val)
         except ValueError:
@@ -113,6 +117,6 @@ def get_doctors():
     doctors = query.all()
     
     return success_response(
-        data=[d.to_dict(include_sensitive=False) for d in doctors],
+        data={'doctors': [d.to_dict(include_sensitive=False) for d in doctors]},
         message='Doctors retrieved successfully.'
     )

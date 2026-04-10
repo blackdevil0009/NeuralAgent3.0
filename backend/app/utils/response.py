@@ -40,8 +40,8 @@ def created_response(data=None, message: str = 'Created successfully'):
     return success_response(data=data, message=message, status_code=201)
 
 
-def unauthorized_response(message: str = 'Unauthorized'):
-    return error_response(message=message, status_code=401)
+def unauthorized_response(message: str = 'Unauthorized', error_code: str = None):
+    return error_response(message=message, status_code=401, errors={'code': error_code} if error_code else None)
 
 
 def forbidden_response(message: str = 'Forbidden'):

@@ -20,7 +20,10 @@ def jwt_required_custom(fn):
             verify_jwt_in_request()
         except Exception as exc:
             logger.warning(f"JWT check failed: {exc}")
-            return unauthorized_response('Authentication required. Please log in again.')
+            msg = str(exc)
+            if "Signature has expired" in msg:
+                return unauthorized_response('Session expired. Please log in again.', error_code='token_expired')
+            return unauthorized_response('Authentication required. Please log in again.', error_code='unauthorized')
         return fn(*args, **kwargs)
     return wrapper
 

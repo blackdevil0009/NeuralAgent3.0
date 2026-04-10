@@ -129,11 +129,13 @@ class User(db.Model):
                 'degree':               self.degree or '',
                 'position':             self.position or '',
                 'specialization':       self.specialization or '',
+                'spec':                 self.specialization or '',  # alias for frontend
                 'experience':           self.experience or '',
                 'hospital':             self.hospital or '',
                 'clinicLocation':       self.clinic_location or '',
                 'regNumber':            self.reg_number or '',
                 'consultantFee':        self.consultant_fee or 500,
+                'fee':                  self.consultant_fee or 500,  # alias for frontend
                 'workingHours':         self.working_hours or 'Mon-Fri, 10AM-6PM',
                 'upiId':                self.upi_id or '',
                 'bankAccountName':      self.bank_account_name or '',

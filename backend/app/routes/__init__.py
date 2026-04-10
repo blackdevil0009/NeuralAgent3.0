@@ -6,3 +6,5 @@ from .appointment_routes import appointment_bp
 from .consultation_routes import consultation_bp
 from .chat_routes import chat_bp
 from .v2_routes import v2_bp
+from .messages_routes import messages_bp
+from .report_routes import reports_bp

@@ -17,9 +17,15 @@ class Appointment(db.Model):
     # Appointment Data
     appointment_date = db.Column(db.Date, nullable=False)
     appointment_time = db.Column(db.Time, nullable=False)
+    appointment_type = db.Column(db.String(50), nullable=True, default='Video Call') # 'Video Call', 'Chat', 'Offline'
+    notes            = db.Column(db.Text, nullable=True)
+    amount_paid      = db.Column(db.Integer, nullable=True, default=0)
+    razorpay_payment_id = db.Column(db.String(100), nullable=True)
+    razorpay_order_id   = db.Column(db.String(100), nullable=True)
+
     status = db.Column(
-        db.Enum('pending', 'confirmed', 'completed', 'cancelled', name='appointment_status'),
-        nullable=False, default='pending', index=True
+        db.Enum('booked', 'pending', 'confirmed', 'completed', 'cancelled', name='appointment_status'),
+        nullable=False, default='booked', index=True
     )
     
     created_at = db.Column(db.DateTime(timezone=True), nullable=False,
@@ -36,14 +42,17 @@ class Appointment(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'user_id': self.user_id,
-            'doctor_id': self.doctor_id,
-            'appointment_date': self.appointment_date.isoformat() if self.appointment_date else None,
-            'appointment_time': self.appointment_time.isoformat() if self.appointment_time else None,
+            'userId': self.user_id,
+            'doctorId': self.doctor_id,
+            'appointmentDate': self.appointment_date.isoformat() if self.appointment_date else None,
+            'appointmentTime': self.appointment_time.isoformat() if self.appointment_time else None,
+            'appointmentType': self.appointment_type,
+            'notes': self.notes,
+            'amountPaid': self.amount_paid,
             'status': self.status,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            # include simple nested representations if they exist
-            'patient_name': self.patient.name if self.patient else '',
-            'doctor_name': self.doctor.name if self.doctor else ''
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+            'patientName': self.patient.name if self.patient else '',
+            'doctorName': self.doctor.name if self.doctor else '',
+            'spec': self.doctor.specialization if (self.doctor and hasattr(self.doctor, 'specialization')) else ''
         }
