@@ -1,0 +1,92 @@
+# ===== Environment Files =====
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+frontend/.env.production
+
+# ===== Git Platform Files =====
+.vercel
+.firebase/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.db
+*.sqlite3
+
+# ===== Logs & Debug Output =====
+*.log
+*.txt
+!README.md
+debug_*.txt
+out.txt
+test_out.txt
+verification_output.txt
+deepseek_test_output.txt
+vps_logs.txt
+
+# ===== Temp / One-off Scripts =====
+copy_key.py
+deploy.py
+deploy_app_hotfix.py
+e2e_verify.py
+repair_hosting.sh
+ssh_login.vbs
+test_api.py
+test_email.py
+test_post.py
+zip_backend.py
+keep_alive.bat
+
+backend/add_col.py
+backend/alter_users.py
+backend/migrate_temp.py
+backend/check_docs.py
+backend/check_users.py
+backend/chat_vcall.py
+backend/test_flow.py
+backend/test_models.py
+backend/test_prod_chat.py
+backend/test_profile_api.py
+backend/test_register_api.py
+backend/verify_*.py
+backend/vps_cleanup.sh
+backend/vps_setup.sh
+backend/full_deploy.sh
+backend/seed_doctors.py
+
+# ===== PDF / Random Files =====
+*.pdf
+pdf_extracted.txt
+
+# ===== Zip Archives =====
+*.zip
+
+# ===== SQLite / Dev DBs =====
+*.db
+
+# ===== Node =====
+node_modules/
+frontend/node_modules/
+
+# ===== Build Artifacts =====
+frontend/build/
+mobile_app/build/
+
+# ===== Firebase =====
+firebase-debug.log
+firebase_projects.json
+
+# ===== Frontend Verify Logs =====
+frontend/*.log
+frontend/*.txt
+
+# ===== IDEs =====
+.idea/
+*.iml
+.dart_tool/

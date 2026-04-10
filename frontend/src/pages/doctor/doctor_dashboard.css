@@ -1,0 +1,361 @@
+/* ═══════════════════════════════════════════
+   DOCTOR DASHBOARD - CLINICAL THEME
+   Palette: Deep Greens, Polished Ivory, Gold
+═══════════════════════════════════════════ */
+
+:root {
+    --doc-green-deep: #0d2410;
+    --doc-green-mid: #1a4228;
+    --doc-green-light: #2d6a4f;
+    --doc-accent: #c9a84c;
+    --doc-bg-ivory: #f9fdfa;
+    --doc-text-dark: #1a2a1d;
+    --doc-text-mute: #667c6b;
+    --doc-border: rgba(26, 66, 40, 0.12);
+    --doc-shadow: 0 8px 32px rgba(13, 36, 16, 0.08);
+}
+
+.dd-shell {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--doc-bg-ivory);
+    color: var(--doc-text-dark);
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ── Sidebar ── */
+.dd-sidebar {
+    width: 260px;
+    background: var(--doc-green-deep);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    transition: all 0.3s ease;
+    z-index: 200;
+}
+
+.dd-sidebar-logo {
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.dd-logo-icon {
+    font-size: 1.8rem;
+}
+
+.dd-logo-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--doc-accent);
+}
+
+.dd-sidebar-user {
+    padding: 0 24px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 20px;
+}
+
+.dd-user-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--doc-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: var(--doc-green-deep);
+}
+
+.dd-user-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.dd-user-role {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.dd-nav {
+    flex: 1;
+    padding: 0 16px;
+    overflow-y: auto;
+}
+
+.dd-nav-group {
+    margin-bottom: 24px;
+}
+
+.dd-nav-label {
+    padding: 0 12px 10px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 600;
+}
+
+.dd-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    font-size: 0.92rem;
+    transition: all 0.2s;
+    margin-bottom: 4px;
+}
+
+.dd-nav-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+.dd-nav-item.active {
+    background: var(--doc-green-light);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dd-nav-emergency {
+    color: #ff4d4d !important;
+    font-weight: 700;
+}
+
+.dd-nav-emergency:hover {
+    background: rgba(192, 57, 43, 0.1) !important;
+}
+
+.dd-nav-icon {
+    font-size: 1.2rem;
+    width: 24px;
+    text-align: center;
+}
+
+/* ── Main Content ── */
+.dd-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.dd-topbar {
+    height: 70px;
+    background: #fff;
+    border-bottom: 1px solid var(--doc-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.dd-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.dd-page-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--doc-green-deep);
+}
+
+.dd-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.dd-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--doc-border);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.dd-icon-btn:hover {
+    background: #f0f7f2;
+    border-color: var(--doc-green-light);
+}
+
+.dd-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--doc-accent);
+    color: var(--doc-green-deep);
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+}
+
+.dd-content {
+    padding: 30px;
+    flex: 1;
+}
+
+/* ── Common Components ── */
+.dd-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--doc-border);
+    padding: 24px;
+    box-shadow: var(--doc-shadow);
+    transition: transform 0.2s;
+}
+
+.dd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.dd-header h1 {
+    font-family: 'Playfair Display', serif;
+    color: var(--doc-green-deep);
+    margin: 0;
+}
+
+.dd-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+}
+
+.dd-btn-primary {
+    background: var(--doc-green-light);
+    color: #fff;
+}
+
+.dd-btn-primary:hover {
+    background: var(--doc-green-mid);
+    transform: translateY(-1px);
+}
+
+.dd-btn-outline {
+    background: #fff;
+    border: 1px solid var(--doc-green-light);
+    color: var(--doc-green-light);
+}
+
+.dd-btn-outline:hover {
+    background: #f0f7f2;
+}
+
+/* Clinical Grid */
+.dd-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+/* Patient List Table */
+.dd-table-wrap {
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.dd-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.dd-table th {
+    padding: 16px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--doc-text-mute);
+    border-bottom: 2px solid var(--doc-bg-ivory);
+}
+
+.dd-table td {
+    padding: 16px;
+    border-bottom: 1px solid var(--doc-bg-ivory);
+    font-size: 0.9rem;
+}
+
+.dd-status-pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-waiting {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-active {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.status-completed {
+    background: #e2e3e5;
+    color: #41464b;
+}
+
+@media (max-width: 1024px) {
+    .dd-sidebar {
+        width: 80px;
+    }
+
+    .dd-logo-text,
+    .dd-user-name,
+    .dd-user-role,
+    .dd-nav-label,
+    .dd-nav-item span:not(.dd-nav-icon) {
+        display: none;
+    }
+
+    .dd-sidebar-user {
+        justify-content: center;
+        padding: 20px 0;
+    }
+
+    .dd-nav-item {
+        justify-content: center;
+    }
+}

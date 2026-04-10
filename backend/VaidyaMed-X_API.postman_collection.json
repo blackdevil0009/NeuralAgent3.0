@@ -1,0 +1,288 @@
+{
+  "info": {
+    "name": "VaidyaMed-X API",
+    "description": "Complete API collection for VaidyaMed-X Flask Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "BASE_URL", "value": "http://localhost:5000", "type": "string" },
+    { "key": "TOKEN",    "value": "",                      "type": "string" },
+    { "key": "EMAIL",    "value": "test@example.com",      "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Register Patient",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"patient\",\n  \"fullName\": \"Arjun Sharma\",\n  \"email\": \"arjun@example.com\",\n  \"mobile\": \"9876543210\",\n  \"dob\": \"1995-06-15\",\n  \"gender\": \"male\",\n  \"address\": \"Flat 4B, Green Park Apartments, MG Road\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"Karnataka\",\n  \"pincode\": \"560001\",\n  \"password\": \"SecurePass@123\",\n  \"termsAgreed\": true\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {},
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Registration successful! Please check your email for the verification code.\",\n    \"email\": \"arjun@example.com\"\n  },\n  \"error\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Register Doctor",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/auth/register",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "role",           "value": "doctor",           "type": "text" },
+                { "key": "fullName",       "value": "Dr. Priya Mehta",  "type": "text" },
+                { "key": "email",          "value": "drpriya@hospital.com", "type": "text" },
+                { "key": "mobile",         "value": "9123456780",       "type": "text" },
+                { "key": "address",        "value": "Apollo Hospital, Greams Road, Chennai", "type": "text" },
+                { "key": "city",           "value": "Chennai",          "type": "text" },
+                { "key": "state",          "value": "Tamil Nadu",       "type": "text" },
+                { "key": "pincode",        "value": "600006",           "type": "text" },
+                { "key": "degree",         "value": "MBBS",             "type": "text" },
+                { "key": "position",       "value": "Consultant",       "type": "text" },
+                { "key": "specialization", "value": "Ayurveda",         "type": "text" },
+                { "key": "experience",     "value": "8",                "type": "text" },
+                { "key": "hospital",       "value": "Apollo Hospitals",  "type": "text" },
+                { "key": "clinicLocation", "value": "Greams Road, Chennai", "type": "text" },
+                { "key": "regNumber",      "value": "TN-123456",        "type": "text" },
+                { "key": "password",       "value": "DoctorPass@123",   "type": "text" },
+                { "key": "termsAgreed",    "value": "true",             "type": "text" },
+                { "key": "document",       "type": "file",  "src": "/path/to/degree.pdf" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login (Patient)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.success && json.data.token) {",
+                  "  pm.collectionVariables.set('TOKEN', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"arjun@example.com\",\n  \"password\": \"SecurePass@123\",\n  \"role\": \"patient\",\n  \"rememberMe\": false\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK — Login Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Login successful.\",\n    \"token\": \"eyJhbGciOiJIUzI1NiIs...\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIs...\",\n    \"role\": \"patient\",\n    \"user\": {\n      \"id\": \"664f1a...\",\n      \"name\": \"Arjun Sharma\",\n      \"email\": \"arjun@example.com\",\n      \"role\": \"patient\",\n      \"mobile\": \"9876543210\",\n      \"is_email_verified\": true,\n      \"created_at\": \"2026-04-10T14:00:00+00:00\"\n    }\n  },\n  \"error\": null\n}"
+            },
+            {
+              "name": "403 — Email Not Verified",
+              "status": "Forbidden",
+              "code": 403,
+              "body": "{\n  \"success\": false,\n  \"data\": { \"message\": \"Your email is not verified. We sent a new code to your email.\" },\n  \"error\": \"Your email is not verified.\"\n}"
+            },
+            {
+              "name": "200 — 2FA Required",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": { \"status\": \"2fa_required\", \"email\": \"arjun@example.com\", \"message\": \"2FA code sent to your email.\" },\n  \"error\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Registration OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/verify-registration-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"arjun@example.com\",\n  \"otp\": \"482931\",\n  \"role\": \"patient\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify 2FA OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.success && json.data.token) {",
+                  "  pm.collectionVariables.set('TOKEN', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/verify-2fa-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"arjun@example.com\",\n  \"otp\": \"192837\",\n  \"role\": \"patient\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Resend Verification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/auth/resend-verification",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"arjun@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"arjun@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/api/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<token-from-email-link>\",\n  \"password\": \"NewSecurePass@456\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 User Profile",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN}}" }],
+            "url": "{{BASE_URL}}/api/user/profile"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Profile fetched successfully.\",\n    \"id\": \"664f1a...\",\n    \"name\": \"Arjun Sharma\",\n    \"email\": \"arjun@example.com\",\n    \"role\": \"patient\",\n    \"mobile\": \"9876543210\",\n    \"dob\": \"1995-06-15\",\n    \"gender\": \"male\",\n    \"address\": \"Flat 4B, Green Park Apartments, MG Road\",\n    \"city\": \"Bengaluru\",\n    \"state\": \"Karnataka\",\n    \"pincode\": \"560001\",\n    \"is_email_verified\": true,\n    \"created_at\": \"2026-04-10T14:00:00+00:00\"\n  },\n  \"error\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Profile (Patient)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{TOKEN}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/user/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Arjun Kumar Sharma\",\n  \"mobile\": \"9876543210\",\n  \"address\": \"12 Lotus Lane, Indiranagar\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"Karnataka\",\n  \"pincode\": \"560038\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Profile (Doctor)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{TOKEN}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/api/user/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Priya Mehta\",\n  \"mobile\": \"9123456780\",\n  \"address\": \"Apollo Hospitals, Greams Road\",\n  \"city\": \"Chennai\",\n  \"state\": \"Tamil Nadu\",\n  \"pin\": \"600006\",\n  \"degree\": \"MBBS\",\n  \"position\": \"Consultant\",\n  \"specialization\": \"Ayurveda\",\n  \"experience\": \"8\",\n  \"hospital\": \"Apollo Hospitals\",\n  \"clinicLocation\": \"Greams Road, Chennai\",\n  \"regNumber\": \"TN-123456\",\n  \"consultantFee\": 700,\n  \"workingHours\": \"Mon-Sat, 9AM-5PM\",\n  \"upiId\": \"drpriya@ybl\",\n  \"bankAccountName\": \"Dr Priya Mehta\",\n  \"bankAccountNumber\": \"9876543210\",\n  \"bankIfsc\": \"HDFC0001234\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👨‍⚕️ Doctor",
+      "item": [
+        {
+          "name": "Verify UPI",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization",   "value": "Bearer {{TOKEN}}" },
+              { "key": "Content-Type",    "value": "application/json" },
+              { "key": "X-HMAC-Signature","value": "DEV_BYPASS" },
+              { "key": "X-Timestamp",     "value": "1744000000" }
+            ],
+            "url": "{{BASE_URL}}/api/doctor/verify-upi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"upiId\": \"drpriya@ybl\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔧 Utilities",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/utils/health"
+          }
+        },
+        {
+          "name": "IFSC Lookup",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/utils/ifsc/HDFC0001234"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"IFSC info fetched.\",\n    \"bank\": \"HDFC Bank\",\n    \"branch\": \"Nariman Point\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"ifsc\": \"HDFC0001234\"\n  },\n  \"error\": null\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

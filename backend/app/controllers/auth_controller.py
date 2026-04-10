@@ -1,0 +1,524 @@
+"""
+app/controllers/auth_controller.py — Authentication Business Logic (MySQL Edition)
+
+All DB operations use SQLAlchemy ORM via Flask-SQLAlchemy.
+"""
+
+import os
+import logging
+import bcrypt
+from datetime import datetime, timezone, timedelta
+
+from flask import current_app, request
+from flask_jwt_extended import create_access_token, create_refresh_token
+from marshmallow import ValidationError
+from sqlalchemy.exc import IntegrityError
+
+from app.middleware import get_jwt_user_id
+
+from app.extensions import db
+from app.models.user          import User
+from app.models.otp           import Otp
+from app.models.password_reset import PasswordReset
+from app.utils       import (generate_otp, generate_token,
+                              send_otp_email, send_welcome_email,
+                              send_password_reset_email,
+                              success_response, error_response, created_response,
+                              not_found_response)
+from app.utils.validators import (PatientRegisterSchema, DoctorRegisterSchema,
+                                   LoginSchema, OtpSchema, ForgotPasswordSchema,
+                                   ResetPasswordSchema)
+
+logger = logging.getLogger(__name__)
+
+# ── Schema singletons ─────────────────────────────────────────────
+_patient_schema = PatientRegisterSchema()
+_doctor_schema  = DoctorRegisterSchema()
+_login_schema   = LoginSchema()
+_otp_schema     = OtpSchema()
+_forgot_schema  = ForgotPasswordSchema()
+_reset_schema   = ResetPasswordSchema()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Private helpers
+# ═══════════════════════════════════════════════════════════════
+
+def _hash_password(plain: str) -> str:
+    rounds = current_app.config.get('BCRYPT_LOG_ROUNDS', 12)
+    return bcrypt.hashpw(
+        plain.encode('utf-8'),
+        bcrypt.gensalt(rounds)
+    ).decode('utf-8')
+
+
+def _check_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+
+
+def _make_jwt(user_id: int, role: str) -> dict:
+    """Return access + refresh token dict."""
+    claims        = {'role': role}
+    access_token  = create_access_token(identity=str(user_id),
+                                        additional_claims=claims)
+    refresh_token = create_refresh_token(identity=str(user_id),
+                                         additional_claims=claims)
+    return {'token': access_token, 'refresh_token': refresh_token}
+
+
+def _allowed_file(filename: str) -> bool:
+    allowed = current_app.config.get('ALLOWED_EXTENSIONS', {'pdf','jpg','jpeg','png'})
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed
+
+
+def _save_upload(file) -> str:
+    """Save document file and return stored filename."""
+    import uuid
+    from werkzeug.utils import secure_filename
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_dir, exist_ok=True)
+    ext      = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    file.save(os.path.join(upload_dir, filename))
+    return filename
+
+
+def _save_otp(email: str, otp_code: str, purpose: str):
+    """Upsert an OTP record for email + purpose."""
+    ttl     = current_app.config.get('OTP_EXPIRY_MINUTES', 10)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=ttl)
+    # Delete any existing OTP for this email + purpose
+    Otp.query.filter_by(email=email.lower(), purpose=purpose).delete()
+    record = Otp(
+        email=email.lower(),
+        otp=otp_code,
+        purpose=purpose,
+        expires_at=expires,
+    )
+    db.session.add(record)
+    db.session.commit()
+
+
+def _verify_otp(email: str, otp_code: str, purpose: str) -> bool:
+    """Return True and delete the record if OTP is valid and not expired."""
+    now    = datetime.now(timezone.utc)
+    record = Otp.query.filter_by(
+        email=email.lower(), otp=otp_code, purpose=purpose
+    ).first()
+    if not record:
+        return False
+    exp = record.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if now > exp:
+        db.session.delete(record)
+        db.session.commit()
+        return False
+    db.session.delete(record)
+    db.session.commit()
+    return True
+
+
+def _otp_in_cooldown(email: str, purpose: str) -> bool:
+    """True if an OTP was created within the cooldown window."""
+    cooldown = current_app.config.get('OTP_RESEND_COOLDOWN', 60)
+    cutoff   = datetime.now(timezone.utc) - timedelta(seconds=cooldown)
+    return Otp.query.filter(
+        Otp.email    == email.lower(),
+        Otp.purpose  == purpose,
+        Otp.created_at > cutoff,
+    ).count() > 0
+
+
+# ═══════════════════════════════════════════════════════════════
+#  REGISTER
+# ═══════════════════════════════════════════════════════════════
+
+def register_patient(data: dict):
+    """Create a patient account and send OTP."""
+    if User.query.filter_by(email=data['email']).first():
+        return error_response('An account with this email already exists.', 409)
+
+    user = User(
+        email             = data['email'],
+        password_hash     = _hash_password(data['password']),
+        role              = 'patient',
+        name              = data.get('fullName', '').strip(),
+        mobile            = data.get('mobile', '').strip(),
+        dob               = data.get('dob'),
+        gender            = data.get('gender'),
+        address           = data.get('address', '').strip(),
+        city              = data.get('city', '').strip(),
+        state             = data.get('state', '').strip(),
+        pincode           = data.get('pincode', '').strip(),
+        terms_agreed      = bool(data.get('termsAgreed', False)),
+        is_email_verified = False,
+    )
+    try:
+        db.session.add(user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return error_response('An account with this email already exists.', 409)
+
+    otp = generate_otp()
+    _save_otp(data['email'], otp, 'registration')
+    send_otp_email(data['email'], user.name or 'User', otp, 'registration')
+
+    logger.info(f"Patient registered: {data['email']} (id={user.id})")
+    return created_response(
+        data={'email': data['email']},
+        message='Registration successful! Please check your email for the verification code.'
+    )
+
+
+def register_doctor(data: dict, file):
+    """Create a doctor account with document upload and send OTP."""
+    if User.query.filter_by(email=data['email']).first():
+        return error_response('An account with this email already exists.', 409)
+
+    if not file or not _allowed_file(file.filename):
+        return error_response(
+            'A valid document (PDF/JPG/PNG, max 5 MB) is required.', 422
+        )
+
+    doc_path = _save_upload(file)
+
+    user = User(
+        email               = data['email'],
+        password_hash       = _hash_password(data['password']),
+        role                = 'doctor',
+        name                = data.get('fullName', '').strip(),
+        mobile              = data.get('mobile', '').strip(),
+        address             = data.get('address', '').strip(),
+        city                = data.get('city', '').strip(),
+        state               = data.get('state', '').strip(),
+        pincode             = data.get('pincode', '').strip(),
+        degree              = data.get('degree', ''),
+        position            = data.get('position', ''),
+        specialization      = data.get('specialization', ''),
+        experience          = str(data.get('experience', '0')),
+        hospital            = data.get('hospital', '').strip(),
+        clinic_location     = data.get('clinicLocation', '').strip(),
+        reg_number          = data.get('regNumber', '').strip(),
+        document_path       = doc_path,
+        consultant_fee      = 500,
+        working_hours       = 'Mon-Fri, 10AM-6PM',
+        verification_status = 'pending',
+        terms_agreed        = bool(data.get('termsAgreed', False)),
+        is_email_verified   = False,
+    )
+    try:
+        db.session.add(user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return error_response('An account with this email already exists.', 409)
+
+    otp  = generate_otp()
+    name = f"Dr. {user.name}" if user.name else 'Doctor'
+    _save_otp(data['email'], otp, 'registration')
+    send_otp_email(data['email'], name, otp, 'registration')
+
+    logger.info(f"Doctor registered: {data['email']} (id={user.id})")
+    return created_response(
+        data={'email': data['email']},
+        message='Registration successful! Please check your email for the verification code.'
+    )
+
+
+def register():
+    """POST /api/auth/register — dispatch by role/content-type."""
+    content_type = request.content_type or ''
+
+    if 'multipart/form-data' in content_type:
+        # Doctor registration
+        form_data = request.form.to_dict()
+        try:
+            data = _doctor_schema.load(form_data)
+        except ValidationError as err:
+            return error_response('Validation failed', 422, err.messages)
+        return register_doctor(data, request.files.get('document'))
+
+    # JSON body
+    body = request.get_json(force=True, silent=True) or {}
+    role = body.get('role', 'patient')
+
+    if role == 'doctor':
+        try:
+            data = _doctor_schema.load(body)
+        except ValidationError as err:
+            return error_response('Validation failed', 422, err.messages)
+        return register_doctor(data, request.files.get('document'))
+
+    # Patient
+    try:
+        data = _patient_schema.load(body)
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+    return register_patient(data)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  LOGIN
+# ═══════════════════════════════════════════════════════════════
+
+def login():
+    """POST /api/auth/login"""
+    try:
+        data = _login_schema.load(request.get_json(force=True, silent=True) or {})
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+
+    user = User.query.filter_by(email=data['email']).first()
+    if not user or not _check_password(data['password'], user.password_hash):
+        return error_response('Invalid email or password.', 401)
+
+    # Role mismatch check
+    requested = data.get('role', 'patient')
+    if user.role != requested and user.role != 'admin':
+        label = 'Doctor' if requested == 'doctor' else 'Patient'
+        return error_response(
+            f'No {label} account found with this email. '
+            f'Please select the correct login tab.', 403
+        )
+
+    # Email not verified
+    if not user.is_email_verified:
+        otp = generate_otp()
+        _save_otp(user.email, otp, 'registration')
+        send_otp_email(user.email, user.name or 'User', otp, 'registration')
+        return error_response(
+            'Your email is not verified. We sent a new code to your email.', 403
+        )
+
+    # Account inactive
+    if not user.is_active:
+        return error_response(
+            'Your account has been deactivated. Please contact support.', 403
+        )
+
+    # 2FA enabled
+    if user.two_fa_enabled:
+        otp = generate_otp()
+        _save_otp(user.email, otp, '2fa')
+        send_otp_email(user.email, user.name or 'User', otp, '2fa')
+        return success_response(
+            data={'status': '2fa_required', 'email': user.email},
+            message='2FA code sent to your email.'
+        )
+
+    # Success — issue tokens
+    tokens = _make_jwt(user.id, user.role)
+    user.last_login = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return success_response(
+        data={**tokens, 'role': user.role, 'user': user.to_dict()},
+        message='Login successful.'
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  OTP VERIFICATION
+# ═══════════════════════════════════════════════════════════════
+
+def verify_registration_otp():
+    """POST /api/auth/verify-registration-otp"""
+    try:
+        data = _otp_schema.load(request.get_json(force=True, silent=True) or {})
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+
+    if not _verify_otp(data['email'], data['otp'], 'registration'):
+        return error_response('Invalid or expired verification code.', 400)
+
+    user = User.query.filter_by(email=data['email']).first()
+    if not user:
+        return not_found_response('User not found.')
+
+    user.is_email_verified = True
+    db.session.commit()
+
+    send_welcome_email(user.email, user.name or 'User', user.role)
+    return success_response(message='Email verified successfully! You can now log in.')
+
+
+def verify_2fa_otp():
+    """POST /api/auth/verify-2fa-otp"""
+    try:
+        data = _otp_schema.load(request.get_json(force=True, silent=True) or {})
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+
+    if not _verify_otp(data['email'], data['otp'], '2fa'):
+        return error_response('Invalid or expired 2FA code.', 400)
+
+    user = User.query.filter_by(email=data['email']).first()
+    if not user:
+        return not_found_response('User not found.')
+
+    tokens           = _make_jwt(user.id, user.role)
+    user.last_login  = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return success_response(
+        data={**tokens, 'role': user.role, 'user': user.to_dict()},
+        message='2FA verified. Login successful.'
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RESEND OTP
+# ═══════════════════════════════════════════════════════════════
+
+def _resend_otp(purpose: str, ok_msg: str):
+    """Shared resend logic — always responds with success to prevent enumeration."""
+    try:
+        body = _forgot_schema.load(request.get_json(force=True, silent=True) or {})
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+
+    email = body['email']
+    user  = User.query.filter_by(email=email).first()
+
+    if user:
+        if _otp_in_cooldown(email, purpose):
+            cd = current_app.config.get('OTP_RESEND_COOLDOWN', 60)
+            return error_response(
+                f'Please wait {cd} seconds before requesting a new code.', 429
+            )
+        otp = generate_otp()
+        _save_otp(email, otp, purpose)
+        send_otp_email(email, user.name or 'User', otp, purpose)
+
+    return success_response(message=ok_msg)
+
+
+def resend_verification():
+    """POST /api/auth/resend-verification"""
+    return _resend_otp('registration',
+                       'A new verification code has been sent to your email.')
+
+
+def resend_2fa_otp():
+    """POST /api/auth/resend-2fa-otp"""
+    return _resend_otp('2fa', 'A new 2FA code has been sent to your email.')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EMAIL VERIFICATION (token link)
+# ═══════════════════════════════════════════════════════════════
+
+def verify_email_token():
+    """GET /api/auth/verify-email?token=<token>"""
+    token = request.args.get('token', '').strip()
+    if not token:
+        return error_response('Verification token is missing.', 400)
+
+    record = PasswordReset.query.filter_by(
+        token=token, purpose='email_verify', used=False
+    ).first()
+
+    if not record or not record.is_valid:
+        return error_response(
+            'This verification link is invalid or has expired.', 400
+        )
+
+    user = User.query.filter_by(email=record.email).first()
+    if not user:
+        return not_found_response('User not found.')
+
+    record.used = True
+    if user.is_email_verified:
+        db.session.commit()
+        return success_response(message='Email already verified. Please log in.')
+
+    user.is_email_verified = True
+    db.session.commit()
+
+    send_welcome_email(user.email, user.name or 'User', user.role)
+    return success_response(message='Email verified successfully! You can now log in.')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  FORGOT / RESET PASSWORD
+# ═══════════════════════════════════════════════════════════════
+
+def forgot_password():
+    """POST /api/forgot-password"""
+    try:
+        data = _forgot_schema.load(request.get_json(force=True, silent=True) or {})
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+
+    user = User.query.filter_by(email=data['email']).first()
+    if user:
+        token  = generate_token(48)
+        exp    = datetime.now(timezone.utc) + timedelta(minutes=30)
+        # Invalidate previous reset tokens for this email
+        PasswordReset.query.filter_by(
+            email=user.email, purpose='reset', used=False
+        ).update({'used': True})
+        db.session.add(PasswordReset(
+            email=user.email, token=token,
+            purpose='reset', expires_at=exp
+        ))
+        db.session.commit()
+        send_password_reset_email(user.email, user.name or 'User', token)
+        logger.info(f"Password reset requested: {user.email}")
+
+    return success_response(
+        message='If an account exists for that email, a reset link has been sent.'
+    )
+
+
+def reset_password():
+    """POST /api/reset-password"""
+    try:
+        data = _reset_schema.load(request.get_json(force=True, silent=True) or {})
+    except ValidationError as err:
+        return error_response('Validation failed', 422, err.messages)
+
+    record = PasswordReset.query.filter_by(
+        token=data['token'], purpose='reset', used=False
+    ).first()
+
+    if not record or not record.is_valid:
+        return error_response('This reset link is invalid or has expired.', 400)
+
+    user = User.query.filter_by(email=record.email).first()
+    if not user:
+        return not_found_response('User not found.')
+
+    user.password_hash = _hash_password(data['password'])
+    record.used        = True
+    db.session.commit()
+
+    logger.info(f"Password reset successful: {record.email}")
+    return success_response(message='Password reset successfully. You can now log in.')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  2FA SETTINGS
+# ═══════════════════════════════════════════════════════════════
+
+def toggle_2fa():
+    """POST /api/auth/2fa/toggle"""
+    user_id = get_jwt_user_id()
+    user = User.query.get(int(user_id))
+    
+    if not user:
+        return not_found_response('User not found.')
+
+    # Toggle the flag
+    user.two_fa_enabled = not user.two_fa_enabled
+    db.session.commit()
+
+    status_str = "enabled" if user.two_fa_enabled else "disabled"
+    logger.info(f"User {user_id} {status_str} 2FA.")
+
+    return success_response(
+        data={'two_fa_enabled': user.two_fa_enabled},
+        message=f'Two-Factor Authentication successfully {status_str}.'
+    )
