@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────
+#  VaidyaMed-X Backend — Python Dependencies (MySQL Stack)
+# ─────────────────────────────────────────────────────────
+flask==3.0.3
+flask-jwt-extended==4.6.0
+flask-cors==4.0.1
+flask-mail==0.10.0
+flask-sqlalchemy==3.1.1
+flask-migrate==4.0.7
+pymysql==1.1.1
+cryptography==42.0.8
+bcrypt==4.1.3
+marshmallow==3.21.3
+python-dotenv==1.0.1
+requests==2.32.3
+werkzeug==3.0.3
+gunicorn==22.0.0
+flask-socketio==5.3.6
+eventlet==0.35.2
