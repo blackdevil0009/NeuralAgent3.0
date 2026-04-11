@@ -90,3 +90,6 @@ frontend/*.txt
 .idea/
 *.iml
 .dart_tool/
+
+.vercel
+.env*.local
