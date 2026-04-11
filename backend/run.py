@@ -15,6 +15,19 @@ from app import create_app
 
 app = create_app()
 
+# 🏔️ Pre-warm AI Services for high-speed response
+from app.controllers.ai_v2_controller import get_rag_service, get_gemini_service, get_biogpt_service
+with app.app_context():
+    print("🏔️ Pre-warming Clinical AI Engines (BioGPT/RAG)... This may take a few seconds.")
+    try:
+        get_rag_service()
+        get_gemini_service()
+        # BioGPT initialized safely
+        get_biogpt_service() 
+        print("🚀 AI Engines Ready & Optimized.")
+    except Exception as e:
+        print(f"⚠️ Pre-warm notice: {e} (Engines will load on request instead)")
+
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.handler import WebSocketHandler
 

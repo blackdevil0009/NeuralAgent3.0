@@ -29,12 +29,12 @@ def create_app(config_class=None) -> Flask:
     migrate.init_app(app, db)   # flask db init / migrate / upgrade
     jwt.init_app(app)
     mail.init_app(app)
-    socketio.init_app(app)
+    socketio.init_app(app, cors_allowed_origins='*')
 
     # ── CORS ──────────────────────────────────────────────────────
     CORS(
         app,
-        resources={r'/api/*': {'origins': app.config['CORS_ORIGINS']}},
+        resources={r'/api/*': {'origins': '*'}},
         supports_credentials=True,
         allow_headers=[
             'Content-Type', 'Authorization',
