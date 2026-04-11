@@ -251,7 +251,7 @@ export default function HealthDashboard() {
                                         <div style={{ fontSize: '0.76rem', color: '#6b8f71' }}>{u.spec}</div>
                                         <div style={{ fontSize: '0.76rem', color: '#6b8f71', marginTop: 2 }}>⏰ {u.appointmentTime.substring(0, 5)} · {u.type}</div>
                                     </div>
-                                    <span className={`pd-pill ${u.type === 'Video Call' ? 'pd-pill-blue' : 'pd-pill-green'}`}>{u.type}</span>
+                                    <span className={`pd-pill ${u.type === 'Chat Consultation' ? 'pd-pill-blue' : 'pd-pill-green'}`}>{u.type}</span>
                                 </div>
                             );
                         })}

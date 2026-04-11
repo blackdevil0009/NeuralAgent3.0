@@ -10,6 +10,7 @@ from flask import current_app, request
 
 from app.extensions import db
 from app.models.user import User
+from app.models.appointment import Appointment
 from app.middleware  import get_jwt_user_id, get_jwt_claims
 from app.utils       import (success_response, error_response,
                               not_found_response, forbidden_response)
@@ -119,4 +120,28 @@ def get_doctors():
     return success_response(
         data={'doctors': [d.to_dict(include_sensitive=False) for d in doctors]},
         message='Doctors retrieved successfully.'
+    )
+
+
+def get_doctor_profile(doctor_id: int):
+    """GET /api/doctors/<id> — Get detailed doctor profile (revealed only if paid)."""
+    user_id = get_jwt_user_id()
+    
+    doctor = User.query.filter_by(id=doctor_id, role='doctor', is_active=True).first()
+    if not doctor:
+        return not_found_response("Doctor not found.")
+        
+    # Check if this user has any PAID appointment with this doctor
+    paid_appointment = Appointment.query.filter_by(
+        user_id=user_id,
+        doctor_id=doctor_id,
+        payment_status='paid'
+    ).first()
+    
+    # Reveal sensitive info only if they have paid
+    reveal = True if paid_appointment else False
+    
+    return success_response(
+        data=doctor.to_dict(include_sensitive=reveal),
+        message='Doctor profile retrieved' + (' (Unlocked)' if reveal else ' (Masked)')
     )

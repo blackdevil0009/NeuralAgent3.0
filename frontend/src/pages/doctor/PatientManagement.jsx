@@ -196,13 +196,7 @@ export default function PatientManagement() {
                         <p style={{ color: 'var(--doc-text-mute)' }}>Consultation ID: {selectedPatient.id}</p>
                     </div>
 
-                    {(selectedPatient.type === 'Video Call' || selectedPatient.type === 'Video') && (
-                        <button className="dd-btn" 
-                            style={{ width: '100%', marginBottom: 24, justifyContent: 'center', background: 'var(--doc-accent)', color: '#fff', fontWeight: 600, fontSize: '0.95rem', padding: '12px' }}
-                            onClick={() => navigate(`/doctor/vcall?patient=${selectedPatient.patientId}&name=${encodeURIComponent(selectedPatient.patientName)}&appt=${selectedPatient.id}`)}>
-                            📹 Admit to Video Session
-                        </button>
-                    )}
+
 
                     <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
                         <button className="dd-btn dd-btn-outline" style={{ flex: 1, fontSize: '0.8rem' }} onClick={() => setActiveOverlay('medical')}>📋 Medical History</button>

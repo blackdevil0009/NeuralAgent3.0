@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import './App.css';
 
 import { ToastProvider, useToast } from './context/ToastContext';
+import { SocketProvider } from './context/SocketContext';
 import { initErrorHandler } from './utils/error_handlers';
 
 import Home from './pages/home';
@@ -52,8 +53,9 @@ const AppInitializer = () => {
 function App() {
   return (
     <ToastProvider>
-      <AppInitializer />
-      <Router>
+      <SocketProvider>
+        <AppInitializer />
+        <Router>
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Home />} />
@@ -97,6 +99,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
+      </SocketProvider>
     </ToastProvider>
   );
 }

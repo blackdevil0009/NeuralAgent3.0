@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
+import { useSocket } from '../../context/SocketContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
 
@@ -14,7 +14,7 @@ export default function EmergencyDashboard() {
     const [activeEmergency, setActiveEmergency] = useState(null);
     const [medicalData, setMedicalData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const socketRef = useRef(null);
+    const { socket } = useSocket();
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
     const formatEmergency = (e) => ({
@@ -63,27 +63,16 @@ export default function EmergencyDashboard() {
         };
         fetchEmergencies();
 
-        // Real-time socket
-        const socket = io(API_BASE_URL, { 
-            auth: { token },
-            transports: ['websocket', 'polling']
-        });
-        socketRef.current = socket;
+        if (!socket) return;
         
-        socket.on('connect_error', (err) => {
-            console.error("Socket connection error:", err.message);
-            if (err.message.includes('expired') || err.message.includes('auth')) {
-                socket.disconnect();
-                localStorage.clear();
-                sessionStorage.clear();
-                navigate('/login');
-            }
-        });
-
         socket.on('new_emergency', (newEm) => setEmergencies(prev => [formatEmergency(newEm), ...prev]));
         socket.on('emergency_handled', (data) => setEmergencies(prev => prev.filter(e => e.id !== data.id)));
-        return () => socket.disconnect();
-    }, []);
+        
+        return () => {
+            socket.off('new_emergency');
+            socket.off('emergency_handled');
+        };
+    }, [socket]);
 
     const handleResolve = async (id, dbId) => {
         try {

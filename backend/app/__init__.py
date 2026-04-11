@@ -44,7 +44,7 @@ def create_app(config_class=None) -> Flask:
     )
 
     # ── Register Blueprints ───────────────────────────────────────
-    from app.routes import auth_bp, user_bp, doctor_bp, utils_bp, appointment_bp, consultation_bp, chat_bp, v2_bp, messages_bp, reports_bp
+    from app.routes import auth_bp, user_bp, doctor_bp, utils_bp, appointment_bp, consultation_bp, chat_bp, v2_bp, messages_bp, reports_bp, payment_bp, ai_v2_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(doctor_bp)
@@ -55,6 +55,8 @@ def create_app(config_class=None) -> Flask:
     app.register_blueprint(v2_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(reports_bp)
+    app.register_blueprint(payment_bp)
+    app.register_blueprint(ai_v2_bp)
 
     # ── JWT error callbacks ───────────────────────────────────────
     _register_jwt_callbacks(jwt)
@@ -63,7 +65,9 @@ def create_app(config_class=None) -> Flask:
     _register_error_handlers(app)
 
     # ── Ensure upload directory exists ────────────────────────────
-    os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
+    base_upload = app.config.get('UPLOAD_FOLDER', 'uploads')
+    os.makedirs(base_upload, exist_ok=True)
+    os.makedirs(os.path.join(base_upload, 'messages'), exist_ok=True)
 
     # ── Create DB tables (if they don't exist) ────────────────────
     with app.app_context():
@@ -84,13 +88,14 @@ def _init_db(app: Flask):
     """Create all tables if they don't exist. Safe to run multiple times."""
     try:
         # Import models so SQLAlchemy knows about them
-        from app.models.user          import User          # noqa: F401
-        from app.models.otp           import Otp           # noqa: F401
-        from app.models.password_reset import PasswordReset # noqa: F401
-        from app.models.appointment    import Appointment   # noqa: F401
-        from app.models.message        import Message       # noqa: F401
-        from app.models.emergency      import Emergency     # noqa: F401
-        from app.models.medical_report import MedicalReport # noqa: F401
+        from app.models.user              import User              # noqa: F401
+        from app.models.otp              import Otp               # noqa: F401
+        from app.models.password_reset   import PasswordReset     # noqa: F401
+        from app.models.appointment      import Appointment       # noqa: F401
+        from app.models.message          import Message           # noqa: F401
+        from app.models.emergency        import Emergency         # noqa: F401
+        from app.models.medical_report   import MedicalReport     # noqa: F401
+        from app.models.payment_transaction import PaymentTransaction  # noqa: F401
 
         db.create_all()
         app.logger.info("✅ MySQL tables verified / created.")

@@ -11,3 +11,4 @@ from .appointment import Appointment
 from .message     import Message
 from .emergency   import Emergency
 from .medical_report import MedicalReport
+from .payment_transaction import PaymentTransaction

@@ -6,6 +6,17 @@ import reportWebVitals from './reportWebVitals';
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
+// Global Resilience: Automatically fix broken images (e.g. blocked placeholders)
+window.addEventListener('error', (e) => {
+    if (e.target.tagName === 'IMG') {
+        e.target.onerror = null; // Prevent loops
+        e.target.src = '/placeholder-img.png';
+        e.target.style.opacity = '0.5';
+        e.target.style.width = '48px';
+    }
+}, true);
+
 root.render(
   <React.StrictMode>
     <App />

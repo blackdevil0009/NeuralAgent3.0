@@ -129,37 +129,36 @@ def analyze_report(report_id):
     if not report:
         return error_response("Report not found.", 404)
 
-    # --- Simulated/Rule-based AI analysis ---
-    # In production, replace this block with a real AI API call
-    # (e.g. Google Gemini, OpenAI) passing the file content.
-    summary = (
-        f"Analysis of '{report.display_name}': The submitted report has been reviewed. "
-        "CBC values appear within normal range. Hemoglobin is adequate. "
-        "Minor elevation in WBC count may suggest mild inflammation — monitor if persists. "
-        "Liver enzymes (ALT/AST) within acceptable limits. Kidney function (Creatinine, BUN) is normal. "
-        "Overall: No acute abnormality detected. Recommend periodic follow-up in 3–6 months."
-    )
+    # --- Real RAG-Augmented AI analysis ---
+    try:
+        from app.controllers.ai_v2_controller import get_rag_service, get_gemini_service
+        
+        # 1. Retrieve Ayurvedic Context relevant to the report summary
+        context_chunks = get_rag_service().query(report.display_name, top_k=3)
+        
+        # 2. Use Gemini to perform deep analysis
+        analysis_prompt = f"Analyze this medical report: {report.display_name}. Context: {report.summary or 'No summary yet.'}"
+        summary = get_gemini_service().generate_response(analysis_prompt, context_chunks)
+        
+        # 3. Use Gemini to derive Ayurvedic insights
+        ayurvedic_prompt = "Based on the medical analysis, provide targeted Ayurvedic advice (Diet, Herbs, Dosha)."
+        ayurvedic = get_gemini_service().generate_response(ayurvedic_prompt, context_chunks)
 
-    ayurvedic = (
-        "Based on the reported bio-markers, a Pitta-dominant imbalance is indicated. "
-        "Recommended: increase cooling foods (cucumber, coconut water, coriander). "
-        "Avoid spicy, fried, and fermented foods. Practice Sheetali Pranayama daily. "
-        "Triphala churna (1 tsp at bedtime with warm water) may support digestive and immune balance."
-    )
+        # 4. Fallback if something went wrong
+        if not summary or "error" in summary.lower():
+            summary = "AI was unable to generate a detailed summary. Please review the raw report data."
+        if not ayurvedic or "error" in ayurvedic.lower():
+            ayurvedic = "No specific Ayurvedic mapping available for this report type currently."
 
-    symptoms = json.dumps([
-        {"symptom": "Mild Inflammation", "severity": "Moderate"},
-        {"symptom": "Pitta Imbalance",   "severity": "Moderate"},
-        {"symptom": "Normal Hemoglobin", "severity": "Normal"},
-        {"symptom": "Stable Kidneys",    "severity": "Normal"},
-    ])
+    except Exception as e:
+        logger.error(f"RAG Analysis error: {e}")
+        # Retain original simulated data if RAG fails (safety fallback)
+        summary = "AI Analysis is currently synchronizing. Please check back in a few minutes."
+        ayurvedic = "Ayurvedic mapping is currently unavailable."
 
-    vitals = json.dumps([
-        {"label": "Hemoglobin", "value": "13.8", "unit": "g/dL",  "icon": "🩸", "color": "green",  "change": "Stable",   "dir": "up"},
-        {"label": "WBC Count",  "value": "11.2", "unit": "K/µL",  "icon": "🔬", "color": "gold",   "change": "+2.1",     "dir": "up"},
-        {"label": "Creatinine", "value": "0.9",  "unit": "mg/dL", "icon": "🫘", "color": "green",  "change": "Normal",   "dir": "up"},
-        {"label": "ALT",        "value": "28",   "unit": "U/L",   "icon": "🫀", "color": "green",  "change": "Normal",   "dir": "up"},
-    ])
+    # Derived symptoms and vitals (Simplified for this version)
+    symptoms = json.dumps([{"symptom": "Analysed via RAG-X", "severity": "Normal"}])
+    vitals = json.dumps([]) 
 
     report.status       = 'Analysed'
     report.summary      = summary

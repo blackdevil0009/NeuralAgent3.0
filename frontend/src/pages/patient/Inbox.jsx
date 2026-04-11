@@ -72,15 +72,16 @@ export default function Inbox() {
             .then(res => res.json()).then(res => res.data?.appointments || []).catch(() => []);
 
         Promise.all([fetchDoctors, fetchAppointments]).then(([docs, appts]) => {
-            // Build map: doctorId → latest appointment status
+            // Build map: doctorId → latest PAID appointment only
             const map = {};
-            appts.forEach(a => {
-                const key = String(a.doctorId);
-                if (!map[key] || new Date(a.appointmentDate) > new Date(map[key].appointmentDate)) {
-                    map[key] = a;
-                }
-            });
-            setAppointmentMap(map);
+            appts
+                .filter(a => a.paymentStatus === 'paid' || a.status === 'completed')  // Payment-gated
+                .forEach(a => {
+                    const key = String(a.doctorId);
+                    if (!map[key] || new Date(a.appointmentDate) > new Date(map[key].appointmentDate)) {
+                        map[key] = a;
+                    }
+                });
             setAppointmentMap(map);
             const convos = docs
                 .filter(d => map[String(d.id)])
@@ -89,19 +90,20 @@ export default function Inbox() {
                     name: d.name,
                     spec: d.spec,
                     badge: '🌿',
-                    online: map[String(d.id)]?.status === 'Scheduled',
-                    status: map[String(d.id)]?.status || 'Scheduled',
+                    online: map[String(d.id)]?.status === 'confirmed',
+                    status: map[String(d.id)]?.status || 'confirmed',
+                    paymentStatus: map[String(d.id)]?.paymentStatus || 'paid',
                     appointmentDate: map[String(d.id)]?.appointmentDate,
-                    lastMsg: map[String(d.id)]?.status === 'Completed' ? '✅ Consultation completed' : 'Tap to message',
+                    lastMsg: map[String(d.id)]?.status === 'completed' ? '✅ Consultation completed' : 'Tap to message',
                     messages: []
                 }));
             setConversations(convos);
 
-            // If preselected doctor doesn't have an appointment, clear it
+            // If preselected doctor doesn't have a PAID appointment, block and redirect
             if (preselect && !map[String(preselect)]) {
-                handleError('You must book an appointment before messaging this doctor.');
+                handleError('💳 Payment required — Please complete payment to unlock messaging with this doctor.');
                 setActiveId(convos.length > 0 ? convos[0].id : null);
-                navigate('/patient/inbox', { replace: true });
+                navigate('/patient/doctors', { replace: true });
             } else if (!activeId && convos.length > 0) {
                 setActiveId(convos[0].id);
             }
@@ -303,10 +305,10 @@ export default function Inbox() {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     };
 
-    const isCompleted = active && appointmentMap[String(active.id)]?.status === 'Completed';
+    const isCompleted = active && appointmentMap[String(active.id)]?.status === 'completed';
 
-    const activeConvs = conversations.filter(c => c.status !== 'Completed');
-    const historyConvs = conversations.filter(c => c.status === 'Completed');
+    const activeConvs = conversations.filter(c => c.status !== 'completed');
+    const historyConvs = conversations.filter(c => c.status === 'completed');
     const displayConvs = (inboxTab === 'history' ? historyConvs : activeConvs).filter(c =>
         !searchQ ||
         (c.name && c.name.toLowerCase().includes(searchQ.toLowerCase())) ||
@@ -368,8 +370,8 @@ export default function Inbox() {
                                         const hasAppt = !!appointmentMap[docIdKey];
                                         
                                         if (!hasAppt) {
-                                            handleError(`Please book an appointment with Dr. ${d.name} to start a chat.`);
-                                            navigate(`/patient/doctors?q=${d.name}`);
+                                            handleError(`💳 Payment required — Book & pay for an appointment with Dr. ${d.name} to chat.`);
+                                            navigate(`/patient/doctors`);
                                             return;
                                         }
 
@@ -455,7 +457,7 @@ export default function Inbox() {
                         </div>
                     </div>
                     <div className="inbox-chat-actions">
-                        {/* <button className="inbox-icon-btn" title="Video Call" onClick={() => navigate('/patient/appointments')}>📹</button> */}
+
                         <button className="inbox-icon-btn" title="View Reports" onClick={() => navigate('/patient/reports')}>📄</button>
                         <button className="inbox-icon-btn" title="Book Appointment" onClick={() => navigate('/patient/appointments')}>📅</button>
                     </div>
@@ -478,20 +480,23 @@ export default function Inbox() {
                                         {m.text.split('\n').map((line, i) => {
                                             if (line.startsWith('[IMAGE] ')) {
                                                 const url = line.replace('[IMAGE] ', '').trim();
+                                                let src = url.replace('via.placeholder.com', 'placehold.co');
+                                                if (src.startsWith('/api')) src = `${API_BASE_URL}${src}`;
                                                 return <img
                                                     key={i}
-                                                    src={url}
+                                                    src={src}
                                                     alt="attachment"
                                                     style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }}
                                                     onError={(e) => {
                                                         e.target.onerror = null;
-                                                        e.target.src = 'https://img.icons8.com/color/96/file.png';
+                                                        e.target.src = '/placeholder-img.png';
                                                     }}
                                                 />;
                                             }
                                             if (line.startsWith('[DOCUMENT] ')) {
                                                 const url = line.replace('[DOCUMENT] ', '').trim();
-                                                return <a key={i} href={url} target="_blank" rel="noreferrer" style={{ color: m.from === 'me' ? '#fff' : '#2d6a4f', textDecoration: 'underline', display: 'block', marginTop: 4, fontWeight: 'bold' }}>📄 View Document</a>;
+                                                const href = url.startsWith('/api') ? `${API_BASE_URL}${url}` : url;
+                                                return <a key={i} href={href} target="_blank" rel="noreferrer" style={{ color: m.from === 'me' ? '#fff' : '#2d6a4f', textDecoration: 'underline', display: 'block', marginTop: 4, fontWeight: 'bold' }}>📄 View Document</a>;
                                             }
                                             return <div key={i}>{line}</div>;
                                         })}

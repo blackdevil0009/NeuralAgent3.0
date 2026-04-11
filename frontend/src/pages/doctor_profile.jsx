@@ -96,7 +96,15 @@ export default function DoctorProfile() {
         fetch(`${API_BASE_URL}/api/user/profile`, {
             headers: { Authorization: `Bearer ${token}` },
         })
-            .then(r => r.json())
+            .then(async r => {
+                if (r.status === 401) {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    navigate('/login');
+                    throw new Error('Session expired. Please log in again.');
+                }
+                return r.json();
+            })
             .then(resp => {
                 const p = resp.data || resp;
                 setProfile(p);
@@ -186,12 +194,21 @@ export default function DoctorProfile() {
         setSaving(true);
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            console.log("Saving doctor profile payload:", { ...form, consultantFee: Number(form.consultantFee), experience: String(form.experience) });
             const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
                 method: 'PUT',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...form, consultantFee: Number(form.consultantFee), experience: String(form.experience) }),
             });
-            if (!res.ok) { const j = await res.json(); throw new Error(j.data?.message || j.message || 'Save failed'); }
+            const j = await res.json();
+            if (!res.ok) { 
+                if (j.data?.details) {
+                    console.error("Backend Validation Errors:", j.data.details);
+                    setErrors(j.data.details);
+                    throw new Error(j.data.message || 'Validation failed');
+                }
+                throw new Error(j.data?.message || j.message || 'Save failed'); 
+            }
             handleSuccess('Profile saved! A UPI confirmation email has been sent if your UPI changed.');
             setProfile(f => ({ ...f, ...form }));
             setEditMode(false);
@@ -307,7 +324,7 @@ export default function DoctorProfile() {
                     </div>
                     <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                         <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#27ae60' }}>
-                            ₹{profile.consultantFee || 500}
+                            ₹{profile.consultantFee ?? 500}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--doc-text-mute)' }}>Consultation Fee</div>
                         <div style={{ fontSize: '0.82rem', color: 'var(--doc-text-mute)', marginTop: 4 }}>
@@ -360,7 +377,7 @@ export default function DoctorProfile() {
 
                     <div style={cardStyle}>
                         <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>📅 Consultation Types</h3>
-                        {['💬 Chat Consultation', '🎥 Video Call', '🏥 Offline / In-Clinic'].map(t => (
+                        {['💬 Chat Consultation', '🏥 Offline / In-Clinic'].map(t => (
                             <div key={t} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--doc-border)', fontSize: '0.88rem' }}>
                                 <span>{t}</span>
                                 <span style={{ background: '#e8f8ee', color: '#27ae60', fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: 20 }}>Active</span>

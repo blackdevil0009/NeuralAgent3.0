@@ -84,6 +84,15 @@ class BaseConfig:
     OTP_RESEND_COOLDOWN = int(os.getenv('OTP_RESEND_COOLDOWN_SECONDS', 60))
     BCRYPT_LOG_ROUNDS   = int(os.getenv('BCRYPT_LOG_ROUNDS', 12))
 
+    # ── Razorpay Payment Gateway ───────────────────────────────
+    RAZORPAY_KEY_ID      = os.getenv('RAZORPAY_KEY_ID',      'rzp_test_placeholder')
+    RAZORPAY_KEY_SECRET  = os.getenv('RAZORPAY_KEY_SECRET',  'placeholder_secret')
+    RAZORPAY_WEBHOOK_SECRET = os.getenv('RAZORPAY_WEBHOOK_SECRET', '')
+
+    # ── Revenue Split ──────────────────────────────────────────
+    PLATFORM_COMMISSION_PCT = int(os.getenv('PLATFORM_COMMISSION_PCT', 5))
+    ALLOW_PAYMENT_SIMULATION = os.getenv('ALLOW_PAYMENT_SIMULATION', 'False').lower() == 'true'
+
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True

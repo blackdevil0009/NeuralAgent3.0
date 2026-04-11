@@ -8,8 +8,12 @@ Endpoints:
   POST /api/reset-password      — password reset confirm
 """
 
+import os
+import uuid
 from datetime import datetime
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request, send_from_directory, current_app
+from werkzeug.utils import secure_filename
+
 from app.controllers import (forgot_password, reset_password, get_ifsc_info,
                              report_emergency, get_my_emergencies,
                              get_emergencies_list, resolve_emergency)
@@ -128,9 +132,38 @@ def get_legacy_messages():
 @utils_bp.route('/api/messages/upload', methods=['POST'])
 @jwt_required_custom
 def upload_message_file():
-    # Mock file upload - use a more reliable medical report icon instead of via.placeholder
+    """Handle actual file uploads for chat attachments."""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No selected file'}), 400
+
+    # Ensure uploads/messages exists
+    upload_base = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+    msg_folder = os.path.join(upload_base, 'messages')
+    os.makedirs(msg_folder, exist_ok=True)
+
+    # Secure filename with UUID to avoid collisions
+    original_name = secure_filename(file.filename)
+    ext = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else 'dat'
+    unique_name = f"{uuid.uuid4().hex}.{ext}"
+    
+    save_path = os.path.join(msg_folder, unique_name)
+    file.save(save_path)
+
+    # Return the URL. The frontend will use this to render the image/doc.
+    # We serve this via the /api/utils/uploads/<path> route defined below.
     return jsonify({
         'success': True,
-        'url': 'https://img.icons8.com/color/144/medical-report.png', 
-        'message': 'File uploaded.'
+        'url': f"/api/utils/uploads/messages/{unique_name}",
+        'filename': original_name,
+        'message': 'File uploaded successfully.'
     }), 200
+
+@utils_bp.route('/api/utils/uploads/<path:filename>', methods=['GET'])
+def serve_uploads(filename):
+    """Serve uploaded files from the UPLOAD_FOLDER."""
+    upload_base = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+    return send_from_directory(upload_base, filename)

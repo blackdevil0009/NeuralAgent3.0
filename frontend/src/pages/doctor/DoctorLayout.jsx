@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import { useSocket } from '../../context/SocketContext';
 import './doctor_dashboard.css';
 import { API_BASE_URL } from '../../utils/config';
 
@@ -30,6 +30,7 @@ export default function DoctorLayout() {
     const location = useLocation();
     const [user, setUser] = useState({ name: 'Dr. Arjun Menon', avatar: '👨‍⚕️', role: 'Senior Consultant' });
     const [globalAlert, setGlobalAlert] = useState(null); // { id, patient, type }
+    const { socket } = useSocket();
 
     useEffect(() => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -45,12 +46,7 @@ export default function DoctorLayout() {
             if (stored.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (stored.name.split(' ')[0]) }));
         } catch { }
 
-        const socket = io(API_BASE_URL, { 
-            transports: ['websocket', 'polling'], 
-            auth: { token }
-        });
-
-        socket.on('connect', () => console.log("Doctor Dashboard connected to real-time alerts."));
+        if (!socket) return;
 
         socket.on('new_emergency', (data) => {
             console.log("CRITICAL EMERGENCY DETECTED:", data);

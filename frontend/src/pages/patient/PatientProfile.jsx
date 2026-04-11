@@ -64,6 +64,7 @@ export default function PatientProfile() {
                     if (json.data) {
                         const data = {
                             ...json.data,
+                            pin: json.data.pin || json.data.pincode || '',
                             dosha: json.data.dosha || 'Not assessed',
                             gender: json.data.gender || 'Prefer not to say',
                             bloodGroup: json.data.bloodGroup || 'Unknown',

@@ -160,15 +160,28 @@ class ResetPasswordSchema(Schema):
 
 # ── Profile Update Schema (shared, role-aware) ───────────────────
 class PatientProfileSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
     name    = fields.Str(required=True, validate=validate.Length(min=2, max=100))
     mobile  = fields.Str(required=True, validate=validate_phone)
     address = fields.Str(validate=validate.Length(min=5))
     city    = fields.Str(validate=validate.Length(min=2, max=60))
     state   = fields.Str()
     pincode = fields.Str(validate=validate_pin)
+    pin     = fields.Str(validate=validate_pin)  # alias for frontend
+
+    bloodGroup  = fields.Str(allow_none=True)
+    dosha       = fields.Str(allow_none=True)
+    allergies   = fields.Str(allow_none=True)
+    conditions  = fields.Str(allow_none=True)
+    medications = fields.Str(allow_none=True)
 
 
 class DoctorProfileSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
     name            = fields.Str(required=True, validate=validate.Length(min=2, max=100))
     mobile          = fields.Str(required=True, validate=validate_phone)
     address         = fields.Str(validate=validate.Length(min=5))

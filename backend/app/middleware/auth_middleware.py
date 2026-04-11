@@ -13,11 +13,23 @@ logger = logging.getLogger(__name__)
 
 
 def jwt_required_custom(fn):
-    """Require a valid JWT — returns JSON 401 on failure."""
+    """Require a valid JWT — returns JSON 401 on failure. Supports query param 'token' for downloads."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
         try:
-            verify_jwt_in_request()
+            from flask import request
+            # Try default header/cookie verification first
+            verify_jwt_in_request(optional=True)
+            
+            # If identity is still missing, check for 'token' in query string
+            # (Used for window.open for PDF receipt downloads)
+            if not get_jwt_identity():
+                token = request.args.get('token')
+                if token:
+                    verify_jwt_in_request(locations=['query_string'])
+                else:
+                    verify_jwt_in_request() # triggers default failure
+                    
         except Exception as exc:
             logger.warning(f"JWT check failed: {exc}")
             msg = str(exc)

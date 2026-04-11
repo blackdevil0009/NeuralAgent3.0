@@ -30,6 +30,7 @@ _PROTECTED = {
 # ── Allowed update fields per role ────────────────────────────────
 _PATIENT_FIELDS = {
     'name', 'mobile', 'address', 'city', 'state', 'pincode', 'profile_image',
+    'blood_group', 'dosha', 'allergies', 'conditions', 'medications',
 }
 _DOCTOR_FIELDS  = {
     'name', 'mobile', 'address', 'city', 'state', 'pincode', 'profile_image',
@@ -50,6 +51,7 @@ _FIELD_MAP = {
     'bankAccountNumber': 'bank_account_number',
     'bankIfsc':          'bank_ifsc',
     'pin':               'pincode',     # alias
+    'bloodGroup':        'blood_group',
 }
 
 
@@ -73,7 +75,7 @@ def get_profile():
     if not user:
         return not_found_response('User profile not found.')
 
-    return success_response(data=user.to_dict(), message='Profile fetched successfully.')
+    return success_response(data=user.to_dict(include_sensitive=True), message='Profile fetched successfully.')
 
 
 def update_profile():
@@ -88,6 +90,7 @@ def update_profile():
         return not_found_response('User not found.')
 
     raw = request.get_json(force=True, silent=True) or {}
+    logger.warning(f"Profile update payload [user_id={user_id}]: {raw}")
 
     # ── Validate ──────────────────────────────────────────────────
     try:
@@ -96,7 +99,8 @@ def update_profile():
         else:
             validated = _patient_schema.load(raw, partial=True)
     except ValidationError as err:
-        return error_response('Validation failed', 422, err.messages)
+        logger.warning(f"Validation failed for user_id={user_id}: {err.messages}")
+        return error_response('Validation failed', 422, {'message': 'One or more fields are invalid.', 'details': err.messages})
 
     # ── Translate keys & filter to allowed set ────────────────────
     remapped = _remap(validated)
@@ -124,4 +128,4 @@ def update_profile():
     db.session.commit()
 
     logger.info(f"Profile updated: user_id={user_id}, role={user.role}")
-    return success_response(data=user.to_dict(), message='Profile updated successfully.')
+    return success_response(data=user.to_dict(include_sensitive=True), message='Profile updated successfully.')

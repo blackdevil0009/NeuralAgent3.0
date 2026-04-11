@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
 import { io } from 'socket.io-client';
+import { useSocket } from '../../context/SocketContext';
 import { generateRSAKeyPair, hybridEncrypt, hybridDecrypt } from '../../utils/crypto';
 
 // Mock data removed
@@ -22,6 +23,7 @@ export default function DoctorInbox() {
     const [inboxTab, setInboxTab] = useState('active'); // 'active' | 'history'
     const [attachPreview, setAttachPreview] = useState(null);
     const fileInputRef = React.useRef(null);
+    const { socket } = useSocket();
 
     // Initialize E2E RSA Keys — always re-upload to ensure DB has our key
     useEffect(() => {
@@ -156,13 +158,9 @@ export default function DoctorInbox() {
             try { userId = JSON.parse(atob(token.split('.')[1])).sub; } catch(e) {}
         }
 
-        const socket = io(API_BASE_URL, { 
-            auth: { token },
-            transports: ['websocket'] 
-        });
-        socket.on('connect', () => {
-            if (userId) socket.emit('join_inbox', { userId });
-        });
+        if (!socket) return;
+
+        if (userId) socket.emit('join_inbox', { userId });
 
         socket.on('new_inbox_msg', (msg) => {
             // Check if message belongs to current selected conversation
@@ -189,7 +187,9 @@ export default function DoctorInbox() {
             }
         });
 
-        return () => socket.disconnect();
+        return () => {
+            socket.off('new_inbox_msg');
+        };
     }, [selectedConvo]);
 
     // Auto-scroll when messages update
@@ -351,7 +351,7 @@ export default function DoctorInbox() {
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
-                        {/* <button className="dd-btn dd-btn-primary" onClick={() => navigate('/doctor/vcall')} disabled={!selectedConvo}>📹 Video Call</button> */}
+
                         <button className="dd-btn dd-btn-outline" onClick={() => setShowReports(!showReports)} disabled={!selectedConvo}>
                             {showReports ? '💬 Full Chat' : '📄 Patient Reports'}
                         </button>
@@ -379,11 +379,27 @@ export default function DoctorInbox() {
                                 {msg.text.split('\n').map((line, j) => {
                                     if (line.startsWith('[IMAGE] ')) {
                                         const url = line.replace('[IMAGE] ', '').trim();
-                                        return <img key={j} src={url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }} />;
+                                        let src = url.replace('via.placeholder.com', 'placehold.co');
+                                        if (src.startsWith('/api')) src = `${API_BASE_URL}${src}`;
+                                            return (
+                                                <img 
+                                                    key={j} 
+                                                    src={src} 
+                                                    alt="attachment" 
+                                                    style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4, display: 'block' }} 
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = '/placeholder-img.png'; // Local fallback
+                                                        e.target.style.width = '48px';
+                                                        e.target.style.opacity = '0.5';
+                                                    }}
+                                                />
+                                            );
                                     }
                                     if (line.startsWith('[DOCUMENT] ')) {
                                         const url = line.replace('[DOCUMENT] ', '').trim();
-                                        return <a key={j} href={url} target="_blank" rel="noreferrer" style={{ color: msg.sender === 'doctor' ? '#fff' : '#2d6a4f', textDecoration: 'underline', display: 'block', marginTop: 4, fontWeight: 'bold' }}>📄 View Document</a>;
+                                        const href = url.startsWith('/api') ? `${API_BASE_URL}${url}` : url;
+                                        return <a key={j} href={href} target="_blank" rel="noreferrer" style={{ color: msg.sender === 'doctor' ? '#fff' : '#2d6a4f', textDecoration: 'underline', display: 'block', marginTop: 4, fontWeight: 'bold' }}>📄 View Document</a>;
                                     }
                                     return <div key={j}>{line}</div>;
                                 })}

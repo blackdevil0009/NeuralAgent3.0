@@ -178,7 +178,7 @@ export default function AIAssistant() {
                 formData.append('file', fileData);
                 formData.append('message', msg || "Analyze this content.");
 
-                response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
+                response = await fetch(`${API_BASE_URL}/api/v2/ai/query`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -188,7 +188,7 @@ export default function AIAssistant() {
                     body: formData
                 });
             } else {
-                response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
+                response = await fetch(`${API_BASE_URL}/api/v2/ai/query`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -212,11 +212,17 @@ export default function AIAssistant() {
                 return;
             }
 
-            const aiResponseText = resData.data?.response || resData.data?.error || resData.error || resData.msg || resData.message || "I am connected but need a moment to process. 🌿";
+            const aiResponseText = resData.data?.response || resData.data?.answer || resData.data?.error || resData.error || resData.msg || resData.message || (response.status === 200 ? "VaidyaMed-X is currently under heavy load. Please try again in a moment." : "VaidyaMed-X Clinical Brain is currently offline for maintenance.");
+            
+            // Append BioGPT Insight if exists for clinical depth
+            let finalOutput = aiResponseText;
+            if (resData.data?.bio_insight) {
+                finalOutput += `<br/><br/><div class="clinical-verify"><strong>🩺 Supplemental BioGPT Analysis:</strong><br/>${resData.data.bio_insight}</div>`;
+            }
 
             const aiMsg = {
                 id: Date.now() + 1, from: 'ai',
-                text: aiResponseText,
+                text: finalOutput,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
             setMessages(prev => [...prev, aiMsg]);

@@ -39,6 +39,13 @@ class User(db.Model):
     )
     profile_image = db.Column(db.String(255), nullable=True, default='')
 
+    # ── Ayurvedic/Patient health info ──────────────────────────
+    blood_group = db.Column(db.String(10),  nullable=True, default='Unknown')
+    dosha       = db.Column(db.String(50),  nullable=True, default='Not assessed')
+    allergies   = db.Column(db.String(500), nullable=True, default='')
+    conditions  = db.Column(db.String(500), nullable=True, default='')
+    medications = db.Column(db.String(500), nullable=True, default='')
+
     # ── Address ────────────────────────────────────────────────
     address  = db.Column(db.String(300), nullable=True, default='')
     city     = db.Column(db.String(100), nullable=True, default='')
@@ -107,7 +114,7 @@ class User(db.Model):
             'email':                self.email,
             'role':                 self.role,
             'name':                 self.name or '',
-            'mobile':               self.mobile or '',
+            'mobile':               self.mobile or '' if include_sensitive else '+91-XXXXX-XXXXX',
             'dob':                  self.dob.isoformat() if self.dob else None,
             'gender':               self.gender,
             'profile_image':        self.profile_image or '',
@@ -115,6 +122,12 @@ class User(db.Model):
             'city':                 self.city or '',
             'state':                self.state or '',
             'pincode':              self.pincode or '',
+            'pin':                  self.pincode or '',  # alias for frontend
+            'bloodGroup':           self.blood_group or 'Unknown',
+            'dosha':                self.dosha or 'Not assessed',
+            'allergies':            self.allergies or '',
+            'conditions':           self.conditions or '',
+            'medications':          self.medications or '',
             'is_active':            self.is_active,
             'is_email_verified':    self.is_email_verified,
             'two_fa_enabled':       self.two_fa_enabled,
@@ -132,10 +145,10 @@ class User(db.Model):
                 'spec':                 self.specialization or '',  # alias for frontend
                 'experience':           self.experience or '',
                 'hospital':             self.hospital or '',
-                'clinicLocation':       self.clinic_location or '',
+                'clinicLocation':       self.clinic_location or '' if include_sensitive else 'Book to View Address',
                 'regNumber':            self.reg_number or '',
                 'consultantFee':        self.consultant_fee or 500,
-                'fee':                  self.consultant_fee or 500,  # alias for frontend
+                'fee':                  self.consultant_fee if self.consultant_fee is not None else 500,  # alias for frontend
                 'workingHours':         self.working_hours or 'Mon-Fri, 10AM-6PM',
                 'upiId':                self.upi_id or '',
                 'bankAccountName':      self.bank_account_name or '',
@@ -143,7 +156,6 @@ class User(db.Model):
                 'bankIfsc':             self.bank_ifsc or '',
                 'payoutVerified':       self.payout_verified,
                 'verificationStatus':   self.verification_status or 'pending',
-                'pin':                  self.pincode or '',  # alias for frontend
             })
 
         if include_sensitive:

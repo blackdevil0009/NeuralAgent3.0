@@ -17,4 +17,14 @@ db      = SQLAlchemy()
 migrate = Migrate()
 jwt     = JWTManager()
 mail    = Mail()
-socketio = SocketIO(cors_allowed_origins="*")
+socketio = SocketIO(
+    cors_allowed_origins=["http://localhost:3000", "http://127.0.0.1:3000"], 
+    async_mode='gevent',
+    ping_timeout=60,
+    ping_interval=25,
+    allow_upgrades=True,
+    logger=True,
+    engineio_logger=True,
+    always_connect=True,
+    manage_session=True
+)

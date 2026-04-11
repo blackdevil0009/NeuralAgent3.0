@@ -16,4 +16,21 @@ requests==2.32.3
 werkzeug==3.0.3
 gunicorn==22.0.0
 flask-socketio==5.3.6
-eventlet==0.35.2
+gevent==26.4.0
+gevent-websocket==0.10.1
+
+# ── Payment Gateway ────────────────────────────────────────
+razorpay==1.4.2
+
+# ── PDF Generation ────────────────────────────────────────
+reportlab==4.2.2
+# ── AI & RAG Stack ──────────────────────────────────────────
+google-generativeai
+faiss-cpu
+pypdf2
+langchain-text-splitters
+sentence-transformers
+torch
+fairseq
+omegaconf
+sacremoses

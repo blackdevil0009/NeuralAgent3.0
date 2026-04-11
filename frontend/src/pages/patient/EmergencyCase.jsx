@@ -54,7 +54,7 @@ export default function EmergencyCase() {
                 <h1 style={{ color: '#c0392b', fontFamily: 'Playfair Display, serif' }}>Emergency Reported</h1>
                 <p style={{ fontSize: '1.1rem', color: '#555', lineHeight: 1.6 }}>
                     Your emergency request has been broadcast to all available senior consultants.
-                    Please stay calm. A doctor will contact you via video call or chat within minutes.
+                    Please stay calm. A doctor will contact you via secure chat or mobile call within minutes.
                 </p>
                 <div style={{ margin: '30px 0', padding: 20, background: '#f9f9f9', borderRadius: 12, borderLeft: '4px solid #c0392b' }}>
                     <p style={{ fontWeight: 600, margin: 0 }}>Reference ID: {refId}</p>
