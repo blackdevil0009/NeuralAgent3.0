@@ -18,6 +18,7 @@ from app.controllers.appointment_controller import (
     verify_and_confirm,
     get_patient_appointments,
     get_doctor_appointments,
+    get_organization_appointments,
     get_appointment_receipt,
     cancel_appointment,
 )
@@ -32,6 +33,8 @@ def list_appointments():
     claims = get_jwt_claims()
     if claims.get('role') == 'doctor':
         return get_doctor_appointments()
+    if claims.get('role') == 'organization':
+        return get_organization_appointments()
     return get_patient_appointments()
 
 

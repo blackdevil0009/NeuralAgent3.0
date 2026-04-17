@@ -14,7 +14,7 @@ from datetime import datetime
 from flask import request, send_file, current_app
 import io
 
-from app.extensions import db
+from app.extensions import db, socketio
 from app.models.appointment import Appointment
 from app.models.user import User
 from app.models.payment_transaction import PaymentTransaction
@@ -24,6 +24,17 @@ from app.services import payment_service
 from app.services import pdf_service
 
 logger = logging.getLogger(__name__)
+
+
+def _emit_appointment_event(event_name: str, appointment: Appointment):
+    payload = appointment.to_dict(include_sensitive=True)
+    doctor = User.query.get(appointment.doctor_id) if appointment.doctor_id else None
+    hospital_id = doctor.hospital_id if doctor else None
+
+    socketio.emit(event_name, payload, room=f"user_{appointment.user_id}")
+    socketio.emit(event_name, payload, room=f"user_{appointment.doctor_id}")
+    if hospital_id:
+        socketio.emit(event_name, payload, room=f"hospital_{hospital_id}")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -251,6 +262,7 @@ def verify_and_confirm():
     appointment.doctor_share        = doctor_paise
     appointment.platform_share      = platform_paise
     db.session.commit()
+    _emit_appointment_event('appointment_updated', appointment)
 
     # ── Log successful transaction ────────────────────────────
     txn = _log_transaction(
@@ -349,6 +361,32 @@ def get_doctor_appointments():
     )
 
 
+def get_organization_appointments():
+    """GET /api/appointments - list appointments for hospital-linked doctors."""
+    user_id = get_jwt_user_id()
+    claims = get_jwt_claims()
+
+    if claims.get('role') != 'organization':
+        return error_response("Only hospital admins can view hospital appointments.", 403)
+
+    doctors = User.query.filter_by(hospital_id=user_id, role='doctor').all()
+    doctor_ids = [doctor.id for doctor in doctors]
+    if not doctor_ids:
+        return success_response(data={'appointments': []}, message="Hospital appointments retrieved.")
+
+    appointments = (
+        Appointment.query
+        .filter(Appointment.doctor_id.in_(doctor_ids))
+        .filter(Appointment.payment_status == 'paid')
+        .order_by(Appointment.appointment_date.desc(), Appointment.appointment_time.desc())
+        .all()
+    )
+    return success_response(
+        data={'appointments': [appointment.to_dict(include_sensitive=True) for appointment in appointments]},
+        message="Hospital appointments retrieved."
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 #  GET — Download PDF Receipt
 # ═══════════════════════════════════════════════════════════════
@@ -412,6 +450,7 @@ def cancel_appointment(appointment_id: int):
 
     appointment.status = 'cancelled'
     db.session.commit()
+    _emit_appointment_event('appointment_updated', appointment)
 
     logger.info(f"Appointment {appointment_id} cancelled by user {user_id}")
     return success_response(message="Appointment cancelled successfully.")

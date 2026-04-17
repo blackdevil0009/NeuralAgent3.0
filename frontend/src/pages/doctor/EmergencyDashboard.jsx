@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../../utils/config';
@@ -16,6 +16,8 @@ export default function EmergencyDashboard() {
     const [loading, setLoading] = useState(true);
     const { socket } = useSocket();
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const storedUser = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+    const currentDoctorId = String(storedUser?.id || '');
 
     const formatEmergency = (e) => ({
         id: e.id || `EM-${e.dbId}`,
@@ -23,9 +25,14 @@ export default function EmergencyDashboard() {
         patient: e.patientName || e.patient || 'Unknown Patient',
         patientId: e.patientId,
         contact: e.contact || 'Not on file',
+        contactName: e.contactName || 'Primary contact',
+        location: e.location || 'Location not shared',
         type: e.caseType || e.type || 'urgent',
         desc: e.explanation || e.desc || 'No description provided',
         time: e.time || e.createdAt,
+        doctorId: e.doctorId,
+        providerType: e.providerType || 'doctor',
+        providerName: e.providerName || '',
     });
 
     useEffect(() => {
@@ -65,14 +72,18 @@ export default function EmergencyDashboard() {
 
         if (!socket) return;
         
-        socket.on('new_emergency', (newEm) => setEmergencies(prev => [formatEmergency(newEm), ...prev]));
+        socket.on('new_emergency', (newEm) => {
+            const formatted = formatEmergency(newEm);
+            if (String(formatted.doctorId || '') !== currentDoctorId) return;
+            setEmergencies(prev => [formatted, ...prev]);
+        });
         socket.on('emergency_handled', (data) => setEmergencies(prev => prev.filter(e => e.id !== data.id)));
         
         return () => {
             socket.off('new_emergency');
             socket.off('emergency_handled');
         };
-    }, [socket]);
+    }, [socket, currentDoctorId]);
 
     const handleResolve = async (id, dbId) => {
         try {
@@ -87,18 +98,6 @@ export default function EmergencyDashboard() {
                 alert("Already handled or an error occurred.");
             }
         } catch { alert("Network error."); }
-    };
-
-    const initiateEmergencyCall = async (e) => {
-        try {
-            // Notify the patient via socket
-            await fetch(`${API_BASE_URL}/api/emergencies/${e.dbId}/notify_patient`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-        } catch { /* best effort */ }
-        // Navigate doctor to video call room
-        navigate(`/doctor/vcall?room=emergency_${e.dbId}&patientId=${e.patientId}`);
     };
 
     const openHistory = async (e) => {
@@ -164,6 +163,12 @@ export default function EmergencyDashboard() {
                                         </div>
                                         <h2 style={{ margin: '15px 0 5px', color: 'var(--doc-green-deep)' }}>{e.patient}</h2>
                                         <div style={{ fontSize: '0.9rem', color: '#555' }}>📞 Contact: <strong>{e.contact}</strong></div>
+                                        <div style={{ fontSize: '0.88rem', color: '#64748b', marginTop: 6 }}>
+                                            Contact Person: <strong>{e.contactName}</strong>
+                                        </div>
+                                        <div style={{ fontSize: '0.88rem', color: '#64748b', marginTop: 6 }}>
+                                            Location: <strong>{e.location}</strong>
+                                        </div>
                                     </div>
                                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                                             <button
@@ -185,6 +190,16 @@ export default function EmergencyDashboard() {
                             </div>
 
                             <div style={{ padding: '20px 30px', borderTop: '1px solid var(--doc-border)' }}>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                                    <span style={{ fontSize: '0.78rem', background: '#eff6ff', color: '#1d4ed8', padding: '5px 10px', borderRadius: 999 }}>
+                                        {e.providerType === 'doctor' ? 'Direct Doctor Booking' : 'Hospital Desk Booking'}
+                                    </span>
+                                    {e.providerName && (
+                                        <span style={{ fontSize: '0.78rem', background: '#f0fdf4', color: '#166534', padding: '5px 10px', borderRadius: 999 }}>
+                                            {e.providerName}
+                                        </span>
+                                    )}
+                                </div>
                                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--doc-text-mute)', textTransform: 'uppercase', marginBottom: 10 }}>Case Brief</div>
                                 <p style={{ fontSize: '1rem', lineHeight: 1.6, margin: 0, color: '#333' }}>{e.desc}</p>
                             </div>

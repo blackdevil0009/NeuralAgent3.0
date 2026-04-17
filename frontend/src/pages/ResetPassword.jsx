@@ -7,12 +7,14 @@ import { API_BASE_URL } from '../utils/config';
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
+    const loginTarget = searchParams.get('login');
     const navigate = useNavigate();
 
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+    const redirectAfterReset = loginTarget === '/hospital/login' ? '/hospital/login' : '/login';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -47,7 +49,7 @@ export default function ResetPassword() {
             }
 
             handleSuccess('Password Reset successfully! You can now log in.');
-            navigate('/login');
+            navigate(redirectAfterReset);
         } catch (err) {
             handleError(err);
             setErrorMsg(err.message);

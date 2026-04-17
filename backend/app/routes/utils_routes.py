@@ -16,7 +16,8 @@ from werkzeug.utils import secure_filename
 
 from app.controllers import (forgot_password, reset_password, get_ifsc_info,
                              report_emergency, get_my_emergencies,
-                             get_emergencies_list, resolve_emergency)
+                             get_emergencies_list, resolve_emergency,
+                             get_emergency_booking_options)
 from app.middleware  import jwt_required_custom
 
 utils_bp = Blueprint('utils', __name__)
@@ -92,6 +93,11 @@ def dashboard_data():
 @jwt_required_custom
 def emergencies_list_route():
     return get_emergencies_list()
+
+@utils_bp.route('/api/emergencies/options', methods=['GET'])
+@jwt_required_custom
+def emergencies_options_route():
+    return get_emergency_booking_options()
 
 @utils_bp.route('/api/emergencies', methods=['POST'])
 @jwt_required_custom

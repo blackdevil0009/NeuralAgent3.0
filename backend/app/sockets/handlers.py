@@ -46,7 +46,22 @@ def handle_connect(auth):
     #     return False
 
     logger.info(f"User {user.id} ({user.role}) connected to socket.")
+    join_room(f"user_{user.id}")
+    join_room(f"role_{user.role}")
+    if user.role == 'organization':
+        join_room(f"hospital_{user.id}")
+    elif user.role == 'doctor' and getattr(user, 'hospital_id', None):
+        join_room(f"hospital_{user.hospital_id}")
     return True
+
+
+@socketio.on('join_inbox')
+def handle_join_inbox(data):
+    """Join a direct inbox room for the authenticated user."""
+    user_id = data.get('userId') if isinstance(data, dict) else None
+    if user_id:
+        join_room(f"user_{user_id}")
+        emit('status', {'message': f'Joined inbox user_{user_id}'})
 
 
 @socketio.on('join_room')

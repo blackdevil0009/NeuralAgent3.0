@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import './patient_dashboard.css';
 import { handleError } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
+import { clearStoredAuth, getStoredAuthSession } from '../../utils/authStorage';
 
 const NAV = [
     { id: 'health', label: 'Health Dashboard', icon: '🏥', path: '/patient/health' },
@@ -13,7 +14,8 @@ const NAV = [
     { id: 'consultant', label: 'Medical Consultant', icon: '👨‍⚕️', path: '/patient/consultant' },
     { id: 'appointments', label: 'Appointments', icon: '📅', path: '/patient/appointments' },
     { id: 'emergency', label: 'Report Emergency', icon: '🚨', path: '/patient/emergency' },
-    { id: 'doctors', label: 'Find Doctors', icon: '🔍', path: '/patient/doctors' },
+{ id: 'doctors', label: 'Find Doctors', icon: '🔍', path: '/patient/doctors' },
+    { id: 'wellness', label: 'Health Wellness', icon: '🌿', path: '/patient/wellness' },
     { id: 'profile', label: 'My Profile', icon: '👤', path: '/patient/profile' },
 ];
 
@@ -31,6 +33,7 @@ const PAGE_TITLES = {
     emergency: '🚨 Emergency Case Report',
     doctors: 'Find Doctors',
     profile: 'My Profile',
+    wellness: '🌿 Health Wellness',
     'security': 'Security Settings',
 };
 
@@ -45,7 +48,7 @@ export default function PatientLayout() {
 
     const fetchCounts = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const { token } = getStoredAuthSession();
             if (!token) return;
 
             const res = await fetch(`${API_BASE_URL}/api/notifications`, {
@@ -74,17 +77,15 @@ export default function PatientLayout() {
     }, []);
 
     useEffect(() => {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const role = localStorage.getItem('role') || sessionStorage.getItem('role');
+        const { token, role, userData } = getStoredAuthSession();
         
         if (!token || token === 'undefined' || role !== 'patient') {
-            navigate('/login');
+            navigate('/login', { replace: true });
             return;
         }
 
         try {
-            const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
-            if (stored.name) setUser({ name: stored.name, avatar: '🧘' });
+            if (userData?.name) setUser({ name: userData.name, avatar: '🧘' });
             
             // NOTE: WebSocket connection logic removed as backend migrated to purely REST.
         } catch (e) { }
@@ -103,9 +104,8 @@ export default function PatientLayout() {
     const activeId = allNav.find(n => currentPath === n.path || currentPath.startsWith(n.path + '/'))?.id || 'health';
 
     const handleLogout = () => {
-        sessionStorage.clear();
-        localStorage.clear();
-        navigate('/login');
+        clearStoredAuth();
+        navigate('/login', { replace: true });
     };
 
     /* 

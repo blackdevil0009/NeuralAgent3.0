@@ -4,6 +4,7 @@ All emails use Flask-Mail with HTML templates rendered inline.
 """
 
 import logging
+from urllib.parse import quote
 from flask import current_app
 from flask_mail import Message
 
@@ -103,6 +104,7 @@ def send_otp_email(to: str, name: str, otp: str,
         'verification':  ('Verify Your Email', 'verify your account'),
         '2fa':           ('Login Verification Code', 'complete your login'),
         'resend':        ('New Verification Code', 'verify your account'),
+        'doctor_invite': ('Doctor Invitation Code', 'continue your hospital invitation'),
     }
     subject, action = purpose_labels.get(purpose, ('Verification Code', 'verify your account'))
 
@@ -132,6 +134,64 @@ def send_otp_email(to: str, name: str, otp: str,
 </p>
 """
     return send_email(to, f"VaidyaMed-X — {subject}", _base_template(subject, body))
+
+
+def send_hospital_invitation_email(
+    to: str,
+    doctor_name: str,
+    hospital_name: str,
+    invite_url: str,
+    is_registered: bool = False,
+) -> bool:
+    """Send hospital affiliation invitation link to a doctor email."""
+    heading = "Hospital Affiliation Request"
+    action_line = (
+        "A hospital admin invited you to join their VaidyaMed-X facility dashboard."
+    )
+    cta = "Accept Invitation"
+    next_step = (
+        "Since your doctor account already exists, you can accept this invite directly."
+        if is_registered
+        else "If you are new to VaidyaMed-X, complete doctor registration first, then verify your email to auto-link this hospital."
+    )
+
+    body = f"""
+<h2 style="margin:0 0 8px;color:#1b4332;font-size:1.3rem;">Hello Dr. {doctor_name or 'Doctor'} 👋</h2>
+<p style="margin:0 0 20px;color:#555;font-size:0.95rem;line-height:1.6;">
+  <strong>{hospital_name}</strong> has sent you a doctor affiliation invitation on VaidyaMed-X.
+</p>
+
+<div style="background:#f0faf4;border-left:4px solid #52b788;border-radius:8px;padding:16px 20px;margin:0 0 20px;">
+  <p style="margin:0;color:#1b4332;font-size:0.92rem;line-height:1.6;">
+    {action_line}
+  </p>
+</div>
+
+<div style="text-align:center;margin:28px 0;">
+  <a href="{invite_url}"
+     style="display:inline-block;background:linear-gradient(135deg,#52b788,#2d6a4f);
+            color:#fff;text-decoration:none;padding:14px 36px;border-radius:50px;
+            font-weight:600;font-size:0.95rem;">
+    {cta} →
+  </a>
+</div>
+
+<p style="margin:0 0 8px;font-size:0.85rem;color:#555;">
+  {next_step}
+</p>
+<p style="margin:0;font-size:0.8rem;color:#888;">
+  ⏱ For security, this invitation link expires in 48 hours.
+</p>
+
+<p style="margin:16px 0 0;font-size:0.75rem;color:#aaa;word-break:break-all;">
+  Direct link: {invite_url}
+</p>
+"""
+    return send_email(
+        to,
+        f"VaidyaMed-X — {heading}",
+        _base_template(heading, body),
+    )
 
 
 def send_welcome_email(to: str, name: str, role: str) -> bool:
@@ -164,10 +224,20 @@ def send_welcome_email(to: str, name: str, role: str) -> bool:
     return send_email(to, "Welcome to VaidyaMed-X! 🌿", _base_template("Welcome", body))
 
 
-def send_password_reset_email(to: str, name: str, reset_token: str) -> bool:
+def send_password_reset_email(
+    to: str,
+    name: str,
+    reset_token: str,
+    login_path: str = '/login',
+) -> bool:
     """Send a password reset link."""
     frontend_url = current_app.config['FRONTEND_URL']
-    reset_url    = f"{frontend_url}/reset-password?token={reset_token}"
+    safe_login_path = login_path if login_path.startswith('/') else '/login'
+    encoded_login_path = quote(safe_login_path, safe='')
+    reset_url = (
+        f"{frontend_url}/reset-password"
+        f"?token={reset_token}&login={encoded_login_path}"
+    )
     body = f"""
 <h2 style="margin:0 0 8px;color:#1b4332;font-size:1.3rem;">Reset Your Password 🔑</h2>
 <p style="margin:0 0 20px;color:#555;font-size:0.95rem;line-height:1.6;">

@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import './login_style.css';
 import { handleSuccess, handleError } from '../utils/error_handlers';
 import { API_BASE_URL } from '../utils/config';
+import { getRouteForRole, getStoredAuthSession, persistAuthSession } from '../utils/authStorage';
 
 /* ─────────────────────────────────────────────
    Forgot Password Modal
@@ -200,8 +201,20 @@ export default function Login() {
         ? location.state?.message || '✅ Email verified! You can now log in.'
         : '';
 
+    useEffect(() => {
+        const { token, role: storedRole } = getStoredAuthSession();
+
+        if (!token) {
+            return;
+        }
+
+        if (storedRole === 'doctor' || storedRole === 'patient') {
+            navigate(getRouteForRole(storedRole), { replace: true });
+        }
+    }, [navigate]);
+
     // If registered from registration.jsx, we might want to show OTP screen immediately
-    React.useEffect(() => {
+    useEffect(() => {
         if (location.state?.email) {
             setEmail(location.state.email);
             if (location.state?.showVerify) {
@@ -260,25 +273,24 @@ export default function Login() {
             }
 
             /* Persist token — always store server-returned role */
-            const serverRole = responseData.role;
-            const store = rememberMe ? localStorage : sessionStorage;
-            store.setItem('token', responseData.token);
-            store.setItem('role', serverRole || role);
-            if (responseData.user) store.setItem('user', JSON.stringify(responseData.user));
+            const serverRole = responseData.role || role;
+            persistAuthSession({
+                storage: rememberMe ? localStorage : sessionStorage,
+                token: responseData.token,
+                role: serverRole,
+                user: responseData.user,
+                refreshToken: responseData.refresh_token,
+            });
 
             /* Route strictly by server-returned role */
-            if (serverRole === 'doctor') {
-                navigate('/doctor');
-            } else {
-                navigate('/patient');
-            }
+            navigate(getRouteForRole(serverRole) || '/patient', { replace: true });
         } catch (err) {
             handleError(err);
             setErrorMsg(err.message);
         } finally {
             setLoading(false);
         }
-    }, [email, password, role, rememberMe, navigate]);
+    }, [email, password, role, rememberMe, navigate, validate]);
 
     /* ── OTP Submit ── */
     const handleOtpSubmit = async (e) => {
@@ -310,13 +322,15 @@ export default function Login() {
 
             /* 2FA Success - Persist token & use server-returned role for routing */
             const serverRole = responseData.user?.role || responseData.role || role;
-            const store = rememberMe ? localStorage : sessionStorage;
-            store.setItem('token', responseData.token);
-            store.setItem('role', serverRole);
-            if (responseData.user) store.setItem('user', JSON.stringify(responseData.user));
+            persistAuthSession({
+                storage: rememberMe ? localStorage : sessionStorage,
+                token: responseData.token,
+                role: serverRole,
+                user: responseData.user,
+                refreshToken: responseData.refresh_token,
+            });
 
-            if (serverRole === 'doctor') navigate('/doctor');
-            else navigate('/patient');
+            navigate(getRouteForRole(serverRole) || '/patient', { replace: true });
 
         } catch (err) {
             handleError(err);
@@ -330,7 +344,7 @@ export default function Login() {
     const [resendCooldown, setResendCooldown] = useState(0);
     const [resendMsg, setResendMsg] = useState('');
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (resendCooldown <= 0) return;
         const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
         return () => clearTimeout(t);

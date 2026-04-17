@@ -36,9 +36,10 @@ class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping':    True,    # detect stale connections
-        'pool_recycle':     300,     # recycle every 5 min
-        'pool_size':        10,
-        'max_overflow':     20,
+        'pool_recycle':     60,      # recycle every 60s
+        'pool_size':        15,
+        'max_overflow':     25,
+        'pool_timeout':     30,
         'connect_args': {
             'connect_timeout': 10,
         },

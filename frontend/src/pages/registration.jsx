@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/config';
 import './registration_style.css';
 import { handleSuccess, handleError } from '../utils/error_handlers';
@@ -366,10 +366,10 @@ const VALID_SPECIALIZATIONS = [
 /* ─────────────────────────────────────────────
    Doctor Form
 ───────────────────────────────────────────── */
-function DoctorForm({ onSubmit, loading }) {
+function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) {
     const [form, setForm] = useState({
         fullName: '',
-        email: '',
+        email: initialEmail,
         mobile: '',
         address: '',
         city: '',
@@ -467,6 +467,7 @@ function DoctorForm({ onSubmit, loading }) {
 
         const payload = new FormData();
         Object.entries({ role: 'doctor', ...form }).forEach(([k, v]) => payload.append(k, v));
+        if (inviteToken) payload.append('inviteToken', inviteToken);
         payload.append('document', docFile);
         onSubmit(payload);
     };
@@ -755,6 +756,7 @@ function DoctorForm({ onSubmit, loading }) {
     );
 }
 
+
 /* ─────────────────────────────────────────────
    Eye-toggle button style (inline for portability)
 ───────────────────────────────────────────── */
@@ -782,7 +784,12 @@ const INDIAN_STATES = [
    Main Registration Page Component
 ───────────────────────────────────────────── */
 export default function Registration() {
-    const [activeTab, setActiveTab] = useState('patient'); // 'patient' | 'doctor'
+    const [searchParams] = useSearchParams();
+    const tabFromQuery = (searchParams.get('tab') || searchParams.get('role') || '').toLowerCase();
+    const inviteTokenFromQuery = searchParams.get('inviteToken') || '';
+    const inviteEmailFromQuery = searchParams.get('email') || '';
+
+    const [activeTab, setActiveTab] = useState(tabFromQuery === 'doctor' ? 'doctor' : 'patient');
     const [loading, setLoading] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
@@ -811,9 +818,18 @@ export default function Registration() {
             
             // Extract email for pre-filling login
             const email = isFormData ? data.get('email') : data.email;
-            setTimeout(() => navigate('/login', { 
-                state: { registered: true, email, message: msg, showVerify: true } 
-            }), 3000);
+            const inviteToken = isFormData ? (data.get('inviteToken') || '') : (data.inviteToken || '');
+
+            if (inviteToken && (isFormData ? data.get('role') : data.role) === 'doctor') {
+                setTimeout(
+                    () => navigate(`/doctor/invite?token=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(email || '')}&mode=verify`),
+                    1200
+                );
+            } else {
+                setTimeout(() => navigate('/login', {
+                    state: { registered: true, email, message: msg, showVerify: true }
+                }), 3000);
+            }
         } catch (err) {
             handleError(err);
         } finally {
@@ -871,7 +887,7 @@ export default function Registration() {
                 {/* ── Render Active Form ── */}
                 {activeTab === 'patient'
                     ? <PatientForm onSubmit={handleSubmit} loading={loading} />
-                    : <DoctorForm onSubmit={handleSubmit} loading={loading} />
+                    : <DoctorForm onSubmit={handleSubmit} loading={loading} initialEmail={inviteEmailFromQuery} inviteToken={inviteTokenFromQuery} />
                 }
             </div>
         </div>

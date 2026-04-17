@@ -85,7 +85,6 @@ export default function DoctorProfile() {
     const [saving, setSaving]     = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [errors, setErrors]     = useState({});
-    const [payoutVerified, setPayoutVerified] = useState(false);
     const [ifscInfo, setIfscInfo] = useState(null);
     const [ifscLoading, setIfscLoading] = useState(false);
     const [upiValid, setUpiValid] = useState(null);
@@ -132,7 +131,6 @@ export default function DoctorProfile() {
                     bankAccountNumber: p.bankAccountNumber || '',
                     bankIfsc: p.bankIfsc || '',
                 });
-                setPayoutVerified(!!p.payoutVerified);
             })
             .catch(handleError)
             .finally(() => setLoading(false));
@@ -210,7 +208,9 @@ export default function DoctorProfile() {
                 throw new Error(j.data?.message || j.message || 'Save failed'); 
             }
             handleSuccess('Profile saved! A UPI confirmation email has been sent if your UPI changed.');
-            setProfile(f => ({ ...f, ...form }));
+            const updatedProfile = j.data || j;
+            setProfile(updatedProfile);
+            localStorage.setItem('user', JSON.stringify(updatedProfile));
             setEditMode(false);
         } catch (err) {
             handleError(err);
@@ -259,7 +259,6 @@ export default function DoctorProfile() {
             if (!res.ok) throw new Error(data.error || 'Failed to initiate verification.');
 
             handleSuccess('Verification payout initiated! Please check your UPI account for ₹1.');
-            setPayoutVerified(false); 
         } catch (err) {
             handleError(err);
         }
@@ -270,6 +269,8 @@ export default function DoctorProfile() {
 
     const sm = statusMeta[vs] || statusMeta.pending;
     const fullAddr = [profile.address, profile.city, profile.state, profile.pin].filter(Boolean).join(', ');
+    const emergencySummary = profile.emergencySummary || {};
+    const recentEmergencyCases = profile.recentEmergencyCases || [];
 
     /* ════════════════════════════════════════════
        VIEW MODE (static, read-only)
@@ -296,14 +297,7 @@ export default function DoctorProfile() {
                     </button>
                 </div>
 
-                {/* Verification banner */}
-                <div style={{ background: sm.color + '18', border: `1px solid ${sm.color}`, borderRadius: 10, padding: '12px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: '1.4rem' }}>{sm.icon}</span>
-                    <div>
-                        <strong style={{ color: sm.color }}>Credential Status: {vs.toUpperCase()}</strong>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--doc-text-mute)', marginTop: 2 }}>{sm.text}</div>
-                    </div>
-                </div>
+
 
                 {/* Doctor identity card at top */}
                 <div style={{ ...cardStyle, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
@@ -385,6 +379,38 @@ export default function DoctorProfile() {
                         ))}
                     </div>
                 </div>
+
+                <div style={{ ...cardStyle, marginTop: 20 }}>
+                    <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>Emergency Workload</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14, marginBottom: 18 }}>
+                        <StatChip label="Assigned" value={emergencySummary.totalAssigned || 0} color="#1d4ed8" />
+                        <StatChip label="Active" value={emergencySummary.activeCases || 0} color="#d97706" />
+                        <StatChip label="Resolved" value={emergencySummary.resolvedCases || 0} color="#15803d" />
+                        <StatChip label="Critical" value={emergencySummary.criticalCases || 0} color="#b91c1c" />
+                    </div>
+                    {recentEmergencyCases.length === 0 ? (
+                        <p style={{ margin: 0, color: 'var(--doc-text-mute)' }}>No emergency assignments recorded yet.</p>
+                    ) : (
+                        <div style={{ display: 'grid', gap: 12 }}>
+                            {recentEmergencyCases.map(item => (
+                                <div key={item.id} style={{ border: '1px solid var(--doc-border)', borderRadius: 12, padding: 14, background: '#fbfcfd' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                        <strong style={{ color: 'var(--doc-text)' }}>{item.patientName || 'Patient'}</strong>
+                                        <span style={{ color: 'var(--doc-text-mute)', fontSize: '0.82rem' }}>
+                                            {(item.status || 'pending').toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div style={{ marginTop: 6, fontSize: '0.88rem', color: 'var(--doc-text-mute)' }}>
+                                        {item.caseType || 'urgent'} • {item.providerName || item.hospitalName || 'Emergency Booking'}
+                                    </div>
+                                    <p style={{ margin: '8px 0 0', fontSize: '0.9rem', lineHeight: 1.6, color: '#334155' }}>
+                                        {item.explanation || item.desc || 'No description shared.'}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     }
@@ -411,14 +437,7 @@ export default function DoctorProfile() {
                 </div>
             </div>
 
-            {/* Verification banner */}
-            <div style={{ background: sm.color + '18', border: `1px solid ${sm.color}`, borderRadius: 10, padding: '12px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: '1.4rem' }}>{sm.icon}</span>
-                <div>
-                    <strong style={{ color: sm.color }}>Credential Status: {vs.toUpperCase()}</strong>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--doc-text-mute)', marginTop: 2 }}>{sm.text}</div>
-                </div>
-            </div>
+
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 {/* Personal */}
@@ -545,6 +564,15 @@ export default function DoctorProfile() {
                     {saving ? '⏳ Saving…' : '💾 Save Changes'}
                 </button>
             </div>
+        </div>
+    );
+}
+
+function StatChip({ label, value, color }) {
+    return (
+        <div style={{ background: `${color}12`, border: `1px solid ${color}22`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#64748b', marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color }}>{value}</div>
         </div>
     );
 }

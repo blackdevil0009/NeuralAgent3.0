@@ -181,11 +181,7 @@ export default function PatientProfile() {
                         <span className="pd-profile-pill">{profile.dosha}</span>
                         <span className="pd-profile-pill">Blood: {profile.bloodGroup}</span>
                         {profile.city && <span className="pd-profile-pill">📍 {profile.city}</span>}
-                        {profile.isVerified ? (
-                            <span className="pd-profile-pill" style={{ background: '#e6fffa', color: '#2c7a7b', border: '1px solid #b2f5ea' }}>✅ Email Verified</span>
-                        ) : (
-                            <span className="pd-profile-pill" style={{ background: '#fff5f5', color: '#c53030', border: '1px solid #feb2b2' }}>⚠️ Verification Pending</span>
-                        )}
+
                     </div>
                 </div>
             </div>
@@ -236,11 +232,13 @@ export default function PatientProfile() {
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {emergencyHistory.map((em, i) => (
+                        {emergencyHistory.map((em, i) => {
+                            const isResolved = em.status === 'resolved' || em.status === 'Handled';
+                            return (
                             <div key={em.id || i} style={{
                                 padding: '15px 20px', borderRadius: 12,
-                                background: em.status === 'Handled' ? '#f0fff4' : '#fff5f5',
-                                border: `1px solid ${em.status === 'Handled' ? '#b2f5ea' : '#feb2b2'}`,
+                                background: isResolved ? '#f0fff4' : '#fff5f5',
+                                border: `1px solid ${isResolved ? '#b2f5ea' : '#feb2b2'}`,
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10
                             }}>
                                 <div>
@@ -249,13 +247,33 @@ export default function PatientProfile() {
                                         <span style={{ fontSize: '0.8rem', color: '#666' }}>ID: {em.id}</span>
                                     </div>
                                     <div style={{ fontSize: '0.9rem', color: '#333', maxWidth: 480 }}>{em.desc}</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 6 }}>
+                                        Destination: {em.providerType === 'doctor' ? 'Direct Doctor / Clinic' : 'Hospital Desk'}
+                                        {em.providerName ? ` • ${em.providerName}` : ''}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>
+                                        Contact: {em.contactName || 'Not shared'} • Location: {em.location || 'Not shared'}
+                                    </div>
+                                    {em.hospitalName || em.assignedDoctorName ? (
+                                        <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>
+                                            {em.hospitalName ? `Hospital: ${em.hospitalName}` : 'Hospital: Not applicable'}
+                                            {em.assignedDoctorName ? ` • Assigned Doctor: Dr. ${em.assignedDoctorName}` : ''}
+                                        </div>
+                                    ) : null}
                                     <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Reported: {em.time}</div>
+                                    {em.assignedAt ? (
+                                        <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Assigned: {em.assignedAt}</div>
+                                    ) : null}
+                                    {em.resolvedAt ? (
+                                        <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Resolved: {em.resolvedAt}</div>
+                                    ) : null}
                                 </div>
-                                <span style={{ padding: '6px 14px', borderRadius: 20, fontWeight: 700, fontSize: '0.8rem', background: em.status === 'Handled' ? '#c6f6d5' : '#fed7d7', color: em.status === 'Handled' ? '#22543d' : '#742a2a' }}>
-                                    {em.status === 'Handled' ? '✅ Handled' : '🔴 Active'}
+                                <span style={{ padding: '6px 14px', borderRadius: 20, fontWeight: 700, fontSize: '0.8rem', background: isResolved ? '#c6f6d5' : '#fed7d7', color: isResolved ? '#22543d' : '#742a2a' }}>
+                                    {isResolved ? '✅ Resolved' : '🔴 Active'}
                                 </span>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

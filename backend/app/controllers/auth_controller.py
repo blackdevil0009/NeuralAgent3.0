@@ -20,12 +20,14 @@ from app.extensions import db
 from app.models.user          import User
 from app.models.otp           import Otp
 from app.models.password_reset import PasswordReset
+from app.models.hospital_invitation import HospitalInvitation
 from app.utils       import (generate_otp, generate_token,
                               send_otp_email, send_welcome_email,
                               send_password_reset_email,
                               success_response, error_response, created_response,
                               not_found_response)
 from app.utils.validators import (PatientRegisterSchema, DoctorRegisterSchema,
+                                   OrganizationRegisterSchema,
                                    LoginSchema, OtpSchema, ForgotPasswordSchema,
                                    ResetPasswordSchema)
 
@@ -34,6 +36,7 @@ logger = logging.getLogger(__name__)
 # ── Schema singletons ─────────────────────────────────────────────
 _patient_schema = PatientRegisterSchema()
 _doctor_schema  = DoctorRegisterSchema()
+_org_schema     = OrganizationRegisterSchema()
 _login_schema   = LoginSchema()
 _otp_schema     = OtpSchema()
 _forgot_schema  = ForgotPasswordSchema()
@@ -172,7 +175,7 @@ def register_patient(data: dict):
     )
 
 
-def register_doctor(data: dict, file):
+def register_doctor(data: dict, file, invite_token: str = ''):
     """Create a doctor account with document upload and send OTP."""
     if User.query.filter_by(email=data['email']).first():
         return error_response('An account with this email already exists.', 409)
@@ -215,6 +218,21 @@ def register_doctor(data: dict, file):
         db.session.rollback()
         return error_response('An account with this email already exists.', 409)
 
+    invite_token = (invite_token or '').strip()
+    if invite_token:
+        invite = HospitalInvitation.query.filter_by(
+            token=invite_token,
+            doctor_email=user.email.lower()
+        ).first()
+        if invite and invite.status in ('pending', 'registered'):
+            exp = invite.expires_at
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < exp:
+                invite.status = 'registered'
+                invite.invited_doctor_id = user.id
+                db.session.commit()
+
     otp  = generate_otp()
     name = f"Dr. {user.name}" if user.name else 'Doctor'
     _save_otp(data['email'], otp, 'registration')
@@ -227,29 +245,92 @@ def register_doctor(data: dict, file):
     )
 
 
+def register_organization(data: dict, file):
+    """Create an organization account and send OTP."""
+    if User.query.filter_by(email=data['email']).first():
+        return error_response('An account with this email already exists.', 409)
+
+    doc_path = _save_upload(file) if file and _allowed_file(file.filename) else None
+
+    user = User(
+        email             = data['email'],
+        password_hash     = _hash_password(data['password']),
+        role              = 'organization',
+        name              = data.get('hospitalName', '').strip(),
+        admin_name        = data.get('adminName', '').strip(),
+        mobile            = data.get('mobile', '').strip(),
+        address           = data.get('address', '').strip(),
+        city              = (data.get('city') or '').strip(),
+        state             = (data.get('state') or '').strip(),
+        pincode           = (data.get('pincode') or '').strip(),
+        reg_number        = data.get('regNumber', '').strip(),
+        hospital          = data.get('hospitalName', '').strip(),
+        hospital_type     = data.get('hospitalType', '').strip() or None,
+        document_path     = doc_path,
+        terms_agreed      = str(data.get('termsAgreed', 'false')).lower() in ('true', '1', 'yes'),
+        is_email_verified = False,
+        is_verified       = True,
+    )
+    try:
+        db.session.add(user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return error_response('An account with this email already exists.', 409)
+
+    otp  = generate_otp()
+    _save_otp(data['email'], otp, 'registration')
+    send_otp_email(data['email'], user.name, otp, 'registration')
+
+    logger.info(f"Organization registered: {data['email']} (id={user.id})")
+    return created_response(
+        data={'email': data['email']},
+        message='Registration successful! Please check your official email for the verification code.'
+    )
+
+
 def register():
     """POST /api/auth/register — dispatch by role/content-type."""
     content_type = request.content_type or ''
 
     if 'multipart/form-data' in content_type:
-        # Doctor registration
+        # Dispatch by role (both Doctor and Organization send multipart)
         form_data = request.form.to_dict()
+        invite_token = form_data.get('inviteToken', '')
+        role = form_data.get('role', 'doctor')
+
+        if role == 'organization':
+            try:
+                data = _org_schema.load(form_data)
+            except ValidationError as err:
+                return error_response('Validation failed', 422, err.messages)
+            return register_organization(data, request.files.get('document'))
+
+        # Default: Doctor registration
         try:
             data = _doctor_schema.load(form_data)
         except ValidationError as err:
             return error_response('Validation failed', 422, err.messages)
-        return register_doctor(data, request.files.get('document'))
+        return register_doctor(data, request.files.get('document'), invite_token=invite_token)
 
     # JSON body
     body = request.get_json(force=True, silent=True) or {}
+    invite_token = body.get('inviteToken', '')
     role = body.get('role', 'patient')
+
+    if role == 'organization':
+        try:
+            data = _org_schema.load(body)
+        except ValidationError as err:
+            return error_response('Validation failed', 422, err.messages)
+        return register_organization(data, request.files.get('document'))
 
     if role == 'doctor':
         try:
             data = _doctor_schema.load(body)
         except ValidationError as err:
             return error_response('Validation failed', 422, err.messages)
-        return register_doctor(data, request.files.get('document'))
+        return register_doctor(data, request.files.get('document'), invite_token=invite_token)
 
     # Patient
     try:
@@ -277,7 +358,7 @@ def login():
     # Role mismatch check
     requested = data.get('role', 'patient')
     if user.role != requested and user.role != 'admin':
-        label = 'Doctor' if requested == 'doctor' else 'Patient'
+        label = requested.capitalize()
         return error_response(
             f'No {label} account found with this email. '
             f'Please select the correct login tab.', 403
@@ -338,8 +419,57 @@ def verify_registration_otp():
         return not_found_response('User not found.')
 
     user.is_email_verified = True
-    db.session.commit()
+    invite_accepted = None
 
+    if user.role == 'doctor':
+        invite = (
+            HospitalInvitation.query.filter(
+                HospitalInvitation.doctor_email == user.email.lower(),
+                HospitalInvitation.status.in_(('pending', 'registered')),
+            )
+            .order_by(HospitalInvitation.created_at.desc())
+            .first()
+        )
+        if invite:
+            exp = invite.expires_at
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < exp:
+                if user.hospital_id in (None, invite.hospital_id):
+                    user.hospital_id = invite.hospital_id
+                    user.is_verified = True
+                    if user.verification_status == 'pending':
+                        user.verification_status = 'verified'
+                    invite.status = 'accepted'
+                    invite.invited_doctor_id = user.id
+                    invite.accepted_doctor_id = user.id
+                    invite.accepted_at = datetime.now(timezone.utc)
+                    invite_accepted = invite
+            elif invite.status in ('pending', 'registered'):
+                invite.status = 'expired'
+
+    if invite_accepted:
+        if user.two_fa_enabled:
+            otp = generate_otp()
+            _save_otp(user.email, otp, '2fa')
+            send_otp_email(user.email, user.name or 'Doctor', otp, '2fa')
+            db.session.commit()
+            send_welcome_email(user.email, user.name or 'User', user.role)
+            return success_response(
+                data={'status': '2fa_required', 'email': user.email, 'inviteAccepted': True},
+                message='Email verified and hospital invitation accepted. 2FA code sent.',
+            )
+
+        tokens = _make_jwt(user.id, user.role)
+        user.last_login = datetime.now(timezone.utc)
+        db.session.commit()
+        send_welcome_email(user.email, user.name or 'User', user.role)
+        return success_response(
+            data={**tokens, 'role': user.role, 'user': user.to_dict(), 'inviteAccepted': True},
+            message='Email verified and hospital invitation accepted.',
+        )
+
+    db.session.commit()
     send_welcome_email(user.email, user.name or 'User', user.role)
     return success_response(message='Email verified successfully! You can now log in.')
 
@@ -465,7 +595,13 @@ def forgot_password():
             purpose='reset', expires_at=exp
         ))
         db.session.commit()
-        send_password_reset_email(user.email, user.name or 'User', token)
+        login_path = '/hospital/login' if user.role == 'organization' else '/login'
+        send_password_reset_email(
+            user.email,
+            user.name or 'User',
+            token,
+            login_path=login_path,
+        )
         logger.info(f"Password reset requested: {user.email}")
 
     return success_response(
@@ -510,6 +646,11 @@ def toggle_2fa():
     
     if not user:
         return not_found_response('User not found.')
+
+    data = request.get_json(force=True, silent=True) or {}
+    password = data.get('password', '')
+    if not password or not _check_password(password, user.password_hash):
+        return error_response('Invalid password.', 401)
 
     # Toggle the flag
     user.two_fa_enabled = not user.two_fa_enabled

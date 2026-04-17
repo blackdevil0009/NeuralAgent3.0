@@ -25,7 +25,7 @@ class User(db.Model):
                               index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role          = db.Column(
-        db.Enum('patient', 'doctor', 'admin', name='user_role'),
+        db.Enum('patient', 'doctor', 'admin', 'organization', name='user_role'),
         nullable=False, default='patient', index=True
     )
 
@@ -38,6 +38,7 @@ class User(db.Model):
         nullable=True
     )
     profile_image = db.Column(db.String(255), nullable=True, default='')
+    admin_name    = db.Column(db.String(150), nullable=True, default='')
 
     # ── Ayurvedic/Patient health info ──────────────────────────
     blood_group = db.Column(db.String(10),  nullable=True, default='Unknown')
@@ -80,6 +81,15 @@ class User(db.Model):
         db.Enum('pending', 'verified', 'rejected', name='verify_status'),
         nullable=True, default='pending'
     )
+
+    # ── Hospital-Doctor Management ──────────────────────────────
+    hospital_id       = db.Column(db.Integer,     nullable=True)
+    hospital_type     = db.Column(
+        db.Enum('private', 'govt', 'clinic', 'ayurvedic', name='hospital_type_enum'),
+        nullable=True, default=None
+    )
+    is_verified       = db.Column(db.Boolean,     nullable=False, default=False)
+    verification_code = db.Column(db.String(10),  nullable=True)
 
     # ── Account state ──────────────────────────────────────────
     is_active         = db.Column(db.Boolean, nullable=False, default=True,
@@ -155,6 +165,21 @@ class User(db.Model):
                 'bankAccountNumber':    self.bank_account_number or '',
                 'bankIfsc':             self.bank_ifsc or '',
                 'payoutVerified':       self.payout_verified,
+                'verificationStatus':   self.verification_status or 'pending',
+                'hospitalId':           self.hospital_id,
+                'isVerified':           self.is_verified,
+            })
+
+        # Organization/Hospital-specific fields
+        if self.role == 'organization':
+            data.update({
+                'adminName':            self.admin_name or '',
+                'hospitalName':         self.hospital or self.name or '',
+                'hospitalType':         self.hospital_type or '',
+                'regNumber':            self.reg_number or '',
+                'documentPath':         self.document_path or '' if include_sensitive else 'Document on file',
+                'hospitalId':           self.hospital_id,
+                'isVerified':           self.is_verified,
                 'verificationStatus':   self.verification_status or 'pending',
             })
 

@@ -15,4 +15,5 @@ from .appointment_controller import (
 from .payment_controller import get_payment_history, razorpay_webhook
 from .consultation_controller import check_consultation_access
 from .emergency_controller import (report_emergency, get_my_emergencies,
-                                   get_emergencies_list, resolve_emergency)
+                                   get_emergencies_list, resolve_emergency,
+                                   get_emergency_booking_options)

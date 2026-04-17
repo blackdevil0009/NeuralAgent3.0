@@ -30,35 +30,37 @@ export default function TwoFactorAuth() {
         }
     };
 
-    const handleToggle = async (e) => {
-        e.preventDefault();
-        if (!password) return;
+const handleToggle = async (e) => {
+    e.preventDefault();
+    if (!password) return;
 
-        setLoading(true);
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/auth/2fa/toggle`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ enabled: !enabled, password })
-            });
+    const oldEnabled = enabled;
+    setLoading(true);
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/2fa/toggle`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ enabled: !enabled, password })
+        });
 
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || 'Failed to update 2FA status');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to update 2FA status');
 
-            handleSuccess(json.message);
-            setEnabled(!enabled);
-            setShowConfirm(false);
-            setPassword('');
-        } catch (err) {
-            handleError(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        handleSuccess(json.message);
+        setEnabled(json.data.twoFactorEnabled || !oldEnabled);  // Use server truth
+        setShowConfirm(false);
+        setPassword('');
+    } catch (err) {
+        handleError(err);
+        setEnabled(oldEnabled);  // Revert on failure
+    } finally {
+        setLoading(false);
+    }
+};
 
     if (fetching) return <div style={{ padding: 20, textAlign: 'center' }}>Loading security settings...</div>;
 

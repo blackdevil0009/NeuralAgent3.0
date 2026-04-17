@@ -30,10 +30,11 @@ export default function Doctor2FA() {
         }
     };
 
-    const handleToggle = async (e) => {
+const handleToggle = async (e) => {
         e.preventDefault();
         if (!password) return;
 
+        const oldEnabled = enabled;
         setLoading(true);
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         try {
@@ -50,11 +51,12 @@ export default function Doctor2FA() {
             if (!res.ok) throw new Error(json.error || 'Failed to update 2FA status');
 
             handleSuccess(json.message);
-            setEnabled(!enabled);
+            setEnabled(json.data.twoFactorEnabled || !oldEnabled);  // Use server truth
             setShowConfirm(false);
             setPassword('');
         } catch (err) {
             handleError(err);
+            setEnabled(oldEnabled);  // Revert on failure
         } finally {
             setLoading(false);
         }

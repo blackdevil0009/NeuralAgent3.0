@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../utils/config';
+import { AUTH_SESSION_EVENT, getStoredAuthSession } from '../utils/authStorage';
 
 const SocketContext = createContext();
 
@@ -15,12 +16,15 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
     const [connected, setConnected] = useState(false);
+    const [authVersion, setAuthVersion] = useState(0);
 
     useEffect(() => {
-        const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
-        const token = getToken();
+        const { token } = getStoredAuthSession();
         
         if (!token) {
+            if (socket) {
+                socket.disconnect();
+            }
             setSocket(null);
             setConnected(false);
             return;
@@ -56,6 +60,16 @@ export const SocketProvider = ({ children }) => {
         return () => {
             console.log("Cleaning up shared WebSocket...");
             newSocket.disconnect();
+        };
+    }, [authVersion]);
+
+    useEffect(() => {
+        const syncAuth = () => setAuthVersion((version) => version + 1);
+        window.addEventListener(AUTH_SESSION_EVENT, syncAuth);
+        window.addEventListener('storage', syncAuth);
+        return () => {
+            window.removeEventListener(AUTH_SESSION_EVENT, syncAuth);
+            window.removeEventListener('storage', syncAuth);
         };
     }, []);
 

@@ -463,6 +463,62 @@ body {
     transform: translateY(-3px);
 }
 
+/* --- Org CTA --- */
+.hero-org-cta {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.btn-org-register {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 28px;
+    border-radius: 16px;
+    background: #fff;
+    color: #1a4228;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: 2px solid rgba(82, 183, 136, 0.3);
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-org-register svg {
+    width: 22px;
+    height: 22px;
+    color: #2d6a4f;
+}
+
+.btn-org-register:hover {
+    transform: scale(1.03) translateY(-2px);
+    border-color: #52b788;
+    box-shadow: 0 10px 25px rgba(82, 183, 136, 0.25), 
+                0 0 15px rgba(82, 183, 136, 0.2);
+    color: #2d6a4f;
+}
+
+.org-subtitle {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 10px;
+    padding-left: 4px;
+    font-weight: 400;
+}
+
+@media (max-width: 768px) {
+    .hero-org-cta {
+        align-items: center;
+        width: 100%;
+    }
+}
+
 /* Hero stats */
 .hero-stats {
     display: flex;

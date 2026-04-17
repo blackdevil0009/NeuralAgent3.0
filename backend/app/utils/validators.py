@@ -29,8 +29,8 @@ def validate_pin(value):
 
 def validate_address(value):
     low = value.strip().lower()
-    if len(low) < 10:
-        raise ValidationError('Address must be at least 10 characters.')
+    if len(low) < 5:
+        raise ValidationError('Address must be at least 5 characters.')
     if low in DUMMY_WORDS:
         raise ValidationError('Please enter a real address.')
 
@@ -106,6 +106,39 @@ class DoctorRegisterSchema(Schema):
         return data
 
 
+# ── Organization Registration Schema ─────────────────────────────
+class OrganizationRegisterSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
+    hospitalName    = fields.Str(required=True, validate=validate.Length(min=2, max=150))
+    adminName       = fields.Str(required=True, validate=validate.Length(min=2, max=100))
+    email           = fields.Email(required=True)
+    mobile          = fields.Str(required=True, validate=validate_phone)
+    address         = fields.Str(required=True, validate=validate_address)
+    city            = fields.Str(load_default='', allow_none=True)  # auto-filled by LocationPicker
+    state           = fields.Str(load_default='', allow_none=True)
+    pincode         = fields.Str(load_default='', allow_none=True)
+    regNumber       = fields.Str(required=True, validate=validate.Length(min=2, max=50))
+    hospitalType    = fields.Str(required=True,
+                                 validate=validate.OneOf(['private','govt','clinic','ayurvedic']))
+    password        = fields.Str(required=True, validate=validate.Length(min=8, max=128))
+    role            = fields.Str(load_default='organization')
+    # FormData sends booleans as strings — handle both
+    termsAgreed     = fields.Str(load_default='false')
+
+    @validates('termsAgreed')
+    def must_agree(self, value):
+        if str(value).lower() not in ('true', '1', 'yes', 'on'):
+            raise ValidationError('You must accept the Terms & Conditions.')
+
+    @pre_load
+    def sanitize(self, data, **kwargs):
+        if 'email' in data and data['email']:
+            data['email'] = data['email'].strip().lower()
+        return data
+
+
 # ── Login Schema ─────────────────────────────────────────────────
 class LoginSchema(Schema):
     class Meta:
@@ -114,7 +147,7 @@ class LoginSchema(Schema):
     email      = fields.Email(required=True)
     password   = fields.Str(required=True, validate=validate.Length(min=1))
     role       = fields.Str(load_default='patient',
-                            validate=validate.OneOf(['patient','doctor','admin']))
+                            validate=validate.OneOf(['patient','doctor','admin','organization']))
     rememberMe = fields.Bool(load_default=False)
 
     @pre_load
@@ -201,3 +234,21 @@ class DoctorProfileSchema(Schema):
     bankAccountName = fields.Str(allow_none=True)
     bankAccountNumber = fields.Str(allow_none=True)
     bankIfsc        = fields.Str(allow_none=True)
+
+
+class OrganizationProfileSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+
+    hospitalName = fields.Str(required=True, validate=validate.Length(min=2, max=150))
+    adminName    = fields.Str(required=True, validate=validate.Length(min=2, max=100))
+    mobile       = fields.Str(required=True, validate=validate_phone)
+    address      = fields.Str(required=True, validate=validate_address)
+    city         = fields.Str(required=True, validate=validate.Length(min=2, max=60))
+    state        = fields.Str(required=True, validate=validate.Length(min=2, max=60))
+    pincode      = fields.Str(required=True, validate=validate_pin)
+    regNumber    = fields.Str(required=True, validate=validate.Length(min=2, max=50))
+    hospitalType = fields.Str(
+        required=True,
+        validate=validate.OneOf(['private', 'govt', 'clinic', 'ayurvedic'])
+    )

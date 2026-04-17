@@ -185,6 +185,14 @@ export default function HealthDashboard() {
                             </div>
                         </div>
                     ))}
+                    <Link to="/patient/wellness" className="pd-stat-card" style={{ textDecoration: 'none', height: '100%' }}>
+                        <div className="pd-stat-icon green" style={{ fontSize: '1.8rem' }}>🌿</div>
+                        <div>
+                            <div className="pd-stat-value" style={{ fontSize: '1.2rem' }}>Health Wellness</div>
+                            <div className="pd-stat-label">Dosha quiz, diet plans & reminders</div>
+                            <div className="pd-stat-change up" style={{ fontSize: '0.85rem' }}>New</div>
+                        </div>
+                    </Link>
                 </div>
             )}
 

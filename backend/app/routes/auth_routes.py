@@ -31,7 +31,11 @@ from app.middleware import jwt_required_custom
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 # ── Private endpoints (JWT required) ─────────────────────────────
-auth_bp.add_url_rule('/2fa/toggle', view_func=toggle_2fa, methods=['POST'])
+auth_bp.add_url_rule(
+    '/2fa/toggle',
+    view_func=jwt_required_custom(toggle_2fa),
+    methods=['POST']
+)
 
 # ── Public endpoints (no JWT required) ───────────────────────────
 auth_bp.add_url_rule('/register',              view_func=register,              methods=['POST'])

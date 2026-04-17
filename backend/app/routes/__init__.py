@@ -10,3 +10,5 @@ from .messages_routes import messages_bp
 from .report_routes import reports_bp
 from .payment_routes import payment_bp
 from .ai_v2_routes import ai_v2_bp
+from .hospital_routes import hospital_bp
+from .hospital_emergency_routes import hospital_emergency_bp

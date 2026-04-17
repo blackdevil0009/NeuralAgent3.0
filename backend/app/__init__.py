@@ -8,6 +8,7 @@ import logging.handlers
 
 from flask      import Flask, jsonify
 from flask_cors import CORS
+from sqlalchemy import inspect, text
 
 from app.config     import get_config
 from app.extensions import db, migrate, jwt, mail, socketio
@@ -44,7 +45,9 @@ def create_app(config_class=None) -> Flask:
     )
 
     # ── Register Blueprints ───────────────────────────────────────
-    from app.routes import auth_bp, user_bp, doctor_bp, utils_bp, appointment_bp, consultation_bp, chat_bp, v2_bp, messages_bp, reports_bp, payment_bp, ai_v2_bp
+    from app.routes import (auth_bp, user_bp, doctor_bp, utils_bp, appointment_bp, 
+                            consultation_bp, chat_bp, v2_bp, messages_bp, reports_bp, 
+                            payment_bp, ai_v2_bp, hospital_bp, hospital_emergency_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(doctor_bp)
@@ -57,6 +60,8 @@ def create_app(config_class=None) -> Flask:
     app.register_blueprint(reports_bp)
     app.register_blueprint(payment_bp)
     app.register_blueprint(ai_v2_bp)
+    app.register_blueprint(hospital_bp)
+    app.register_blueprint(hospital_emergency_bp)
 
     # ── JWT error callbacks ───────────────────────────────────────
     _register_jwt_callbacks(jwt)
@@ -96,11 +101,110 @@ def _init_db(app: Flask):
         from app.models.emergency        import Emergency         # noqa: F401
         from app.models.medical_report   import MedicalReport     # noqa: F401
         from app.models.payment_transaction import PaymentTransaction  # noqa: F401
+        from app.models.hospital_invitation import HospitalInvitation  # noqa: F401
 
         db.create_all()
+        _ensure_users_table_columns(app)
+        _ensure_emergencies_table_columns(app)
         app.logger.info("✅ MySQL tables verified / created.")
     except Exception as exc:
         app.logger.error(f"❌ DB init failed: {exc}")
+
+
+def _ensure_users_table_columns(app: Flask):
+    """Ensure the users table contains columns required by the current model."""
+    try:
+        inspector = inspect(db.engine)
+        if 'users' not in inspector.get_table_names():
+            return
+
+        existing_cols = {column['name'] for column in inspector.get_columns('users')}
+        required_cols = {
+            'admin_name':        'VARCHAR(150) NULL',
+            'hospital_id':       'INT NULL',
+            'hospital_type':     "ENUM('private','govt','clinic','ayurvedic') NULL",
+            'is_verified':       'BOOLEAN NOT NULL DEFAULT FALSE',
+            'verification_code': 'VARCHAR(10) NULL',
+            'two_fa_enabled':    'BOOLEAN NOT NULL DEFAULT FALSE',
+            'two_fa_secret':     "VARCHAR(64) NULL DEFAULT ''",
+            'verification_status': "ENUM('pending','verified','rejected') NULL",
+            'payout_verified':   'BOOLEAN NOT NULL DEFAULT FALSE',
+            'upi_verify_requested': 'BOOLEAN NOT NULL DEFAULT FALSE',
+            'document_path':     'VARCHAR(300) NULL',
+        }
+
+        missing = [name for name in required_cols if name not in existing_cols]
+        if missing:
+            with db.engine.begin() as conn:
+                for column_name in missing:
+                    ddl_type = required_cols[column_name]
+                    conn.execute(text(
+                        f"ALTER TABLE users ADD COLUMN {column_name} {ddl_type}"
+                    ))
+            app.logger.info(
+                f"✅ Added missing users table column(s): {', '.join(missing)}"
+            )
+
+        _sync_role_enum(app)
+    except Exception as exc:
+        app.logger.error(f"❌ Failed to sync users table schema: {exc}")
+
+
+def _sync_role_enum(app: Flask):
+    """Ensure the users.role enum includes organization."""
+    try:
+        with db.engine.begin() as conn:
+            result = conn.execute(text(
+                "SHOW COLUMNS FROM users WHERE Field='role'"
+            ))
+            row = result.first()
+            if not row:
+                return
+
+            column_type = row[1] if len(row) > 1 else ''
+            if 'organization' not in str(column_type):
+                conn.execute(text(
+                    "ALTER TABLE users MODIFY COLUMN role "
+                    "ENUM('patient','doctor','admin','organization') "
+                    "NOT NULL DEFAULT 'patient'"
+                ))
+                app.logger.info("✅ Updated users.role ENUM to include organization.")
+    except Exception as exc:
+        app.logger.error(f"❌ Failed to sync users.role enum: {exc}")
+
+
+def _ensure_emergencies_table_columns(app: Flask):
+    """Ensure the emergencies table contains columns required by the current model."""
+    try:
+        inspector = inspect(db.engine)
+        if 'emergencies' not in inspector.get_table_names():
+            return
+
+        existing_cols = {column['name'] for column in inspector.get_columns('emergencies')}
+        required_cols = {
+            'patient_name': 'VARCHAR(150) NULL',
+            'contact_name': 'VARCHAR(150) NULL',
+            'location': 'VARCHAR(300) NULL',
+            'provider_type': "VARCHAR(20) NULL DEFAULT 'hospital'",
+            'provider_name': 'VARCHAR(200) NULL',
+            'hospital_id': 'INT NULL',
+            'assigned_at': 'DATETIME NULL',
+            'resolved_at': 'DATETIME NULL',
+        }
+
+        missing = [name for name in required_cols if name not in existing_cols]
+        if missing:
+            with db.engine.begin() as conn:
+                for column_name in missing:
+                    ddl_type = required_cols[column_name]
+                    conn.execute(text(
+                        f"ALTER TABLE emergencies ADD COLUMN {column_name} {ddl_type}"
+                    ))
+            app.logger.info(
+                f"✅ Added missing emergencies table column(s): {', '.join(missing)}"
+            )
+    except Exception as exc:
+        app.logger.error(f"❌ Failed to sync emergencies table schema: {exc}")
 
 
 def _configure_logging(app: Flask):

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import './doctor_dashboard.css';
-import { API_BASE_URL } from '../../utils/config';
+import { clearStoredAuth, getStoredAuthSession } from '../../utils/authStorage';
 
 const NAV = [
     { id: 'dashboard', label: 'Patient Management', icon: '📋', path: '/doctor/dashboard' },
@@ -31,24 +31,24 @@ export default function DoctorLayout() {
     const [user, setUser] = useState({ name: 'Dr. Arjun Menon', avatar: '👨‍⚕️', role: 'Senior Consultant' });
     const [globalAlert, setGlobalAlert] = useState(null); // { id, patient, type }
     const { socket } = useSocket();
+    const currentDoctorId = String(getStoredAuthSession().userData?.id || '');
 
     useEffect(() => {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        const role = localStorage.getItem('role') || sessionStorage.getItem('role');
+        const { token, role, userData } = getStoredAuthSession();
         
         if (!token || token === 'undefined' || role !== 'doctor') {
-            navigate('/login');
+            navigate('/login', { replace: true });
             return;
         }
 
         try {
-            const stored = JSON.parse(sessionStorage.getItem('user') || localStorage.getItem('user') || '{}');
-            if (stored.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (stored.name.split(' ')[0]) }));
+            if (userData?.name) setUser(prev => ({ ...prev, name: 'Dr. ' + (userData.name.split(' ')[0]) }));
         } catch { }
 
         if (!socket) return;
 
         socket.on('new_emergency', (data) => {
+            if (String(data?.doctorId || '') !== currentDoctorId) return;
             console.log("CRITICAL EMERGENCY DETECTED:", data);
             setGlobalAlert({
                 id: data.id,
@@ -61,18 +61,16 @@ export default function DoctorLayout() {
 
         return () => {
             socket.off('new_emergency');
-            socket.disconnect();
         };
-    }, [navigate]);
+    }, [navigate, socket, currentDoctorId]);
 
     const currentPath = location.pathname;
     const allNav = [...NAV, ...SETTINGS_NAV];
     const activeNav = allNav.find(n => currentPath === n.path || currentPath.startsWith(n.path + '/')) || NAV[0];
 
     const handleLogout = () => {
-        sessionStorage.clear();
-        localStorage.clear();
-        navigate('/login');
+        clearStoredAuth();
+        navigate('/login', { replace: true });
     };
 
     return (
