@@ -395,8 +395,9 @@ export default function EmergencyCase() {
                                             ? `${selectedProvider.specialization || 'General Medicine'} • ${selectedProvider.clinicName || 'Local Clinic'}`
                                             : `${selectedProvider.type || 'general'} facility`}
                                     </div>
-                                    <div style={{ color: '#6b7280', fontSize: '0.88rem', marginTop: 6 }}>
-                                        {selectedProvider.clinicLocation || selectedProvider.address || 'Address not shared'}
+                                    <div style={{ color: '#6b7280', fontSize: '0.88rem', marginTop: 8, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                                        <span>📍</span>
+                                        <span>{selectedProvider.clinicLocation || selectedProvider.address || 'Address not shared'}</span>
                                     </div>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                                         {form.providerType === 'doctor' ? (

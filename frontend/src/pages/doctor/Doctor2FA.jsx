@@ -21,7 +21,7 @@ export default function Doctor2FA() {
             });
             const json = await res.json();
             if (res.ok) {
-                setEnabled(json.data?.twoFactorEnabled || false);
+                setEnabled(Boolean(json.data?.two_fa_enabled));
             }
         } catch (err) {
             console.error('Failed to fetch 2FA status');
@@ -50,8 +50,8 @@ const handleToggle = async (e) => {
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update 2FA status');
 
-            handleSuccess(json.message);
-            setEnabled(json.data.twoFactorEnabled || !oldEnabled);  // Use server truth
+            handleSuccess(json.message || 'Two-Factor Authentication updated.');
+            setEnabled(Boolean(json.data?.two_fa_enabled));  // Use exact server truth
             setShowConfirm(false);
             setPassword('');
         } catch (err) {

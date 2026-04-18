@@ -254,19 +254,26 @@ export default function PatientProfile() {
                                     <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>
                                         Contact: {em.contactName || 'Not shared'} • Location: {em.location || 'Not shared'}
                                     </div>
-                                    {em.hospitalName || em.assignedDoctorName ? (
-                                        <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 4 }}>
-                                            {em.hospitalName ? `Hospital: ${em.hospitalName}` : 'Hospital: Not applicable'}
-                                            {em.assignedDoctorName ? ` • Assigned Doctor: Dr. ${em.assignedDoctorName}` : ''}
+                                    {em.hospitalName && (
+                                        <div style={{ fontSize: '0.82rem', color: '#1e293b', marginTop: 8, padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                                <span>🏥</span> {em.hospitalName}
+                                            </div>
+                                            {(em.hospitalAddress || em.hospitalCity) && (
+                                                <div style={{ color: '#64748b', fontSize: '0.78rem', paddingLeft: 22, lineHeight: 1.4 }}>
+                                                    {em.hospitalAddress}{em.hospitalCity ? `, ${em.hospitalCity}` : ''}
+                                                    {em.hospitalState ? `, ${em.hospitalState}` : ''}
+                                                    {em.hospitalPin ? ` - ${em.hospitalPin}` : ''}
+                                                </div>
+                                            )}
                                         </div>
-                                    ) : null}
-                                    <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Reported: {em.time}</div>
-                                    {em.assignedAt ? (
-                                        <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Assigned: {em.assignedAt}</div>
-                                    ) : null}
-                                    {em.resolvedAt ? (
-                                        <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>Resolved: {em.resolvedAt}</div>
-                                    ) : null}
+                                    )}
+                                    {em.assignedDoctorName && (
+                                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span>🩺</span> Assigned: <strong>Dr. {em.assignedDoctorName}</strong>
+                                        </div>
+                                    )}
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 8 }}>Reported: {em.time}</div>
                                 </div>
                                 <span style={{ padding: '6px 14px', borderRadius: 20, fontWeight: 700, fontSize: '0.8rem', background: isResolved ? '#c6f6d5' : '#fed7d7', color: isResolved ? '#22543d' : '#742a2a' }}>
                                     {isResolved ? '✅ Resolved' : '🔴 Active'}
@@ -278,6 +285,11 @@ export default function PatientProfile() {
                 )}
             </div>
 
+            {/* 📅 Upcoming Appointments Section */}
+            {!isEditing && (
+                <AppointmentListSection navigate={navigate} />
+            )}
+
             {isEditing && (
                 <div style={{ textAlign: 'right' }}>
                     <button className="pd-btn pd-btn-primary" onClick={handleSubmit} disabled={loading} style={{ minWidth: 180, justifyContent: 'center' }}>
@@ -288,7 +300,104 @@ export default function PatientProfile() {
 
             {/* 👨‍⚕️ Registered Doctors Section */}
             {!isEditing && (
-                <DoctorListSection navigate={navigate} />
+                <>
+                    <DoctorListSection navigate={navigate} />
+                    <HospitalListSection navigate={navigate} />
+                </>
+            )}
+        </div>
+    );
+}
+
+/**
+ * Component to show upcoming appointments on the profile page
+ */
+function AppointmentListSection({ navigate }) {
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        fetch(`${API_BASE_URL}/api/appointments`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => res.json())
+        .then(json => {
+            const list = json.data?.appointments || [];
+            // Filter only upcoming ones
+            const upcomingList = list.filter(a => 
+                ['confirmed', 'booked', 'Scheduled', 'Upcoming'].includes(a.status)
+            ).sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
+            setAppointments(upcomingList);
+            setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }, []);
+
+    if (loading) return (
+        <div className="pd-card" style={{ marginTop: 24, textAlign: 'center', padding: 30 }}>
+            <p style={{ color: '#888' }}>⏳ Loading your appointments...</p>
+        </div>
+    );
+
+    return (
+        <div className="pd-card" style={{ marginTop: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h3 className="pd-section-title" style={{ margin: 0 }}>📅 Upcoming Appointments</h3>
+                <button className="pd-btn pd-btn-outline pd-btn-sm" onClick={() => navigate('/patient/appointments')}>Manage All</button>
+            </div>
+            
+            {appointments.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#888' }}>
+                    <p>You have no upcoming appointments.</p>
+                    <button className="pd-btn pd-btn-primary pd-btn-sm" style={{ marginTop: 10 }} onClick={() => navigate('/patient/doctors')}>Book Now</button>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {appointments.slice(0, 3).map(appt => (
+                        <div key={appt.id} style={{ 
+                            padding: 16, borderRadius: 12, border: '1px solid #f1f5f9', 
+                            background: '#f8fafc', display: 'flex', gap: 14, alignItems: 'center',
+                            cursor: 'pointer'
+                        }} onClick={() => navigate('/patient/appointments')}>
+                            <div style={{ 
+                                width: 50, height: 50, borderRadius: 12, 
+                                background: 'linear-gradient(135deg, #2d6a4f, #1b4332)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                color: '#fff', fontSize: '0.7rem', fontWeight: 800, lineHeight: 1.2
+                            }}>
+                                <span style={{ fontSize: '1.1rem' }}>{new Date(appt.appointmentDate).getDate()}</span>
+                                <span>{new Date(appt.appointmentDate).toLocaleString('default', { month: 'short' }).toUpperCase()}</span>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                                    {appt.hospital ? '🏥' : '🩺'} Dr. {appt.doctorName}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                                    {appt.appointmentTime?.substring(0, 5)} • {appt.spec || 'Consultation'}
+                                </div>
+                                {appt.hospital && (
+                                    <div style={{ fontSize: '0.75rem', color: '#2d6a4f', fontWeight: 600, marginTop: 2 }}>
+                                        {appt.hospital}
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <span className="pd-pill pd-pill-blue" style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>
+                                    {appt.status}
+                                </span>
+                                <div style={{ fontSize: '0.75rem', color: '#2d6a4f', fontWeight: 700, marginTop: 4 }}>
+                                    {appt.amountPaid > 0 ? `₹${appt.amountPaid}` : 'Free'}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {appointments.length > 3 && (
+                        <button className="pd-btn pd-btn-outline pd-btn-sm" style={{ alignSelf: 'center', marginTop: 10 }} onClick={() => navigate('/patient/appointments')}>
+                            + View {appointments.length - 3} More
+                        </button>
+                    )}
+                </div>
             )}
         </div>
     );
@@ -360,7 +469,64 @@ function DoctorListSection({ navigate }) {
                     );
                 })}
             </div>
-            {doctors.length === 0 && <p style={{ textAlign: 'center', color: '#888', padding: 20 }}>No doctors found.</p>}
+        </div>
+    );
+}
+
+/**
+ * Component to show all registered hospitals on the profile page
+ */
+function HospitalListSection({ navigate }) {
+    const [hospitals, setHospitals] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        fetch(`${API_BASE_URL}/api/emergencies/options`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => res.json())
+        .then(json => {
+            setHospitals(json.data?.hospitals || []);
+            setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }, []);
+
+    if (loading || hospitals.length === 0) return null;
+
+    return (
+        <div className="pd-card" style={{ marginTop: 24, background: 'linear-gradient(to bottom, #ffffff, #f0f9ff)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h3 className="pd-section-title" style={{ margin: 0 }}>🏥 Our Partner Hospitals</h3>
+                <button className="pd-btn pd-btn-outline pd-btn-sm" onClick={() => navigate('/patient/emergency')}>Book Emergency</button>
+            </div>
+            
+            <div className="pd-grid-2" style={{ gap: 16 }}>
+                {hospitals.slice(0, 4).map(hsp => (
+                    <div key={hsp.id} style={{ 
+                        padding: 16, borderRadius: 12, border: '1px solid #e0f2fe', 
+                        background: '#fff', display: 'flex', gap: 14, alignItems: 'center',
+                        transition: 'transform 0.2s', cursor: 'pointer'
+                    }} onClick={() => navigate(`/patient/emergency`)}>
+                        <div style={{ 
+                            width: 50, height: 50, borderRadius: '12px', 
+                            background: 'linear-gradient(135deg, #0369a1, #075985)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem'
+                        }}>🏢</div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0369a1' }}>{hsp.name}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{hsp.type || 'General'} Facility</div>
+                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                📍 {hsp.address}
+                            </div>
+                        </div>
+                        <button className="pd-btn pd-btn-sm pd-btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                            Visit
+                        </button>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
