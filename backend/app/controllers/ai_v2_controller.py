@@ -26,33 +26,12 @@ def ingest_ai_data():
 
 def query_ai_assistant():
     """POST /api/v2/ai/query"""
-    if request.is_json:
-        body = request.get_json(silent=True) or {}
-        query = body.get('message')
-    else:
-        query = request.form.get('message')
-
-    if not query:
-        return error_response("Query message is required.", 400)
-
-    try:
-        service = get_ayurveda_service()
-        result = service.query(query)
-        
-        if "error" in result:
-            return error_response(result["error"], 500)
-
-        response_data = {
-            "response": result.get("response"),
-            "condition": result.get("condition"),
-            "confidence": result.get("confidence", 0.0),
-            "source": "Local TinyLLaMA + Ayurveda RAG"
-        }
-
-        return success_response(data=response_data)
-    except Exception as e:
-        logger.error(f"AI Query error: {e}")
-        return error_response(f"AI Service Failure: {str(e)}", 500)
+    # AI System is temporarily in maintenance mode
+    return success_response(data={
+        "response": "The Ayurveda AI Assistant is currently undergoing maintenance. Please check back later. 🌿",
+        "condition": "Maintenance",
+        "confidence": 1.0
+    })
 
 def reset_ai_knowledge():
     """DELETE /api/v2/ai/reset"""

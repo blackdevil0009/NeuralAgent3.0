@@ -131,29 +131,21 @@ def analyze_report(report_id):
 
     # --- Real RAG-Augmented AI analysis ---
     try:
-        from app.controllers.ai_v2_controller import get_rag_service, get_gemini_service
+        from app.controllers.ai_v2_controller import get_ayurveda_service
+        service = get_ayurveda_service()
         
-        # 1. Retrieve Ayurvedic Context relevant to the report summary
-        context_chunks = get_rag_service().query(report.display_name, top_k=3)
+        # 1. Use the new Ayurveda service to get insights based on report title/content
+        result = service.query(f"Analyze medical report: {report.display_name}")
         
-        # 2. Use Gemini to perform deep analysis
-        analysis_prompt = f"Analyze this medical report: {report.display_name}. Context: {report.summary or 'No summary yet.'}"
-        summary = get_gemini_service().generate_response(analysis_prompt, context_chunks)
-        
-        # 3. Use Gemini to derive Ayurvedic insights
-        ayurvedic_prompt = "Based on the medical analysis, provide targeted Ayurvedic advice (Diet, Herbs, Dosha)."
-        ayurvedic = get_gemini_service().generate_response(ayurvedic_prompt, context_chunks)
+        summary = result.get("response", "AI was unable to generate a detailed summary.")
+        ayurvedic = result.get("response", "No specific Ayurvedic mapping available.")
 
-        # 4. Fallback if something went wrong
-        if not summary or "error" in summary.lower():
-            summary = "AI was unable to generate a detailed summary. Please review the raw report data."
-        if not ayurvedic or "error" in ayurvedic.lower():
-            ayurvedic = "No specific Ayurvedic mapping available for this report type currently."
-
+        # If it's the structured format, we can try to separate them, 
+        # but for now, the result.response is a complete structured text.
+        
     except Exception as e:
         logger.error(f"RAG Analysis error: {e}")
-        # Retain original simulated data if RAG fails (safety fallback)
-        summary = "AI Analysis is currently synchronizing. Please check back in a few minutes."
+        summary = "AI Analysis is currently synchronizing."
         ayurvedic = "Ayurvedic mapping is currently unavailable."
 
     # Derived symptoms and vitals (Simplified for this version)
