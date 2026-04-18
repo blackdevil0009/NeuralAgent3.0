@@ -61,6 +61,10 @@ class Emergency(db.Model):
             'doctorId': self.doctor_id,
             'hospitalId': self.hospital_id,
             'hospitalName': hospital_name,
+            'hospitalAddress': self.hospital.address if self.hospital else '',
+            'hospitalCity': self.hospital.city if self.hospital else '',
+            'hospitalState': self.hospital.state if self.hospital else '',
+            'hospitalPin': self.hospital.pincode if self.hospital else '',
             'patientName': self.patient_name or (self.patient.name if self.patient else 'Patient'),
             'patient': self.patient_name or (self.patient.name if self.patient else 'Patient'), # alias for dashboard
             'explanation': self.explanation,

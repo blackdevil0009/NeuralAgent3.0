@@ -31,3 +31,4 @@ pypdf2
 langchain-text-splitters
 sentence-transformers
 torch
+ollama
