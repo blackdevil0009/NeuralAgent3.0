@@ -30,18 +30,13 @@ def create_app(config_class=None) -> Flask:
     migrate.init_app(app, db)   # flask db init / migrate / upgrade
     jwt.init_app(app)
     mail.init_app(app)
-    socketio.init_app(app, cors_allowed_origins='*')
+    socketio.init_app(app, cors_allowed_origins=app.config.get('CORS_ORIGINS', '*'))
 
     # ── CORS ──────────────────────────────────────────────────────
     CORS(
         app,
-        resources={r'/api/*': {'origins': '*'}},
+        resources={r'/api/*': {'origins': app.config.get('CORS_ORIGINS', '*')}},
         supports_credentials=True,
-        allow_headers=[
-            'Content-Type', 'Authorization',
-            'X-HMAC-Signature', 'X-Timestamp',
-        ],
-        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     )
 
     # ── Register Blueprints ───────────────────────────────────────
@@ -80,6 +75,36 @@ def create_app(config_class=None) -> Flask:
 
     # ── Socket.IO Handlers ────────────────────────────────────────
     from app.sockets import handlers # noqa: F401
+
+    @app.after_request
+    def deduplicate_cors(response):
+        """Fix for 'multiple values' CORS error if proxy also sets headers."""
+        cors_headers = [
+            'Access-Control-Allow-Origin',
+            'Access-Control-Allow-Credentials',
+            'Access-Control-Allow-Headers',
+            'Access-Control-Allow-Methods',
+            'Access-Control-Expose-Headers'
+        ]
+        for header in cors_headers:
+            if header in response.headers:
+                values = response.headers.getlist(header)
+                # Check if we have multiple header entries or a single entry with commas
+                combined = []
+                for v in values:
+                    combined.extend([s.strip() for s in v.split(',') if s.strip()])
+                
+                if combined:
+                    # Deduplicate while preserving order
+                    unique = list(dict.fromkeys(combined))
+                    
+                    # For Origin and Credentials, we MUST only have one value
+                    if header in ('Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials'):
+                        response.headers[header] = unique[0]
+                    else:
+                        # For others, we can join them back
+                        response.headers[header] = ', '.join(unique)
+        return response
 
     app.logger.info("🌿 VaidyaMed-X app created. DB: MySQL.")
     return app

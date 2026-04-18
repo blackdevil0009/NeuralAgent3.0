@@ -77,7 +77,8 @@ class BaseConfig:
     ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 
     # ── CORS ───────────────────────────────────────────────────
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    _raw_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    CORS_ORIGINS = list(set(o.strip() for o in _raw_origins if o.strip()))
 
     # ── App-Level ──────────────────────────────────────────────
     FRONTEND_URL        = os.getenv('FRONTEND_URL', 'http://localhost:3000')
