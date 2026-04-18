@@ -99,6 +99,19 @@ export default function AIAssistant() {
                 body: JSON.stringify({ message: msg })
             });
 
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Server Error Response:", errorText);
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error("Non-JSON Response:", text);
+                throw new Error("Invalid response (expected JSON, got HTML). Check if Backend API is running at the correct URL.");
+            }
+
             const resData = await response.json();
             
             if (response.status === 401) {
