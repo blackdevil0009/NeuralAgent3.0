@@ -54,6 +54,57 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   static const _roles = ['Patient', 'Doctor'];
 
+  bool _verifyingDoc = false;
+  bool _docAutoFilled = false;
+
+  Future<void> _verifyDocumentOCR() async {
+    if (_docFile == null) return;
+    if (_nameCtrl.text.trim().isEmpty || _degree == null) {
+      _snack('Please fill Name and Degree first before verifying.', isError: true);
+      return;
+    }
+
+    setState(() => _verifyingDoc = true);
+    try {
+      final fields = {
+        'fullName': _nameCtrl.text.trim(),
+        'degree': _degree!,
+        'regNumber': _licenseCtrl.text.trim(),
+        'dob': _dobCtrl.text.trim(),
+      };
+
+      final res = await ApiClient.postMultipart(
+        ApiConfig.verifyDocument,
+        fields,
+        fileField: 'document',
+        filePath: _docFile!.path,
+        fileBytes: _docFile!.bytes,
+        fileName: _docFile!.name,
+      );
+
+      if (res.ok && res.data != null) {
+        final extracted = res.data!['extracted'] as Map<String, dynamic>? ?? {};
+        setState(() {
+          if (extracted['regNumber'] != null) {
+            _licenseCtrl.text = extracted['regNumber'].toString();
+          }
+          if (extracted['dob'] != null) {
+            _dobCtrl.text = extracted['dob'].toString();
+          }
+          _docAutoFilled = true;
+          _verifyingDoc = false;
+        });
+        _snack('✅ Credentials verified & auto-filled!');
+      } else {
+        setState(() => _verifyingDoc = false);
+        _snack(res.data?['message'] ?? res.error ?? 'Verification failed.', isError: true);
+      }
+    } catch (e) {
+      setState(() => _verifyingDoc = false);
+      _snack('Error during verification.', isError: true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -457,7 +508,12 @@ class _RegisterScreenState extends State<RegisterScreen>
             final result = await FilePicker.platform.pickFiles(
               type: FileType.custom, allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png']
             );
-            if (result != null) setState(() => _docFile = result.files.first);
+            if (result != null) {
+              setState(() {
+                _docFile = result.files.first;
+                _docAutoFilled = false;
+              });
+            }
           },
           child: Container(
             padding: const EdgeInsets.all(12),
@@ -471,10 +527,39 @@ class _RegisterScreenState extends State<RegisterScreen>
                 Icon(Icons.upload_file, color: _docFile == null ? AppColors.textMuted : AppColors.primaryGreen),
                 const SizedBox(width: 8),
                 Expanded(child: Text(_docFile?.name ?? 'Tap to select document', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                if (_docFile != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.check_circle, size: 16, color: AppColors.primaryGreen),
+                ]
               ],
             ),
           ),
         ),
+        if (_docFile != null && !_docAutoFilled) ...[
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            onPressed: _verifyingDoc ? null : _verifyDocumentOCR,
+            icon: _verifyingDoc 
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.auto_fix_high, size: 16),
+            label: Text(_verifyingDoc ? 'Scanning...' : 'Verify & Auto-fill Credentials'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ] else if (_docAutoFilled) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 12, color: AppColors.primaryGreen),
+              const SizedBox(width: 4),
+              Text('Auto-filled from document', style: TextStyle(fontSize: 11, color: AppColors.primaryGreen, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
       ],
     ],
   );

@@ -32,6 +32,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _licenseCtrl;
   late TextEditingController _hospitalCtrl;
   late TextEditingController _clinicLocCtrl;
+  late TextEditingController _upiCtrl;
+  late TextEditingController _bankAccCtrl;
 
   String _gender = 'Prefer not to say';
   String _bloodGroup = 'Unknown';
@@ -59,6 +61,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _licenseCtrl = TextEditingController(text: _profile['reg_number'] ?? _profile['regNumber'] ?? '');
     _hospitalCtrl = TextEditingController(text: _profile['hospital'] ?? '');
     _clinicLocCtrl = TextEditingController(text: _profile['clinicLocation'] ?? _profile['clinic_location'] ?? '');
+    _upiCtrl = TextEditingController(text: _profile['upi_id'] ?? '');
+    _bankAccCtrl = TextEditingController(text: _profile['bank_account_number'] ?? '');
     _gender = _profile['gender'] ?? 'Prefer not to say';
     _bloodGroup = _profile['bloodGroup'] ?? 'Unknown';
     _dosha = _profile['dosha'] ?? 'Not assessed';
@@ -83,6 +87,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _profile['medications'] = _medicationsCtrl.text;
       _profile['specialization'] = _specCtrl.text;
       _profile['hospital'] = _hospitalCtrl.text;
+      _profile['upi_id'] = _upiCtrl.text;
+      _profile['bank_account_number'] = _bankAccCtrl.text;
       _isEditing = false;
       _isSaving = false;
     });
@@ -93,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    for (final c in [_nameCtrl, _mobileCtrl, _dobCtrl, _addressCtrl, _cityCtrl, _stateCtrl, _pinCtrl, _allergiesCtrl, _conditionsCtrl, _medicationsCtrl, _specCtrl, _licenseCtrl, _hospitalCtrl, _clinicLocCtrl]) {
+    for (final c in [_nameCtrl, _mobileCtrl, _dobCtrl, _addressCtrl, _cityCtrl, _stateCtrl, _pinCtrl, _allergiesCtrl, _conditionsCtrl, _medicationsCtrl, _specCtrl, _licenseCtrl, _hospitalCtrl, _clinicLocCtrl, _upiCtrl, _bankAccCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -268,6 +274,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _fieldRow('Hospital / Clinic', _hospitalCtrl, readOnly: !_isEditing),
                       _divider(),
                       _fieldRow('Clinic Location', _clinicLocCtrl, readOnly: !_isEditing),
+                      _divider(),
+                      _fieldRow('UPI ID', _upiCtrl, readOnly: !_isEditing, hint: 'username@bank'),
+                      _divider(),
+                      _fieldRow('Bank Account', _bankAccCtrl, readOnly: !_isEditing, hint: 'A/C Number'),
+                      _divider(),
+                      _payoutStatusRow(_profile),
                     ]),
                     const SizedBox(height: 20),
                   ],
@@ -413,4 +425,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     ),
   );
+
+  Widget _payoutStatusRow(Map<String, dynamic> profile) {
+    final upi = _upiCtrl.text.trim();
+    final bank = _bankAccCtrl.text.trim();
+    final isVerified = profile['payout_verified'] == true;
+    
+    // Auto-verify logic for UI feedback
+    final upiValid = upi.isNotEmpty && RegExp(r'^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$').hasMatch(upi);
+    final bankValid = bank.isNotEmpty;
+    final autoVerified = upiValid && bankValid;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          const SizedBox(width: 130, child: Text('Payout Status', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textMuted))),
+          if (isVerified || autoVerified)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: const Color(0xFFEAF5EE), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.primaryGreen, width: 1)),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, size: 14, color: AppColors.primaryGreen),
+                  SizedBox(width: 4),
+                  Text('Verified', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: const Color(0xFFFDECEA), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.errorRed, width: 1)),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.error_outline, size: 14, color: AppColors.errorRed),
+                  SizedBox(width: 4),
+                  Text('Not Verified', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.errorRed)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

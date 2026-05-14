@@ -46,4 +46,6 @@ auth_bp.add_url_rule('/verify-registration-otp', view_func=verify_registration_o
 auth_bp.add_url_rule('/verify-2fa-otp',        view_func=verify_2fa_otp,        methods=['POST'])
 auth_bp.add_url_rule('/resend-verification',   view_func=resend_verification,   methods=['POST'])
 auth_bp.add_url_rule('/resend-2fa-otp',        view_func=resend_2fa_otp,        methods=['POST'])
+auth_bp.add_url_rule('/forgot-password',       view_func=forgot_password,       methods=['POST'])
+auth_bp.add_url_rule('/reset-password',        view_func=reset_password,        methods=['POST'])
 auth_bp.add_url_rule('/verify-document',       view_func=verify_document_ocr,   methods=['POST'])
