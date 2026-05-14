@@ -33,9 +33,13 @@ def create_app(config_class=None) -> Flask:
     socketio.init_app(app, cors_allowed_origins=app.config.get('CORS_ORIGINS', '*'))
 
     # ── CORS ──────────────────────────────────────────────────────
+    origins = app.config.get('CORS_ORIGINS', ['*'])
     CORS(
         app,
-        resources={r'/api/*': {'origins': app.config.get('CORS_ORIGINS', '*')}},
+        resources={
+            r'/api/*': {'origins': origins},
+            r'/socket.io/*': {'origins': origins}
+        },
         supports_credentials=True,
     )
 

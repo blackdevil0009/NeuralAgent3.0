@@ -72,14 +72,17 @@ if __name__ == '__main__':
         print("   Stop the process using it or set PORT= env var to an available port.")
         sys.exit(1)
 
-    http_server = WSGIServer(
-        (host, port),
-        app,
-        handler_class=WebSocketHandler,
-    )
-
+    # Start the server using SocketIO's run method
+    from app.extensions import socketio
     try:
-        http_server.serve_forever()
-    except OSError as exc:
-        print(f"❌ Failed to bind server socket: {exc}")
+        socketio.run(
+            app,
+            host=host,
+            port=port,
+            debug=False, # Debug should be off in production
+            use_reloader=False,
+            log_output=True
+        )
+    except Exception as exc:
+        print(f"❌ Failed to start server: {exc}")
         sys.exit(1)
