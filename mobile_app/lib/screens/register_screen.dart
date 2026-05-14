@@ -86,10 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         final extracted = res.data!['extracted'] as Map<String, dynamic>? ?? {};
         setState(() {
           if (extracted['regNumber'] != null) {
-            _licenseCtrl.text = extracted['regNumber'].toString();
-          }
-          if (extracted['dob'] != null) {
-            _dobCtrl.text = extracted['dob'].toString();
+            _licenseCtrl.text = extracted['regNumber'].toString().replaceAll('"', '').replaceAll("'", "");
           }
           _docAutoFilled = true;
           _verifyingDoc = false;

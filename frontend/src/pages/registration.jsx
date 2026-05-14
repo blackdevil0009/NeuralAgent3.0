@@ -491,10 +491,9 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                 const extracted = json.data?.extracted || {};
                 // Always auto-fill DOB and RegNumber from OCR result
                 const extractedDob = json.data?.extracted_dob || extracted.dob;
-                const extractedRegNumber = extracted.regNumber;
+                const extractedRegNumber = (extracted.regNumber || '').toString().replace(/['"]/g, '');
                 setForm(prev => ({
                     ...prev,
-                    ...(extractedDob ? { dob: extractedDob } : {}),
                     ...(extractedRegNumber ? { regNumber: extractedRegNumber } : {}),
                 }));
             }
