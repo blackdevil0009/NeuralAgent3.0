@@ -4,47 +4,47 @@ import { API_BASE_URL } from '../utils/config';
 import { handleSuccess, handleError } from '../utils/error_handlers';
 
 const VALID_DEGREES = [
-    'MBBS','MD','MS','BDS','MDS','BAMS','BHMS','BUMS','BPT','MPT',
-    'BNYS','DNB','DM','MCh','PhD','MSc','BSc Nursing','GNM','ANM',
-    'D.Pharm','B.Pharm','M.Pharm','Pharm.D','DMRT','DMRD',
-    'DA','DCH','DGO','DLO','DTCD','DDVL','DEM','DFM','DPM',
-    'DO','DOMS','FRCS','MRCP','FRCP','FRCOG','FACS','FIACS',
+    'MBBS', 'MD', 'MS', 'BDS', 'MDS', 'BAMS', 'BHMS', 'BUMS', 'BPT', 'MPT',
+    'BNYS', 'DNB', 'DM', 'MCh', 'PhD', 'MSc', 'BSc Nursing', 'GNM', 'ANM',
+    'D.Pharm', 'B.Pharm', 'M.Pharm', 'Pharm.D', 'DMRT', 'DMRD',
+    'DA', 'DCH', 'DGO', 'DLO', 'DTCD', 'DDVL', 'DEM', 'DFM', 'DPM',
+    'DO', 'DOMS', 'FRCS', 'MRCP', 'FRCP', 'FRCOG', 'FACS', 'FIACS',
 ];
 const VALID_POSITIONS = [
-    'Consultant','Senior Consultant','Resident Doctor','Junior Resident',
-    'Senior Resident','Professor','Associate Professor','Assistant Professor',
-    'HOD','Chief of Medicine','Vaidya','Chief Vaidya','Medical Officer',
-    'General Practitioner','Specialist','Surgeon','Physician',
-    'Intern','Fellow','Super Specialist','Director','CMO',
+    'Consultant', 'Senior Consultant', 'Resident Doctor', 'Junior Resident',
+    'Senior Resident', 'Professor', 'Associate Professor', 'Assistant Professor',
+    'HOD', 'Chief of Medicine', 'Vaidya', 'Chief Vaidya', 'Medical Officer',
+    'General Practitioner', 'Specialist', 'Surgeon', 'Physician',
+    'Intern', 'Fellow', 'Super Specialist', 'Director', 'CMO',
 ];
 const VALID_SPECIALIZATIONS = [
-    'Ayurveda','Allopathy','Homeopathy','Unani','Naturopathy','Yoga & Naturopathy',
-    'General Medicine','General Surgery','Cardiology','Dermatology','Neurology',
-    'Orthopedics','Pediatrics','Gynecology','Psychiatry','Ophthalmology',
-    'ENT','Radiology','Anesthesiology','Pathology','Oncology','Nephrology',
-    'Urology','Endocrinology','Gastroenterology','Pulmonology','Rheumatology',
-    'Hematology','Infectious Disease','Emergency Medicine','Family Medicine',
-    'Community Medicine','Geriatrics','Sports Medicine','Palliative Care',
-    'Physical Medicine','Dentistry','Oral Surgery','Physiotherapy',
-    'Pharmacy','Nursing','Medical Genetics','Biomedicine','Nutrition & Dietetics',
-    'Neonatology','Hepatology','Interventional Cardiology','Plastic Surgery',
-    'Neurosurgery','Vascular Surgery','Thoracic Surgery','Transplant Medicine',
+    'Ayurveda', 'Allopathy', 'Homeopathy', 'Unani', 'Naturopathy', 'Yoga & Naturopathy',
+    'General Medicine', 'General Surgery', 'Cardiology', 'Dermatology', 'Neurology',
+    'Orthopedics', 'Pediatrics', 'Gynecology', 'Psychiatry', 'Ophthalmology',
+    'ENT', 'Radiology', 'Anesthesiology', 'Pathology', 'Oncology', 'Nephrology',
+    'Urology', 'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
+    'Hematology', 'Infectious Disease', 'Emergency Medicine', 'Family Medicine',
+    'Community Medicine', 'Geriatrics', 'Sports Medicine', 'Palliative Care',
+    'Physical Medicine', 'Dentistry', 'Oral Surgery', 'Physiotherapy',
+    'Pharmacy', 'Nursing', 'Medical Genetics', 'Biomedicine', 'Nutrition & Dietetics',
+    'Neonatology', 'Hepatology', 'Interventional Cardiology', 'Plastic Surgery',
+    'Neurosurgery', 'Vascular Surgery', 'Thoracic Surgery', 'Transplant Medicine',
 ];
 const INDIAN_STATES = [
-    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
-    'Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka',
-    'Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram',
-    'Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana',
-    'Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
-    'Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu',
-    'Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry',
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+    'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+    'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+    'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
 ];
 
 const EMPTY = {
-    name:'', mobile:'', address:'', city:'', state:'', pin:'',
-    degree:'', position:'', specialization:'', experience:'',
-    hospital:'', clinicLocation:'', regNumber:'',
-    consultantFee:'', workingHours:'',
+    name: '', mobile: '', address: '', city: '', state: '', pin: '',
+    degree: '', position: '', specialization: '', experience: '',
+    hospital: '', clinicLocation: '', regNumber: '',
+    consultantFee: '', workingHours: '',
     upiId: '', bankAccountDetails: '',
     bankAccountName: '', bankAccountNumber: '', bankIfsc: '',
 };
@@ -58,7 +58,7 @@ const inputStyle = (err) => ({ width: '100%', boxSizing: 'border-box', padding: 
 const errorStyle = { color: '#e74c3c', fontSize: '0.76rem', marginTop: 3 };
 
 const statusMeta = {
-    pending:  { color: '#e67e22', icon: '⏳', text: 'Your credentials are under review. You will be notified once verified.' },
+    pending: { color: '#e67e22', icon: '⏳', text: 'Your credentials are under review. You will be notified once verified.' },
     verified: { color: '#27ae60', icon: '✅', text: 'Your credentials are verified. Your profile is live and visible to patients.' },
     rejected: { color: '#e74c3c', icon: '❌', text: 'Your credentials were rejected. Update and contact support to re-submit.' },
 };
@@ -77,14 +77,14 @@ const Field = ({ label, name, type = 'text', placeholder, children, req, form, h
 );
 
 export default function DoctorProfile() {
-    const [profile, setProfile]   = useState(null);
-    const [form, setForm]         = useState(EMPTY);
-    const [email, setEmail]       = useState('');
-    const [vs, setVs]             = useState('pending');
-    const [loading, setLoading]   = useState(true);
-    const [saving, setSaving]     = useState(false);
+    const [profile, setProfile] = useState(null);
+    const [form, setForm] = useState(EMPTY);
+    const [email, setEmail] = useState('');
+    const [vs, setVs] = useState('pending');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [editMode, setEditMode] = useState(false);
-    const [errors, setErrors]     = useState({});
+    const [errors, setErrors] = useState({});
     const [ifscInfo, setIfscInfo] = useState(null);
     const [ifscLoading, setIfscLoading] = useState(false);
     const [upiValid, setUpiValid] = useState(null);
@@ -110,22 +110,22 @@ export default function DoctorProfile() {
                 setEmail(p.email || '');
                 setVs(p.verificationStatus || 'pending');
                 setForm({
-                    name:          p.name || '',
-                    mobile:        p.mobile || '',
-                    address:       p.address || '',
-                    city:          p.city || '',
-                    state:         p.state || '',
-                    pin:           p.pin || '',
-                    degree:        p.degree || '',
-                    position:      p.position || '',
-                    specialization:p.specialization || '',
-                    experience:    p.experience || '',
-                    hospital:      p.hospital || '',
-                    clinicLocation:p.clinicLocation || '',
-                    regNumber:     p.regNumber || '',
-                    consultantFee: p.consultantFee ?? 500,
-                    workingHours:  p.workingHours || 'Mon-Fri, 10AM-6PM',
-                    upiId:         p.upiId || '',
+                    name: p.name || '',
+                    mobile: p.mobile || '',
+                    address: p.address || '',
+                    city: p.city || '',
+                    state: p.state || '',
+                    pin: p.pin || '',
+                    degree: p.degree || '',
+                    position: p.position || '',
+                    specialization: p.specialization || '',
+                    experience: p.experience || '',
+                    hospital: p.hospital || '',
+                    clinicLocation: p.clinicLocation || '',
+                    regNumber: p.regNumber || '',
+                    consultantFee: p.consultantFee ?? 0,
+                    workingHours: p.workingHours || 'Mon-Fri, 10AM-6PM',
+                    upiId: p.upiId || '',
                     bankAccountDetails: p.bankAccountDetails || '',
                     bankAccountName: p.bankAccountName || '',
                     bankAccountNumber: p.bankAccountNumber || '',
@@ -166,23 +166,22 @@ export default function DoctorProfile() {
 
     const validate = () => {
         const errs = {};
-        if (!form.name.trim())                                              errs.name = 'Full name is required.';
-        if (!/^[6-9]\d{9}$/.test(form.mobile))                             errs.mobile = 'Valid 10-digit mobile required.';
-        if (!form.address.trim() || form.address.trim().length < 5)        errs.address = 'Address is required.';
-        if (!form.city.trim())                                              errs.city = 'City is required.';
-        if (!form.state)                                                    errs.state = 'State is required.';
-        if (!form.pin || !/^\d{6}$/.test(form.pin))                        errs.pin = 'Valid 6-digit PIN required.';
-        if (!form.degree)                                                   errs.degree = 'Degree is required.';
-        if (!form.position)                                                 errs.position = 'Position is required.';
-        if (!form.specialization)                                           errs.specialization = 'Specialization is required.';
-        if (!form.experience || isNaN(form.experience))                     errs.experience = 'Experience is required.';
-        if (!form.hospital.trim() || form.hospital.trim().length < 3)      errs.hospital = 'Hospital name is required.';
+        if (!form.name.trim()) errs.name = 'Full name is required.';
+        if (!/^[6-9]\d{9}$/.test(form.mobile)) errs.mobile = 'Valid 10-digit mobile required.';
+        if (!form.address.trim() || form.address.trim().length < 5) errs.address = 'Address is required.';
+        if (!form.city.trim()) errs.city = 'City is required.';
+        if (!form.state) errs.state = 'State is required.';
+        if (!form.pin || !/^\d{6}$/.test(form.pin)) errs.pin = 'Valid 6-digit PIN required.';
+        if (!form.degree) errs.degree = 'Degree is required.';
+        if (!form.position) errs.position = 'Position is required.';
+        if (!form.specialization) errs.specialization = 'Specialization is required.';
+        if (!form.experience || isNaN(form.experience)) errs.experience = 'Experience is required.';
+        if (!form.hospital.trim() || form.hospital.trim().length < 3) errs.hospital = 'Hospital name is required.';
         if (!form.clinicLocation.trim() || form.clinicLocation.trim().length < 5) errs.clinicLocation = 'Clinic location is required.';
-        if (!form.regNumber.trim())                                         errs.regNumber = 'Medical Reg. Number is required.';
-        else if (!/^[A-Z]{1,3}-?\d{5,10}$/i.test(form.regNumber.trim()))   errs.regNumber = 'Format: STATE-XXXXXX (e.g. MH-123456).';
-        if (!form.consultantFee || isNaN(form.consultantFee))               errs.consultantFee = 'Enter a valid fee.';
-        if (!form.workingHours.trim())                                      errs.workingHours = 'Working hours are required.';
-        if (!form.upiId.trim())                                            errs.upiId = 'UPI ID is mandatory for payouts.';
+        if (!form.regNumber.trim()) errs.regNumber = 'Medical Reg. Number is required.';
+        if (!form.consultantFee || isNaN(form.consultantFee)) errs.consultantFee = 'Enter a valid fee.';
+        if (!form.workingHours.trim()) errs.workingHours = 'Working hours are required.';
+        if (!form.upiId.trim()) errs.upiId = 'UPI ID is mandatory for payouts.';
         return errs;
     };
 
@@ -199,13 +198,13 @@ export default function DoctorProfile() {
                 body: JSON.stringify({ ...form, consultantFee: Number(form.consultantFee), experience: String(form.experience) }),
             });
             const j = await res.json();
-            if (!res.ok) { 
+            if (!res.ok) {
                 if (j.data?.details) {
                     console.error("Backend Validation Errors:", j.data.details);
                     setErrors(j.data.details);
                     throw new Error(j.data.message || 'Validation failed');
                 }
-                throw new Error(j.data?.message || j.message || 'Save failed'); 
+                throw new Error(j.data?.message || j.message || 'Save failed');
             }
             handleSuccess('Profile saved! A UPI confirmation email has been sent if your UPI changed.');
             const updatedProfile = j.data || j;
@@ -229,7 +228,7 @@ export default function DoctorProfile() {
                 degree: profile.degree || '', position: profile.position || '',
                 specialization: profile.specialization || '', experience: profile.experience || '',
                 hospital: profile.hospital || '', clinicLocation: profile.clinicLocation || '',
-                regNumber: profile.regNumber || '', consultantFee: profile.consultantFee ?? 500,
+                regNumber: profile.regNumber || '', consultantFee: profile.consultantFee ?? 0,
                 workingHours: profile.workingHours || 'Mon-Fri, 10AM-6PM',
             });
         }
@@ -242,13 +241,13 @@ export default function DoctorProfile() {
             handleError('Please provide and save your UPI ID before requesting verification.');
             return;
         }
-        
+
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/doctor/verify-upi`, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${token}`, 
+                headers: {
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                     'X-HMAC-Signature': 'DEV_BYPASS',
                     'X-Timestamp': Math.floor(Date.now() / 1000).toString()
@@ -318,7 +317,7 @@ export default function DoctorProfile() {
                     </div>
                     <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                         <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#27ae60' }}>
-                            ₹{profile.consultantFee ?? 500}
+                            ₹{profile.consultantFee ?? 0}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--doc-text-mute)' }}>Consultation Fee</div>
                         <div style={{ fontSize: '0.82rem', color: 'var(--doc-text-mute)', marginTop: 4 }}>
@@ -355,13 +354,20 @@ export default function DoctorProfile() {
                         <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: '0.95rem', borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>💸 Payout Details</h3>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                             <span style={{ ...labelStyle, marginBottom: 0 }}>Verification Status</span>
-                            <span style={{ 
-                                background: profile.payoutVerified ? '#e8f8ee' : '#fff4e5', 
-                                color: profile.payoutVerified ? '#27ae60' : '#d35400', 
-                                fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: 20, border: '1px solid currentColor' 
-                            }}>
-                                {profile.payoutVerified ? 'Verified' : 'Unverified'}
-                            </span>
+                            {(() => {
+                                const hasValidUpi = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/.test(profile.upiId || '');
+                                const hasBankAcc = !!(profile.bankAccountNumber || '').trim();
+                                const isVerified = profile.payoutVerified || (hasValidUpi && hasBankAcc);
+                                return (
+                                    <span style={{
+                                        background: isVerified ? '#e8f8ee' : '#fff4e5',
+                                        color: isVerified ? '#27ae60' : '#d35400',
+                                        fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: 20, border: '1px solid currentColor'
+                                    }}>
+                                        {isVerified ? '✅ Verified' : 'Unverified'}
+                                    </span>
+                                );
+                            })()}
                         </div>
                         <Info label="UPI ID" value={profile.upiId} />
                         <Info label="Account Holder" value={profile.bankAccountName} />
@@ -487,7 +493,16 @@ export default function DoctorProfile() {
                         </select>
                     </Field>
                     <Field label="Years of Experience" name="experience" type="number" placeholder="e.g. 5" req {...fProps} />
-                    <Field label="Medical Reg. Number" name="regNumber" placeholder="e.g. MH-123456" req {...fProps} />
+                    {/* Medical Reg. Number — read-only, set from OCR during registration */}
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={labelStyle}>Medical Reg. Number <span style={{ color: '#aaa', textTransform: 'none', fontSize: '0.7rem' }}>(read-only — set from document)</span></label>
+                        <input
+                            value={form.regNumber || 'Not set'}
+                            readOnly
+                            style={{ ...inputStyle(false), background: '#f5f5f5', color: '#666', cursor: 'not-allowed' }}
+                        />
+                        <div style={{ fontSize: '0.72rem', color: '#888', marginTop: 3 }}>🔒 Registration number is verified from your uploaded document and cannot be edited.</div>
+                    </div>
                 </div>
 
                 {/* Practice */}
@@ -503,13 +518,20 @@ export default function DoctorProfile() {
                 <div style={cardStyle}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--doc-border)', paddingBottom: 10 }}>
                         <h3 style={{ margin: 0, fontSize: '0.95rem' }}>💸 Payout & Financial Details</h3>
-                        {!profile.payoutVerified && (
-                             <button className="dd-btn dd-btn-outline" style={{ fontSize: '0.7rem', padding: '4px 12px' }} onClick={handleRequestPayoutVerification}>
-                                 Verify Credentials
-                             </button>
-                        )}
+                        {(() => {
+                            const hasValidUpi = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/.test(form.upiId || '');
+                            const hasBankAcc = !!(form.bankAccountNumber || '').trim();
+                            const isVerified = profile.payoutVerified || (hasValidUpi && hasBankAcc);
+                            return !isVerified ? (
+                                <button className="dd-btn dd-btn-outline" style={{ fontSize: '0.7rem', padding: '4px 12px' }} onClick={handleRequestPayoutVerification}>
+                                    Verify Credentials
+                                </button>
+                            ) : (
+                                <span style={{ color: '#27ae60', fontSize: '0.75rem', fontWeight: 700 }}>✅ Payout Verified</span>
+                            );
+                        })()}
                     </div>
-                    
+
                     <Field label="UPI ID" name="upiId" placeholder="e.g. yourname@ybl" req {...fProps}>
                         <input
                             type="text"
@@ -523,7 +545,7 @@ export default function DoctorProfile() {
                         {upiValid === true && <div style={{ color: '#27ae60', fontSize: '0.76rem', marginTop: 3 }}>✅ Valid UPI format</div>}
                         {upiValid === false && <div style={{ color: '#e74c3c', fontSize: '0.76rem', marginTop: 3 }}>⚠ Invalid UPI format (e.g. name@ybl)</div>}
                     </Field>
-                    
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                         <Field label="Bank Account Holder Name" name="bankAccountName" placeholder="As per bank passbook" {...fProps} />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -542,7 +564,7 @@ export default function DoctorProfile() {
                                 {ifscLoading && <div style={{ color: '#888', fontSize: '0.76rem', marginTop: 3 }}>🔍 Looking up...</div>}
                                 {ifscInfo && !ifscInfo.error && (
                                     <div style={{ background: '#e8f8ee', border: '1px solid #27ae60', borderRadius: 6, padding: '6px 10px', marginTop: 4, fontSize: '0.78rem', color: '#1a5c2e' }}>
-                                        🏦 <b>{ifscInfo.bank}</b> — {ifscInfo.branch}<br/>
+                                        🏦 <b>{ifscInfo.bank}</b> — {ifscInfo.branch}<br />
                                         📍 {ifscInfo.city}, {ifscInfo.state}
                                     </div>
                                 )}

@@ -103,7 +103,7 @@ def create_payment_order():
         try:
             # Return existing pending order so frontend can retry payment
             order = payment_service.create_razorpay_order(
-                amount_inr=doctor.consultant_fee or 500,
+                amount_inr=doctor.consultant_fee if doctor.consultant_fee is not None else 0,
                 appointment_id=dup.id,
                 notes={'patient_id': user_id, 'doctor_id': doctor_id}
             )
@@ -111,8 +111,8 @@ def create_payment_order():
                 data={
                     'appointmentId':   dup.id,
                     'orderId':         dup.razorpay_order_id or order['id'],
-                    'amount':          (doctor.consultant_fee or 500) * 100,   # paise
-                    'amountINR':       doctor.consultant_fee or 500,
+                    'amount':          (doctor.consultant_fee if doctor.consultant_fee is not None else 0) * 100,   # paise
+                    'amountINR':       doctor.consultant_fee if doctor.consultant_fee is not None else 0,
                     'currency':        'INR',
                     'doctorName':      doctor.name,
                     'keyId':           current_app.config.get('RAZORPAY_KEY_ID', ''),
@@ -128,7 +128,7 @@ def create_payment_order():
             return error_response("Failed to initialize payment. Please try again later.", 500)
 
     # ── Create Razorpay order ────────────────────────────────
-    amount_inr = doctor.consultant_fee or 500
+    amount_inr = doctor.consultant_fee if doctor.consultant_fee is not None else 0
     try:
         order = payment_service.create_razorpay_order(
             amount_inr=amount_inr,

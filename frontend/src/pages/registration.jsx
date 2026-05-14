@@ -83,16 +83,16 @@ function PatientForm({ onSubmit, loading }) {
     const validate = () => {
         const errs = {};
         const phoneRe = /^[6-9]\d{9}$/;
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRe = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
 
         if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
-        if (!emailRe.test(form.email)) errs.email = 'Enter a valid email address.';
+        if (!emailRe.test(form.email)) errs.email = 'Enter a valid @gmail.com address.';
         if (!phoneRe.test(form.mobile)) errs.mobile = 'Enter a valid 10-digit mobile number (starts with 6-9).';
         if (!form.dob) errs.dob = 'Date of birth is required.';
         if (!form.gender) errs.gender = 'Please select a gender.';
 
         const addrLower = (form.address || '').trim().toLowerCase();
-        const dummyWords = ['test','dummy','fake','abc','xyz','asdf','qwerty','aaa','123','na','none','nil','null','temp','sample'];
+        const dummyWords = ['test', 'dummy', 'fake', 'abc', 'xyz', 'asdf', 'qwerty', 'aaa', '123', 'na', 'none', 'nil', 'null', 'temp', 'sample'];
         if (!addrLower || addrLower.length < 10) errs.address = 'Address must be at least 10 characters.';
         else if (dummyWords.some(w => addrLower === w || addrLower === w + w)) errs.address = 'Please enter a real address.';
 
@@ -101,6 +101,9 @@ function PatientForm({ onSubmit, loading }) {
         if (!/^\d{6}$/.test(form.pincode)) errs.pincode = 'Enter a valid 6-digit PIN code.';
 
         if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
+        else if (!/[A-Z]/.test(form.password)) errs.password = 'Must contain an uppercase letter.';
+        else if (!/[0-9]/.test(form.password)) errs.password = 'Must contain a number.';
+        else if (!/[^A-Za-z0-9]/.test(form.password)) errs.password = 'Must contain a special character.';
         if (form.confirmPass !== form.password) errs.confirmPass = 'Passwords do not match.';
         if (!form.termsAgreed) errs.termsAgreed = 'You must accept the terms & conditions.';
 
@@ -279,6 +282,9 @@ function PatientForm({ onSubmit, loading }) {
                         {form.password && (
                             <span className="pw-hint">Strength: <strong>{strengthLabel[pwStrength]}</strong></span>
                         )}
+                        <small style={{ color: '#666', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>
+                            Must be at least 8 characters, include an uppercase letter, a number, and a special character.
+                        </small>
                         {errors.password && <span className="field-error">{errors.password}</span>}
                     </div>
 
@@ -334,33 +340,58 @@ function PatientForm({ onSubmit, loading }) {
    Doctor credential constants
 ───────────────────────────────────────────── */
 const VALID_DEGREES = [
-    'MBBS','MD','MS','BDS','MDS','BAMS','BHMS','BUMS','BPT','MPT',
-    'BNYS','DNB','DM','MCh','PhD','MSc','BSc Nursing','GNM','ANM',
-    'D.Pharm','B.Pharm','M.Pharm','Pharm.D','DMRT','DMRD',
-    'DA','DCH','DGO','DLO','DTCD','DDVL','DEM','DFM','DPM',
-    'DO','DOMS','FRCS','MRCP','FRCP','FRCOG','FACS','FIACS'
+    // Allopathy / Modern Medicine
+    'MBBS', 'MD', 'MS', 'DNB', 'DM', 'MCh',
+    // Dental
+    'BDS', 'MDS',
+    // Ayurveda
+    'BAMS', 'MD (Ayurveda)', 'MS (Ayurveda)',
+    // Homeopathy
+    'BHMS', 'MD (Homeopathy)',
+    // Unani
+    'BUMS', 'MD (Unani)',
+    // Naturopathy
+    'BNYS',
+    // Physiotherapy
+    'BPT', 'MPT',
+    // Nursing
+    'BSc Nursing', 'MSc Nursing', 'GNM', 'ANM', 'Post Basic BSc Nursing',
+    // Pharmacy
+    'D.Pharm', 'B.Pharm', 'M.Pharm', 'Pharm.D',
+    // Allied / Paramedical
+    'BMLT', 'DMLT', 'BOT', 'MOT', 'B.Audiology',
+    // Public Health / Others
+    'MPH', 'MHA', 'MBA (Hospital Mgmt)',
+    // Research / Academic
+    'PhD (Medical)', 'BSc', 'MSc',
+    // International / Fellowship
+    'FRCS', 'MRCP', 'FRCP', 'FRCOG', 'FACS', 'FIACS', 'FCPS',
+    // Diplomas
+    'DA', 'DCH', 'DGO', 'DLO', 'DTCD', 'DDVL', 'DEM', 'DFM', 'DPM',
+    'DO', 'DOMS', 'DMRT', 'DMRD', 'Diploma in Geriatric Medicine',
 ];
 
 const VALID_POSITIONS = [
-    'Consultant','Senior Consultant','Resident Doctor','Junior Resident',
-    'Senior Resident','Professor','Associate Professor','Assistant Professor',
-    'HOD','Chief of Medicine','Vaidya','Chief Vaidya','Medical Officer',
-    'General Practitioner','Specialist','Surgeon','Physician',
-    'Intern','Fellow','Super Specialist','Director','CMO'
+    'Consultant', 'Senior Consultant', 'Resident Doctor', 'Junior Resident',
+    'Senior Resident', 'Professor', 'Associate Professor', 'Assistant Professor',
+    'HOD', 'Chief of Medicine', 'Vaidya', 'Chief Vaidya', 'Medical Officer',
+    'General Practitioner', 'Specialist', 'Surgeon', 'Physician',
+    'Intern', 'Fellow', 'Super Specialist', 'Director', 'CMO'
 ];
 
 const VALID_SPECIALIZATIONS = [
-    'Ayurveda','Allopathy','Homeopathy','Unani','Naturopathy','Yoga & Naturopathy',
-    'General Medicine','General Surgery','Cardiology','Dermatology','Neurology',
-    'Orthopedics','Pediatrics','Gynecology','Psychiatry','Ophthalmology',
-    'ENT','Radiology','Anesthesiology','Pathology','Oncology','Nephrology',
-    'Urology','Endocrinology','Gastroenterology','Pulmonology','Rheumatology',
-    'Hematology','Infectious Disease','Emergency Medicine','Family Medicine',
-    'Community Medicine','Geriatrics','Sports Medicine','Palliative Care',
-    'Physical Medicine','Dentistry','Oral Surgery','Physiotherapy',
-    'Pharmacy','Nursing','Medical Genetics','Biomedicine','Nutrition & Dietetics',
-    'Neonatology','Hepatology','Interventional Cardiology','Plastic Surgery',
-    'Neurosurgery','Vascular Surgery','Thoracic Surgery','Transplant Medicine'
+    'Ayurveda', 'Allopathy', 'Homeopathy', 'Unani', 'Naturopathy', 'Yoga & Naturopathy',
+    'General Medicine', 'General Surgery', 'Cardiology', 'Dermatology', 'Neurology',
+    'Orthopedics', 'Pediatrics', 'Gynecology', 'Psychiatry', 'Ophthalmology',
+    'ENT', 'Radiology', 'Anesthesiology', 'Pathology', 'Oncology', 'Nephrology',
+    'Urology', 'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
+    'Hematology', 'Infectious Disease', 'Emergency Medicine', 'Family Medicine',
+    'Community Medicine', 'Geriatrics', 'Sports Medicine', 'Palliative Care',
+    'Physical Medicine', 'Dentistry', 'Oral Surgery', 'Physiotherapy',
+    'Pharmacy', 'Nursing', 'Medical Genetics', 'Biomedicine', 'Nutrition & Dietetics',
+    'Neonatology', 'Hepatology', 'Interventional Cardiology', 'Plastic Surgery',
+    'Neurosurgery', 'Vascular Surgery', 'Thoracic Surgery', 'Transplant Medicine',
+    'Other (specify)',
 ];
 
 /* ─────────────────────────────────────────────
@@ -371,6 +402,7 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
         fullName: '',
         email: initialEmail,
         mobile: '',
+        dob: '',
         address: '',
         city: '',
         state: '',
@@ -378,9 +410,9 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
         degree: '',
         position: '',
         specialization: '',
+        customSpecialization: '',
         experience: '',
         hospital: '',
-        clinicLocation: '',
         regNumber: '',
         password: '',
         confirmPass: '',
@@ -392,6 +424,10 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
     const [pwStrength, setPwStrength] = useState(0);
     const [showPass, setShowPass] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+
+    const [verificationStatus, setVerificationStatus] = useState('pending'); // pending, verifying, verified, rejected
+    const [verificationReason, setVerificationReason] = useState('');
+    const [verificationToken, setVerificationToken] = useState('');
 
     const handleChange = useCallback((e) => {
         const { name, value, type, checked } = e.target;
@@ -415,19 +451,68 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
             }
             setDocFile(file);
             setErrors(prev => ({ ...prev, docFile: '' }));
+            setVerificationStatus('pending');
+            setVerificationReason('');
+            setVerificationToken('');
         }
     };
 
-    const DUMMY_WORDS = ['test','dummy','fake','abc','xyz','asdf','qwerty','aaa','123','na','none','nil','null','temp','sample'];
+    const handleVerifyDocument = async () => {
+        if (!docFile) return setErrors(prev => ({ ...prev, docFile: 'Please select a document first.' }));
+        if (!form.fullName || !form.degree) {
+            return setErrors(prev => ({ ...prev, docFile: 'Please fill your Full Name and Degree first before verifying.' }));
+        }
+
+        setVerificationStatus('verifying');
+        setVerificationReason('');
+
+        try {
+            const payload = new FormData();
+            payload.append('document', docFile);
+            payload.append('fullName', form.fullName);
+            payload.append('degree', form.degree);
+            // regNumber is optional — OCR will extract and auto-fill it
+            if (form.regNumber) payload.append('regNumber', form.regNumber);
+            if (form.dob) payload.append('dob', form.dob);  // send DOB for cross-check if filled
+
+            const res = await fetch(`${API_BASE_URL}/api/auth/verify-document`, {
+                method: 'POST',
+                body: payload
+            });
+            const json = await res.json();
+
+            if (!res.ok) {
+                setVerificationStatus('rejected');
+                setVerificationReason(json.data?.message || json.message || 'Verification failed.');
+            } else {
+                setVerificationStatus('verified');
+                setVerificationToken(json.data.verification_token);
+                setVerificationReason('');
+                const extracted = json.data?.extracted || {};
+                // Always auto-fill DOB and RegNumber from OCR result
+                const extractedDob = json.data?.extracted_dob || extracted.dob;
+                const extractedRegNumber = extracted.regNumber;
+                setForm(prev => ({
+                    ...prev,
+                    ...(extractedDob ? { dob: extractedDob } : {}),
+                    ...(extractedRegNumber ? { regNumber: extractedRegNumber } : {}),
+                }));
+            }
+        } catch (err) {
+            setVerificationStatus('rejected');
+            setVerificationReason('Network error during verification.');
+        }
+    };
+
+    const DUMMY_WORDS = ['test', 'dummy', 'fake', 'abc', 'xyz', 'asdf', 'qwerty', 'aaa', '123', 'na', 'none', 'nil', 'null', 'temp', 'sample'];
 
     const validate = () => {
         const errs = {};
         const phoneRe = /^[6-9]\d{9}$/;
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const regNumRe = /^[A-Z]{1,3}-?\d{5,10}$/i;
+        const emailRe = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
 
         if (!form.fullName.trim()) errs.fullName = 'Full name is required.';
-        if (!emailRe.test(form.email)) errs.email = 'Enter a valid email address.';
+        if (!emailRe.test(form.email)) errs.email = 'Enter a valid @gmail.com address.';
         if (!phoneRe.test(form.mobile)) errs.mobile = 'Enter a valid 10-digit mobile number (starts with 6-9).';
 
         // Address validation
@@ -442,18 +527,21 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
         if (!form.degree) errs.degree = 'Please select a valid degree.';
         if (!form.position) errs.position = 'Please select a valid position.';
         if (!form.specialization) errs.specialization = 'Please select a valid specialization.';
+        if (form.specialization === 'Other (specify)' && !form.customSpecialization.trim())
+            errs.customSpecialization = 'Please specify your specialization.';
         if (!form.experience || isNaN(form.experience) || +form.experience < 0)
             errs.experience = 'Enter valid years of experience.';
 
         if (!form.hospital.trim() || form.hospital.trim().length < 3) errs.hospital = 'Hospital / Clinic name is required.';
-        if (!form.clinicLocation.trim() || form.clinicLocation.trim().length < 5)
-            errs.clinicLocation = 'Clinic location / area is required.';
 
-        if (!form.regNumber.trim()) errs.regNumber = 'Medical Registration Number is required.';
-        else if (!regNumRe.test(form.regNumber.trim())) errs.regNumber = 'Invalid format. Use STATE-XXXXXX (e.g. MH-123456 or DL12345).';
+        if (!form.regNumber.trim()) errs.regNumber = 'Medical Registration Number is required (auto-filled by document scan).';
 
         if (!docFile) errs.docFile = 'Please upload your degree/marksheet document.';
+        else if (verificationStatus !== 'verified') errs.docFile = 'You must verify your document before proceeding.';
         if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
+        else if (!/[A-Z]/.test(form.password)) errs.password = 'Must contain an uppercase letter.';
+        else if (!/[0-9]/.test(form.password)) errs.password = 'Must contain a number.';
+        else if (!/[^A-Za-z0-9]/.test(form.password)) errs.password = 'Must contain a special character.';
         if (form.confirmPass !== form.password) errs.confirmPass = 'Passwords do not match.';
         if (!form.termsAgreed) errs.termsAgreed = 'You must accept the terms & conditions.';
 
@@ -466,9 +554,17 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
         if (Object.keys(errs).length) { setErrors(errs); return; }
 
         const payload = new FormData();
-        Object.entries({ role: 'doctor', ...form }).forEach(([k, v]) => payload.append(k, v));
+        // Use custom specialization if 'Other' was chosen
+        const finalSpecialization = form.specialization === 'Other (specify)'
+            ? form.customSpecialization.trim()
+            : form.specialization;
+        const submittedForm = { ...form, specialization: finalSpecialization };
+        Object.entries({ role: 'doctor', ...submittedForm }).forEach(([k, v]) => {
+            if (k !== 'confirmPass' && k !== 'customSpecialization') payload.append(k, v);
+        });
         if (inviteToken) payload.append('inviteToken', inviteToken);
         payload.append('document', docFile);
+        payload.append('verificationToken', verificationToken);
         onSubmit(payload);
     };
 
@@ -513,6 +609,20 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                         />
                         {errors.mobile && <span className="field-error">{errors.mobile}</span>}
                     </div>
+
+                    <div className="form-group">
+                        <label htmlFor="d-dob">Date of Birth</label>
+                        <input
+                            id="d-dob" type="date" name="dob"
+                            value={form.dob} onChange={handleChange}
+                            aria-invalid={!!errors.dob}
+                            max={new Date().toISOString().split('T')[0]}
+                        />
+                        {verificationStatus === 'verified' && form.dob && (
+                            <small style={{ color: '#27ae60', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>✅ Auto-filled from document</small>
+                        )}
+                        {errors.dob && <span className="field-error">{errors.dob}</span>}
+                    </div>
                 </div>
 
                 <hr className="reg-divider" />
@@ -520,6 +630,16 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                 {/* ── Address ── */}
                 <h3 className="reg-section-title"><span>🏥</span> Address Details</h3>
                 <div className="reg-grid">
+                    <div className="form-group full-col">
+                        <label htmlFor="d-hospital">Clinic / Hospital Name *</label>
+                        <input id="d-hospital" type="text" name="hospital"
+                            placeholder="Official name of your clinic or hospital"
+                            value={form.hospital} onChange={handleChange}
+                            aria-invalid={!!errors.hospital}
+                        />
+                        {errors.hospital && <span className="field-error">{errors.hospital}</span>}
+                    </div>
+
                     <div className="form-group full-col">
                         <label htmlFor="d-address">Clinic / Hospital Address *</label>
                         <LocationPicker
@@ -602,6 +722,18 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                             {VALID_SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                         {errors.specialization && <span className="field-error">{errors.specialization}</span>}
+                        {form.specialization === 'Other (specify)' && (
+                            <input
+                                type="text"
+                                name="customSpecialization"
+                                placeholder="Enter your specialization"
+                                value={form.customSpecialization}
+                                onChange={handleChange}
+                                style={{ marginTop: '8px' }}
+                                aria-invalid={!!errors.customSpecialization}
+                            />
+                        )}
+                        {errors.customSpecialization && <span className="field-error">{errors.customSpecialization}</span>}
                     </div>
 
                     <div className="form-group">
@@ -615,38 +747,15 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="d-hospital">Hospital / Clinic Name *</label>
-                        <input id="d-hospital" type="text" name="hospital"
-                            placeholder="Official name of your hospital or clinic"
-                            value={form.hospital} onChange={handleChange}
-                            aria-invalid={!!errors.hospital}
-                        />
-                        {errors.hospital && <span className="field-error">{errors.hospital}</span>}
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="d-clinicLocation">Clinic / Hospital Location *</label>
-                        <LocationPicker
-                            id="d-clinicLocation"
-                            placeholder="🔍 Search area, locality or landmark…"
-                            value={form.clinicLocation}
-                            error={errors.clinicLocation}
-                            onChange={val => setForm(prev => ({ ...prev, clinicLocation: val }))}
-                            onSelect={({ formatted, address }) => setForm(prev => ({
-                                ...prev,
-                                clinicLocation: address || formatted || prev.clinicLocation,
-                            }))}
-                        />
-                        {errors.clinicLocation && <span className="field-error">{errors.clinicLocation}</span>}
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="d-regNumber">Medical Reg. Number * <small style={{color:'#888'}}>(e.g. MH-123456)</small></label>
+                        <label htmlFor="d-regNumber">Medical Reg. Number * <small style={{ color: '#888' }}>(e.g. MH-123456)</small></label>
                         <input id="d-regNumber" type="text" name="regNumber"
                             placeholder="STATE-XXXXXX or XXXXXXXX"
                             value={form.regNumber} onChange={handleChange}
                             aria-invalid={!!errors.regNumber}
                         />
+                        {verificationStatus === 'verified' && form.regNumber && (
+                            <small style={{ color: '#27ae60', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>✅ Auto-filled from document</small>
+                        )}
                         {errors.regNumber && <span className="field-error">{errors.regNumber}</span>}
                     </div>
 
@@ -666,8 +775,25 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                             />
                         </div>
                         {docFile && (
-                            <p className="file-name-display">✅ Selected: {docFile.name} ({(docFile.size / 1024).toFixed(1)} KB)</p>
+                            <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <p className="file-name-display" style={{ margin: 0 }}>✅ Selected: {docFile.name} ({(docFile.size / 1024).toFixed(1)} KB)</p>
+                                {verificationStatus === 'pending' && (
+                                    <button type="button" onClick={handleVerifyDocument} className="btn-verify" style={{ padding: '6px 12px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                                        Verify with AI 🔍
+                                    </button>
+                                )}
+                                {verificationStatus === 'verifying' && (
+                                    <span style={{ color: '#e67e22', fontWeight: 'bold' }}>⏳ Analyzing Document...</span>
+                                )}
+                                {verificationStatus === 'verified' && (
+                                    <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>✅ Verified Authentic</span>
+                                )}
+                                {verificationStatus === 'rejected' && (
+                                    <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>❌ Verification Rejected</span>
+                                )}
+                            </div>
                         )}
+                        {verificationReason && <p style={{ color: '#e74c3c', marginTop: '5px', fontSize: '0.85rem', fontWeight: 600 }}>Reason: {verificationReason}</p>}
                         {errors.docFile && <span className="field-error">{errors.docFile}</span>}
                     </div>
                 </div>
@@ -702,6 +828,9 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                         {form.password && (
                             <span className="pw-hint">Strength: <strong>{strengthLabel[pwStrength]}</strong></span>
                         )}
+                        <small style={{ color: '#666', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>
+                            Must be at least 8 characters, include an uppercase letter, a number, and a special character.
+                        </small>
                         {errors.password && <span className="field-error">{errors.password}</span>}
                     </div>
 
@@ -752,7 +881,7 @@ function DoctorForm({ onSubmit, loading, initialEmail = '', inviteToken = '' }) 
                     Already have an account? <Link to="/login">Login here</Link>
                 </p>
             </div>
-        </form>
+        </form >
     );
 }
 
@@ -810,12 +939,12 @@ export default function Registration() {
             const json = await res.json();
             if (!res.ok) throw new Error(json.data?.message || 'Registration failed. Please try again.');
 
-            const msg = res.status === 200 
+            const msg = res.status === 200
                 ? '📧 Account already exists but is unverified. A new verification link has been sent!'
                 : '🎉 Registration successful! Please check your email and verify your account to log in.';
 
             handleSuccess(msg);
-            
+
             // Extract email for pre-filling login
             const email = isFormData ? data.get('email') : data.email;
             const inviteToken = isFormData ? (data.get('inviteToken') || '') : (data.inviteToken || '');

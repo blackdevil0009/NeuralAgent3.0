@@ -316,3 +316,44 @@ def send_upi_confirmation_email(to: str, name: str, upi_id: str) -> bool:
 </p>
 """
     return send_email(to, "VaidyaMed-X — UPI ID Updated", _base_template("UPI Updated", body))
+
+
+def send_profile_update_email(to: str, name: str, role: str, changed_fields: list) -> bool:
+    """Notify user that their profile was updated successfully."""
+    role_label = 'Doctor' if role == 'doctor' else ('Patient' if role == 'patient' else 'Admin')
+    greeting = f"Dr. {name}" if role == 'doctor' else name
+
+    if changed_fields:
+        fields_html = "".join(
+            f'<li style="padding:4px 0;color:#374151;">{field}</li>'
+            for field in changed_fields
+        )
+        fields_block = f"""
+<div style="background:#f0faf4;border-left:4px solid #52b788;border-radius:8px;
+            padding:14px 20px;margin:16px 0;">
+  <p style="margin:0 0 10px;font-size:0.85rem;font-weight:600;color:#1b4332;
+             text-transform:uppercase;letter-spacing:0.5px;">Updated Fields</p>
+  <ul style="margin:0;padding-left:18px;font-size:0.9rem;">
+    {fields_html}
+  </ul>
+</div>"""
+    else:
+        fields_block = ""
+
+    body = f"""
+<h2 style="margin:0 0 8px;color:#1b4332;font-size:1.3rem;">Profile Updated ✅</h2>
+<p style="margin:0 0 16px;color:#555;font-size:0.95rem;line-height:1.6;">
+  Hello <strong>{greeting}</strong>, your VaidyaMed-X <strong>{role_label}</strong> profile
+  was successfully updated.
+</p>
+{fields_block}
+<p style="margin:16px 0 0;font-size:0.85rem;color:#e74c3c;">
+  🔒 If you did not make these changes, please contact support immediately or reset your password.
+</p>
+"""
+    return send_email(
+        to,
+        "VaidyaMed-X — Profile Updated",
+        _base_template("Profile Updated", body)
+    )
+

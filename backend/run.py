@@ -13,6 +13,14 @@ import subprocess
 import atexit
 import time
 
+# Force UTF-8 output on Windows to avoid cp1252 UnicodeEncodeError with emoji
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 # ── Gevent monkey-patch MUST be first ────────────────────────
 from gevent import monkey
 monkey.patch_all()
@@ -25,7 +33,7 @@ app = create_app()
 # from app.controllers.ai_v2_controller import get_ayurveda_service
 
 def pre_warm_ai():
-    print("🏔️ AI Engine pre-warming is temporarily DISABLED for maintenance.")
+    print("AI Engine pre-warming is temporarily DISABLED for maintenance.")
     # try:
     #     service = get_ayurveda_service()
     #     service._initialize_index()
@@ -60,8 +68,8 @@ if __name__ == '__main__':
     print(f"   Debug mode  : {debug}\n")
 
     if not _is_port_available(host, port):
-        print(f"❌ Port {port} is already in use on {host}.")
-        print("   Stop the process using it or set PORT to an available port.")
+        print(f"[ERROR] Port {port} is already in use on {host}.")
+        print("   Stop the process using it or set PORT= env var to an available port.")
         sys.exit(1)
 
     http_server = WSGIServer(

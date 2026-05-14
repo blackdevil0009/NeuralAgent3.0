@@ -16,8 +16,8 @@ function ForgotPasswordModal({ onClose }) {
 
     const handleSend = async (e) => {
         e.preventDefault();
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRe.test(email)) { setErr('Please enter a valid email address.'); return; }
+        const emailRe = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+        if (!emailRe.test(email)) { setErr('Please enter a valid @gmail.com address.'); return; }
         setErr('');
         setLoading(true);
         try {
@@ -102,8 +102,8 @@ function ResendVerificationModal({ onClose, email: initialEmail }) {
     const handleResend = async (e) => {
         e.preventDefault();
         if (timer > 0) return;
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRe.test(email)) { setErr('Please enter a valid email address.'); return; }
+        const emailRe = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+        if (!emailRe.test(email)) { setErr('Please enter a valid @gmail.com address.'); return; }
         setErr('');
         setLoading(true);
         try {
@@ -226,8 +226,8 @@ export default function Login() {
     /* ── Validation ── */
     const validate = () => {
         const errs = {};
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRe.test(email)) errs.email = 'Enter a valid email address.';
+        const emailRe = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+        if (!emailRe.test(email)) errs.email = 'Enter a valid @gmail.com address.';
         if (!password) errs.password = 'Password is required.';
         else if (password.length < 8) errs.password = 'Password must be at least 8 characters.';
         return errs;

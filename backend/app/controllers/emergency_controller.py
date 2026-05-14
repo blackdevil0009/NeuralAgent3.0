@@ -58,7 +58,7 @@ def get_emergency_booking_options():
             ),
             'contact': doctor.mobile or '',
             'experience': doctor.experience or '',
-            'consultantFee': doctor.consultant_fee or 500,
+            'consultantFee': doctor.consultant_fee if doctor.consultant_fee is not None else 0,
             'activeEmergencyCount': Emergency.query.filter(
                 Emergency.doctor_id == doctor.id,
                 Emergency.status != 'resolved',

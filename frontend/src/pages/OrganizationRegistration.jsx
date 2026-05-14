@@ -248,6 +248,9 @@ export default function OrganizationRegistration() {
                                     <div style={{ height: '4px', background: '#e2e8f0', marginTop: '5px', borderRadius: '2px' }}>
                                         <div style={{ height: '100%', width: strengthWidth[pwStrength], background: strengthColor[pwStrength], borderRadius: '2px', transition: '0.3s' }} />
                                     </div>
+                                    <small style={{ color: '#666', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>
+                                        Must be at least 8 characters, include an uppercase letter, a number, and a special character.
+                                    </small>
                                 </div>
                                 <div className="form-group">
                                     <label>Confirm Password *</label>

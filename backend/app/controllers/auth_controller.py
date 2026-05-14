@@ -12,6 +12,7 @@ from datetime import datetime, timezone, timedelta
 from flask import current_app, request
 from flask_jwt_extended import create_access_token, create_refresh_token
 from marshmallow import ValidationError
+import jwt
 from sqlalchemy.exc import IntegrityError
 
 from app.middleware import get_jwt_user_id
@@ -30,6 +31,7 @@ from app.utils.validators import (PatientRegisterSchema, DoctorRegisterSchema,
                                    OrganizationRegisterSchema,
                                    LoginSchema, OtpSchema, ForgotPasswordSchema,
                                    ResetPasswordSchema)
+from app.services.document_verification_service import get_verification_service
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +179,20 @@ def register_patient(data: dict):
 
 def register_doctor(data: dict, file, invite_token: str = ''):
     """Create a doctor account with document upload and send OTP."""
+    # 1. Verify the AI Document Verification Token
+    token = data.get('verificationToken')
+    if not token:
+        return error_response('Document verification token is missing. Please verify your document first.', 400)
+    
+    try:
+        decoded = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        if decoded.get('purpose') != 'document_verification':
+            return error_response('Invalid verification token purpose.', 400)
+    except jwt.ExpiredSignatureError:
+        return error_response('Verification token expired. Please verify your document again.', 400)
+    except jwt.InvalidTokenError:
+        return error_response('Invalid verification token.', 400)
+
     if User.query.filter_by(email=data['email']).first():
         return error_response('An account with this email already exists.', 409)
 
@@ -193,6 +209,7 @@ def register_doctor(data: dict, file, invite_token: str = ''):
         role                = 'doctor',
         name                = data.get('fullName', '').strip(),
         mobile              = data.get('mobile', '').strip(),
+        dob                 = data.get('dob') or None,
         address             = data.get('address', '').strip(),
         city                = data.get('city', '').strip(),
         state               = data.get('state', '').strip(),
@@ -205,7 +222,7 @@ def register_doctor(data: dict, file, invite_token: str = ''):
         clinic_location     = data.get('clinicLocation', '').strip(),
         reg_number          = data.get('regNumber', '').strip(),
         document_path       = doc_path,
-        consultant_fee      = 500,
+        consultant_fee      = 0,
         working_hours       = 'Mon-Fri, 10AM-6PM',
         verification_status = 'pending',
         terms_agreed        = bool(data.get('termsAgreed', False)),
@@ -653,13 +670,63 @@ def toggle_2fa():
         return error_response('Invalid password.', 401)
 
     # Toggle the flag
-    user.two_fa_enabled = not user.two_fa_enabled
+    user.is_2fa_enabled = not user.is_2fa_enabled
     db.session.commit()
+    state = "enabled" if user.is_2fa_enabled else "disabled"
+    return success_response(message=f"Two-factor authentication has been {state}.")
 
-    status_str = "enabled" if user.two_fa_enabled else "disabled"
-    logger.info(f"User {user_id} {status_str} 2FA.")
+# ═══════════════════════════════════════════════════════════════
+#  AI Document Verification
+# ═══════════════════════════════════════════════════════════════
 
-    return success_response(
-        data={'two_fa_enabled': user.two_fa_enabled},
-        message=f'Two-Factor Authentication successfully {status_str}.'
+def verify_document_ocr():
+    """Verify uploaded doctor credentials using AI OCR."""
+    if 'document' not in request.files:
+        return error_response('No document file uploaded.', 400)
+    
+    file = request.files['document']
+    if not file or not file.filename:
+        return error_response('No selected file.', 400)
+
+    # Need name and degree; regNumber is optional — OCR will extract and auto-fill it
+    expected_name = request.form.get('fullName', '')
+    expected_degree = request.form.get('degree', '')
+    expected_reg_number = request.form.get('regNumber', '')  # Optional — cross-checked if provided
+    expected_dob = request.form.get('dob', '')  # Optional — verified if provided
+
+    if not expected_name or not expected_degree:
+        return error_response('Missing required fields (fullName, degree) for verification.', 400)
+
+    # Read bytes and MIME type
+    image_bytes = file.read()
+    file.seek(0) # Reset pointer so it can be saved later if needed
+    mime_type = file.content_type or 'image/jpeg'
+
+    ai_service = get_verification_service()
+    result = ai_service.verify_document(
+        image_bytes=image_bytes,
+        mime_type=mime_type,
+        expected_name=expected_name,
+        expected_degree=expected_degree,
+        expected_reg_number=expected_reg_number,
+        expected_dob=expected_dob
     )
+
+    if not result.get('is_valid', False):
+        return error_response(result.get('reason', 'Document verification failed.'), 400, errors=result.get('extracted'))
+
+    # If valid, generate a short-lived token (15 mins) to authorize the final registration
+    token_payload = {
+        'purpose': 'document_verification',
+        'expected_name': expected_name,
+        'exp': datetime.now(timezone.utc) + timedelta(minutes=15)
+    }
+    token = jwt.encode(token_payload, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
+
+    # Return the extracted DOB so the frontend can auto-fill the form field
+    extracted = result.get('extracted', {})
+    return success_response(message='Document verified successfully!', data={
+        'verification_token': token,
+        'extracted': extracted,
+        'extracted_dob': extracted.get('dob')  # frontend can auto-fill DOB
+    })

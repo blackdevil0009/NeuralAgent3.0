@@ -35,6 +35,17 @@ def validate_address(value):
         raise ValidationError('Please enter a real address.')
 
 
+def validate_password(value):
+    if len(value) < 8:
+        raise ValidationError('Password must be at least 8 characters long.')
+    if not re.search(r'[A-Z]', value):
+        raise ValidationError('Password must contain at least one uppercase letter.')
+    if not re.search(r'[0-9]', value):
+        raise ValidationError('Password must contain at least one number.')
+    if not re.search(r'[^A-Za-z0-9]', value):
+        raise ValidationError('Password must contain at least one special character.')
+
+
 # ── Patient Registration Schema ──────────────────────────────────
 class PatientRegisterSchema(Schema):
     class Meta:
@@ -50,12 +61,12 @@ class PatientRegisterSchema(Schema):
     city        = fields.Str(required=True, validate=validate.Length(min=2, max=60))
     state       = fields.Str(required=True, validate=validate.Length(min=2, max=60))
     pincode     = fields.Str(required=True, validate=validate_pin)
-    password    = fields.Str(required=True, validate=validate.Length(min=8, max=128))
+    password    = fields.Str(required=True, validate=validate_password)
     role        = fields.Str(load_default='patient')
     termsAgreed = fields.Bool(required=True)
 
     @validates('termsAgreed')
-    def must_agree(self, value):
+    def must_agree(self, value, **kwargs):
         if not value:
             raise ValidationError('You must accept the Terms & Conditions.')
 
@@ -84,19 +95,17 @@ class DoctorRegisterSchema(Schema):
     experience      = fields.Str(required=True)
     hospital        = fields.Str(required=True, validate=validate.Length(min=3, max=150))
     regNumber       = fields.Str(required=True)
-    password        = fields.Str(required=True, validate=validate.Length(min=8, max=128))
+    dob             = fields.Date(load_default=None, allow_none=True, format='%Y-%m-%d')
+    password        = fields.Str(required=True, validate=validate_password)
     role            = fields.Str(load_default='doctor')
     termsAgreed     = fields.Bool(required=True)
+    verificationToken = fields.Str(required=True)
 
     @validates('termsAgreed')
-    def must_agree(self, value):
+    def must_agree(self, value, **kwargs):
         if not value:
             raise ValidationError('You must accept the Terms & Conditions.')
 
-    @validates('regNumber')
-    def validate_reg_number(self, value):
-        if not REG_NUM_RE.match(value.strip()):
-            raise ValidationError('Invalid format. Use STATE-XXXXXX (e.g. MH-123456).')
 
     @pre_load
     def sanitize(self, data, **kwargs):
@@ -121,13 +130,13 @@ class OrganizationRegisterSchema(Schema):
     regNumber       = fields.Str(required=True, validate=validate.Length(min=2, max=50))
     hospitalType    = fields.Str(required=True,
                                  validate=validate.OneOf(['private','govt','clinic','ayurvedic']))
-    password        = fields.Str(required=True, validate=validate.Length(min=8, max=128))
+    password        = fields.Str(required=True, validate=validate_password)
     role            = fields.Str(load_default='organization')
     # FormData sends booleans as strings — handle both
     termsAgreed     = fields.Str(load_default='false')
 
     @validates('termsAgreed')
-    def must_agree(self, value):
+    def must_agree(self, value, **kwargs):
         if str(value).lower() not in ('true', '1', 'yes', 'on'):
             raise ValidationError('You must accept the Terms & Conditions.')
 
@@ -187,7 +196,7 @@ class ResetPasswordSchema(Schema):
         unknown = EXCLUDE
 
     token    = fields.Str(required=True, validate=validate.Length(min=10))
-    password = fields.Str(required=True, validate=validate.Length(min=8, max=128))
+    password = fields.Str(required=True, validate=validate_password)
 
 
 # ── Profile Update Schema (shared, role-aware) ───────────────────

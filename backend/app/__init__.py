@@ -43,6 +43,7 @@ def create_app(config_class=None) -> Flask:
     from app.routes import (auth_bp, user_bp, doctor_bp, utils_bp, appointment_bp, 
                             consultation_bp, chat_bp, v2_bp, messages_bp, reports_bp, 
                             payment_bp, ai_v2_bp, hospital_bp, hospital_emergency_bp)
+    from app.routes.wellness_routes import wellness_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(doctor_bp)
@@ -57,6 +58,7 @@ def create_app(config_class=None) -> Flask:
     app.register_blueprint(ai_v2_bp)
     app.register_blueprint(hospital_bp)
     app.register_blueprint(hospital_emergency_bp)
+    app.register_blueprint(wellness_bp)
 
     # ── JWT error callbacks ───────────────────────────────────────
     _register_jwt_callbacks(jwt)
@@ -124,13 +126,25 @@ def _init_db(app: Flask):
         from app.models.appointment      import Appointment       # noqa: F401
         from app.models.message          import Message           # noqa: F401
         from app.models.emergency        import Emergency         # noqa: F401
-        from app.models.medical_report   import MedicalReport     # noqa: F401
+        from app.models.medical_report   import (                  # noqa: F401
+            MedicalReport, ReportAnalysis, AIInsight, Prescription,
+            FileStorageLog, Consultation, ConsultationNote
+        )
         from app.models.payment_transaction import PaymentTransaction  # noqa: F401
         from app.models.hospital_invitation import HospitalInvitation  # noqa: F401
+        # Wellness AI system models
+        from app.models.wellness import (                          # noqa: F401
+            AIConversation, AIFeedback, WellnessLog,
+            WellnessScore, Reminder, Organization,
+            TenantSubscription, AIAnalytics, Subscription,
+            UserAILimit, AIUsageLog, TokenTracking,
+            CachedResponse, EnterpriseClient, Invoice
+        )
 
         db.create_all()
         _ensure_users_table_columns(app)
         _ensure_emergencies_table_columns(app)
+        _ensure_medical_reports_table_columns(app)
         app.logger.info("✅ MySQL tables verified / created.")
     except Exception as exc:
         app.logger.error(f"❌ DB init failed: {exc}")
@@ -232,6 +246,40 @@ def _ensure_emergencies_table_columns(app: Flask):
         app.logger.error(f"❌ Failed to sync emergencies table schema: {exc}")
 
 
+def _ensure_medical_reports_table_columns(app: Flask):
+    """Ensure existing report tables support the AI medical analysis module."""
+    try:
+        inspector = inspect(db.engine)
+        if 'medical_reports' not in inspector.get_table_names():
+            return
+
+        existing_cols = {column['name'] for column in inspector.get_columns('medical_reports')}
+        required_cols = {
+            'report_type': "VARCHAR(50) NULL DEFAULT 'medical_report'",
+            'storage_status': "VARCHAR(30) NOT NULL DEFAULT 'stored'",
+            'is_encrypted': 'BOOLEAN NOT NULL DEFAULT FALSE',
+            'storage_path': 'VARCHAR(500) NULL',
+            'sha256_hash': 'VARCHAR(64) NULL',
+            'extracted_text': 'LONGTEXT NULL',
+            'abnormal_json': 'LONGTEXT NULL',
+            'insights_json': 'LONGTEXT NULL',
+            'risk_level': "VARCHAR(30) NULL DEFAULT 'unknown'",
+        }
+
+        missing = [name for name in required_cols if name not in existing_cols]
+        if missing:
+            with db.engine.begin() as conn:
+                for column_name in missing:
+                    conn.execute(text(
+                        f"ALTER TABLE medical_reports ADD COLUMN {column_name} {required_cols[column_name]}"
+                    ))
+            app.logger.info(
+                f"✅ Added missing medical_reports column(s): {', '.join(missing)}"
+            )
+    except Exception as exc:
+        app.logger.error(f"❌ Failed to sync medical_reports schema: {exc}")
+
+
 def _configure_logging(app: Flask):
     log_dir    = os.path.join(os.path.dirname(__file__), '..', 'logs')
     os.makedirs(log_dir, exist_ok=True)
@@ -240,6 +288,17 @@ def _configure_logging(app: Flask):
     date_fmt   = '%Y-%m-%d %H:%M:%S'
 
     logging.basicConfig(level=level, format=fmt, datefmt=date_fmt)
+    for noisy_logger in (
+        'engineio',
+        'engineio.server',
+        'socketio',
+        'geventwebsocket',
+        'geventwebsocket.handler',
+        'httpcore',
+        'httpx',
+        'google_genai',
+    ):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
     file_handler = logging.handlers.RotatingFileHandler(
         os.path.join(log_dir, 'vaidyamed.log'),

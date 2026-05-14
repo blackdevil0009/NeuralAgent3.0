@@ -64,7 +64,7 @@ class User(db.Model):
     document_path   = db.Column(db.String(300), nullable=True)
 
     # ── Doctor: practice details ────────────────────────────────
-    consultant_fee  = db.Column(db.Integer,     nullable=True, default=500)
+    consultant_fee  = db.Column(db.Integer,     nullable=True, default=0)
     working_hours   = db.Column(db.String(100), nullable=True,
                                 default='Mon-Fri, 10AM-6PM')
 
@@ -157,8 +157,8 @@ class User(db.Model):
                 'hospital':             self.hospital or '',
                 'clinicLocation':       self.clinic_location or '' if include_sensitive else 'Book to View Address',
                 'regNumber':            self.reg_number or '',
-                'consultantFee':        self.consultant_fee or 500,
-                'fee':                  self.consultant_fee if self.consultant_fee is not None else 500,  # alias for frontend
+                'consultantFee':        self.consultant_fee if self.consultant_fee is not None else 0,
+                'fee':                  self.consultant_fee if self.consultant_fee is not None else 0,  # alias for frontend
                 'workingHours':         self.working_hours or 'Mon-Fri, 10AM-6PM',
                 'upiId':                self.upi_id or '',
                 'bankAccountName':      self.bank_account_name or '',

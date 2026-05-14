@@ -1,52 +1,41 @@
+import logging
 import os
 import sys
-import logging
 
-# Add current app to path if running standalone
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AI-Diagnostic")
 
+
 def check_env():
-    logger.info(f"Python Version: {sys.version}")
-    
+    logger.info("Python Version: %s", sys.version)
     components = {
-        "torch": "Machine Learning Core",
-        "faiss": "Vector Search (Optional)",
-        "sentence_transformers": "Embeddings",
-        "google.generativeai": "Gemini API",
-        "PyPDF2": "PDF Processing",
-        "fairseq": "BioGPT Engine"
+        "google.genai": "Gemini API",
+        "redis": "Redis cache client",
     }
-    
+
     for lib, desc in components.items():
         try:
             __import__(lib)
-            logger.info(f"✅ {lib} ({desc}) is INSTALLED")
+            logger.info("%s (%s) is installed", lib, desc)
         except ImportError:
-            logger.error(f"❌ {lib} ({desc}) is MISSING")
+            logger.error("%s (%s) is missing", lib, desc)
 
-def check_biogpt():
-    # Correct path logic: check_ai.py is in backend/app/ai/
-    # We need to go up 2 levels to get to backend/
-    biogpt_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'BioGPT-main'))
-    checkpoint_path = os.path.join(biogpt_dir, 'checkpoints', 'Pre-trained-BioGPT', 'checkpoint_last.pt')
-    
-    logger.info(f"Checking BioGPT at: {biogpt_dir}")
-    if os.path.exists(biogpt_dir):
-        logger.info("✅ BioGPT Directory Found")
+    if os.getenv("GEMINI_API_KEY"):
+        logger.info("GEMINI_API_KEY is configured server-side")
     else:
-        logger.error("❌ BioGPT Directory NOT Found")
-        
-    if os.path.exists(checkpoint_path):
-        logger.info("✅ BioGPT Checkpoints Found")
-    else:
-        logger.warning("⚠️ BioGPT Checkpoints (checkpoint_last.pt) MISSING. Model cannot run.")
+        logger.warning("GEMINI_API_KEY is not configured")
+
+    logger.info("GEMINI_MODEL=%s", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    logger.info("GEMINI_FALLBACK_MODELS=%s", os.getenv(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-2.5-flash,gemini-2.0-flash,gemini-2.5-flash-lite",
+    ))
+    logger.info("REDIS_URL configured=%s", bool(os.getenv("REDIS_URL")))
+
 
 if __name__ == "__main__":
-    print("\n--- VaidyaMed-X AI Diagnostic Tool ---")
+    print("\n--- VaidyaMedX AI Diagnostic Tool ---")
     check_env()
-    print("\n--- BioGPT Subdirectory Status ---")
-    check_biogpt()
-    print("\n--------------------------------------")
+    print("------------------------------------")

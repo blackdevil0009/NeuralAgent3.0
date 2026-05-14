@@ -17,6 +17,7 @@ from app.utils import (
     error_response,
     not_found_response,
     send_upi_confirmation_email,
+    send_profile_update_email,
 )
 from app.utils.validators import (
     PatientProfileSchema,
@@ -189,11 +190,21 @@ def update_profile():
         return error_response('No updatable fields provided.', 400)
 
     if user.role == 'doctor' and 'upi_id' in clean:
-        new_upi = (clean['upi_id'] or '').strip()
+        new_upi = (clean.get('upi_id') or '').strip()
+        # Get the bank account number from the update payload or existing record
+        new_bank_acc = (clean.get('bank_account_number') or user.bank_account_number or '').strip()
+        upi_valid_format = bool(new_upi and __import__('re').match(r'^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$', new_upi))
+
         if new_upi and new_upi != (user.upi_id or ''):
+            # UPI changed — send a separate UPI-specific confirmation email
             send_upi_confirmation_email(user.email, user.name or 'Doctor', new_upi)
+
+        if upi_valid_format and new_bank_acc:
+            # Valid UPI + bank account number present → auto-verify
+            clean['payout_verified'] = True
+        elif not new_upi:
+            # UPI was cleared → reset verification
             clean['payout_verified'] = False
-            clean['upi_verify_requested'] = False
 
     for column, value in clean.items():
         if hasattr(user, column):
@@ -201,6 +212,23 @@ def update_profile():
 
     user.updated_at = datetime.now(timezone.utc)
     db.session.commit()
+
+    # ── Send profile update notification email ────────────────
+    _FIELD_LABELS = {
+        'name': 'Full Name', 'mobile': 'Mobile Number', 'address': 'Address',
+        'city': 'City', 'state': 'State', 'pincode': 'PIN Code',
+        'degree': 'Degree', 'position': 'Position', 'specialization': 'Specialization',
+        'experience': 'Years of Experience', 'hospital': 'Hospital / Clinic',
+        'clinic_location': 'Clinic Location', 'consultant_fee': 'Consultation Fee',
+        'working_hours': 'Working Hours', 'upi_id': 'UPI ID',
+        'bank_account_name': 'Bank Account Holder', 'bank_account_number': 'Bank Account Number',
+        'bank_ifsc': 'IFSC Code',
+    }
+    changed = [_FIELD_LABELS[k] for k in clean if k in _FIELD_LABELS]
+    try:
+        send_profile_update_email(user.email, user.name or 'User', user.role, changed)
+    except Exception as mail_exc:
+        logger.warning("Profile update email failed for user_id=%s: %s", user_id, mail_exc)
 
     data = user.to_dict(include_sensitive=True)
     if user.role == 'doctor':

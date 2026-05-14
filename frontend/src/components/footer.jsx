@@ -21,7 +21,6 @@ const LINKS = {
     ],
     Contact: [
         { label: '📧 vaidyamedx@gmail.com', href: 'mailto:vaidyamedx@gmail.com' },
-        { label: '💬 8604611867', href: 'https://wa.me/918604611867' },
         { label: '💬 7052608972', href: 'https://wa.me/917052608972' },
     ]
 };
@@ -38,8 +37,13 @@ export default function Footer() {
     const [subscribed, setSubscribed] = useState(false);
 
     const scrollTo = (id) => {
-        const el = document.querySelector(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
+        if (id === '#') return;
+        try {
+            const el = document.querySelector(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        } catch (err) {
+            console.warn("Invalid selector:", id);
+        }
     };
 
     const handleSubscribe = (e) => {
@@ -119,7 +123,10 @@ export default function Footer() {
 
             {/* Bottom bar */}
             <div className="na-footer-bottom">
-                <span>© {new Date().getFullYear()} VaidyaMed-X. All rights reserved.</span>
+                <span>
+                    © {new Date().getFullYear()} VaidyaMed-X. All rights reserved. <br />
+                    <span style={{ fontSize: '0.85em', opacity: 0.8 }}>Presented by Mira Future Tech Vision Pvt Ltd</span>
+                </span>
                 <span>Made with 🌿 &amp; ❤️ in India</span>
             </div>
         </footer>

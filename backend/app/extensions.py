@@ -23,8 +23,8 @@ socketio = SocketIO(
     ping_timeout=60,
     ping_interval=25,
     allow_upgrades=True,
-    logger=True,
-    engineio_logger=True,
+    logger=False,
+    engineio_logger=False,
     always_connect=True,
     manage_session=True
 )

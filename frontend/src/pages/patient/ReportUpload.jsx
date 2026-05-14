@@ -6,6 +6,8 @@ export default function ReportUpload() {
     const [reports, setReports]         = useState([]);
     const [dragOver, setDragOver]       = useState(false);
     const [uploading, setUploading]     = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [pendingFiles, setPendingFiles] = useState([]);
     const [analysing, setAnalysing]     = useState(null);  // ID of report being analysed
     const [selected, setSelected]       = useState(null);
     const [showResult, setShowResult]   = useState(false);
@@ -34,37 +36,81 @@ export default function ReportUpload() {
     useEffect(() => { fetchReports(); }, []);
 
     // ── Upload ────────────────────────────────────────────────────
-    const handleFiles = async (files) => {
-        const file = files[0];
-        if (!file) return;
+    const handleFiles = (files) => {
+        const incoming = Array.from(files || []);
+        if (!incoming.length) return;
 
         const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-        if (!allowed.includes(file.type)) { alert('Only PDF, JPG, PNG allowed.'); return; }
-        if (file.size > 20 * 1024 * 1024) { alert('File must be under 20 MB.'); return; }
+        const valid = [];
+        for (const file of incoming) {
+            if (!allowed.includes(file.type)) {
+                alert(`${file.name} is not supported. Only PDF, JPG, JPEG, and PNG are allowed.`);
+                continue;
+            }
+            if (file.size > 20 * 1024 * 1024) {
+                alert(`${file.name} must be under 20 MB.`);
+                continue;
+            }
+            valid.push({
+                file,
+                id: `${file.name}-${file.size}-${file.lastModified}`,
+                previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+            });
+        }
+        setPendingFiles(prev => [...prev, ...valid]);
+        if (fileRef.current) fileRef.current.value = '';
+    };
+
+    const clearPendingFile = (id) => {
+        setPendingFiles(prev => {
+            const target = prev.find(item => item.id === id);
+            if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+            return prev.filter(item => item.id !== id);
+        });
+    };
+
+    const uploadPendingFiles = async () => {
+        if (!pendingFiles.length) return;
 
         setUploading(true);
+        setUploadProgress(0);
         try {
             const formData = new FormData();
-            formData.append('file', file);
-            formData.append('displayName', file.name.replace(/\.[^.]+$/, ''));
-
-            const res  = await fetch(`${API_BASE_URL}/api/reports`, {
-                method:  'POST',
-                headers: { 'Authorization': `Bearer ${token()}` },
-                body:    formData
-            });
-            const json = await res.json();
-            if (res.ok) {
-                await fetchReports();
-            } else {
-                alert(json.data?.error || json.error || 'Upload failed');
+            pendingFiles.forEach(item => formData.append('files', item.file));
+            if (pendingFiles.length === 1) {
+                formData.append('displayName', pendingFiles[0].file.name.replace(/\.[^.]+$/, ''));
             }
+
+            await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `${API_BASE_URL}/api/reports`);
+                xhr.setRequestHeader('Authorization', `Bearer ${token()}`);
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+                    }
+                };
+                xhr.onload = () => {
+                    try {
+                        const payload = JSON.parse(xhr.responseText || '{}');
+                        if (xhr.status >= 200 && xhr.status < 300) resolve(payload);
+                        else reject(new Error(payload.data?.message || payload.error || 'Upload failed'));
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Upload failed'));
+                xhr.send(formData);
+            });
+
+            pendingFiles.forEach(item => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
+            setPendingFiles([]);
+            await fetchReports();
         } catch (err) {
             handleError(err, 'Upload failed');
         } finally {
             setUploading(false);
-            // Reset file input so same file can be re-uploaded
-            if (fileRef.current) fileRef.current.value = '';
+            setUploadProgress(0);
         }
     };
 
@@ -217,9 +263,60 @@ export default function ReportUpload() {
                     type="file"
                     className="pd-upload-file-input"
                     accept=".pdf,.jpg,.jpeg,.png"
+                    multiple
                     onChange={e => handleFiles(e.target.files)}
                 />
             </div>
+
+            {uploading && (
+                <div className="pd-card" style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#166534', fontWeight: 600 }}>
+                        <span>Secure upload in progress</span>
+                        <span>{uploadProgress}%</span>
+                    </div>
+                    <div style={{ height: 10, background: '#e5efe9', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#166534', borderRadius: 99, transition: 'width 180ms ease' }} />
+                    </div>
+                </div>
+            )}
+
+            {pendingFiles.length > 0 && (
+                <div className="pd-card" style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+                        <div>
+                            <h3 className="pd-section-title" style={{ margin: 0 }}>Ready to Upload</h3>
+                            <p style={{ color: '#789', fontSize: '0.85rem', marginTop: 4 }}>
+                                Preview selected reports before secure storage and AI analysis.
+                            </p>
+                        </div>
+                        <button className="pd-btn pd-btn-primary" onClick={uploadPendingFiles} disabled={uploading}>
+                            Upload {pendingFiles.length} file{pendingFiles.length > 1 ? 's' : ''}
+                        </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+                        {pendingFiles.map(item => (
+                            <div key={item.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#fbfefc' }}>
+                                {item.previewUrl ? (
+                                    <img src={item.previewUrl} alt="" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, marginBottom: 10 }} />
+                                ) : (
+                                    <div style={{ height: 120, borderRadius: 8, background: '#edf7f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#166534', fontWeight: 700, marginBottom: 10 }}>
+                                        PDF
+                                    </div>
+                                )}
+                                <div style={{ fontWeight: 600, color: '#214d34', wordBreak: 'break-word' }}>{item.file.name}</div>
+                                <div style={{ fontSize: '0.78rem', color: '#789', marginTop: 4 }}>{(item.file.size / (1024 * 1024)).toFixed(2)} MB</div>
+                                <button
+                                    className="pd-btn pd-btn-sm"
+                                    style={{ marginTop: 10, background: '#fff5f5', color: '#b42318', border: '1px solid #fecaca' }}
+                                    onClick={() => clearPendingFile(item.id)}
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* ── Reports Table ── */}
             <div className="pd-card">
