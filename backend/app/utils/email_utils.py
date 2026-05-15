@@ -357,3 +357,26 @@ def send_profile_update_email(to: str, name: str, role: str, changed_fields: lis
         _base_template("Profile Updated", body)
     )
 
+
+def send_subscription_confirmation_email(to: str) -> bool:
+    """Send confirmation email for newsletter subscription."""
+    body = f"""
+<h2 style="margin:0 0 8px;color:#1b4332;font-size:1.3rem;">You're Subscribed! 🎉</h2>
+<p style="margin:0 0 16px;color:#555;font-size:0.95rem;line-height:1.6;">
+  Hello! Thank you for subscribing to VaidyaMed-X updates.
+</p>
+<div style="background:#f0faf4;border-left:4px solid #52b788;border-radius:8px;
+            padding:14px 20px;margin:16px 0;">
+  <p style="margin:0;font-size:0.9rem;color:#1b4332;line-height:1.6;">
+    🌿 You'll now receive the latest Ayurvedic health tips, product updates, and news straight to your inbox.
+  </p>
+</div>
+<p style="margin:16px 0 0;font-size:0.85rem;color:#888;">
+  Stay healthy!
+</p>
+"""
+    return send_email(
+        to,
+        "Welcome to VaidyaMed-X Updates 🌿",
+        _base_template("Subscribed", body)
+    )

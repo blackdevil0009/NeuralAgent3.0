@@ -48,6 +48,7 @@ def create_app(config_class=None) -> Flask:
                             consultation_bp, chat_bp, v2_bp, messages_bp, reports_bp, 
                             payment_bp, ai_v2_bp, hospital_bp, hospital_emergency_bp)
     from app.routes.wellness_routes import wellness_bp
+    from app.routes.subscription_routes import subscription_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(doctor_bp)
@@ -63,6 +64,7 @@ def create_app(config_class=None) -> Flask:
     app.register_blueprint(hospital_bp)
     app.register_blueprint(hospital_emergency_bp)
     app.register_blueprint(wellness_bp)
+    app.register_blueprint(subscription_bp, url_prefix='/api')
 
     # ── JWT error callbacks ───────────────────────────────────────
     _register_jwt_callbacks(jwt)

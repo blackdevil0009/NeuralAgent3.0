@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/config';
 
 const LINKS = {
     Platform: [
@@ -35,6 +36,8 @@ const SOCIALS = [
 export default function Footer() {
     const [email, setEmail] = useState('');
     const [subscribed, setSubscribed] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     const scrollTo = (id) => {
         if (id === '#') return;
@@ -46,11 +49,34 @@ export default function Footer() {
         }
     };
 
-    const handleSubscribe = (e) => {
+    const handleSubscribe = async (e) => {
         e.preventDefault();
+        setError(null);
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            setSubscribed(true);
-            setEmail('');
+            setLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/subscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    setSubscribed(true);
+                    setEmail('');
+                } else {
+                    setError(data.error || 'Failed to subscribe. Please try again.');
+                }
+            } catch (err) {
+                console.error('Subscription error:', err);
+                setError('Network error. Please try again later.');
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            setError('Please enter a valid email address.');
         }
     };
 
@@ -112,12 +138,16 @@ export default function Footer() {
                         <form className="na-newsletter-form" onSubmit={handleSubscribe}>
                             <input
                                 type="email" placeholder="your@email.com"
-                                value={email} onChange={e => setEmail(e.target.value)}
+                                value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
                                 className="na-newsletter-input"
+                                disabled={loading}
                             />
-                            <button type="submit" className="na-newsletter-btn">Subscribe</button>
+                            <button type="submit" className="na-newsletter-btn" disabled={loading}>
+                                {loading ? 'Subscribing...' : 'Subscribe'}
+                            </button>
                         </form>
                     )}
+                    {error && <div className="na-newsletter-error" style={{ color: '#ff4d4d', fontSize: '0.85rem', marginTop: '8px' }}>{error}</div>}
                 </div>
             </div>
 
