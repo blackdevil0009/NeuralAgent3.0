@@ -101,6 +101,21 @@ class User(db.Model):
     two_fa_enabled = db.Column(db.Boolean, nullable=False, default=False)
     two_fa_secret  = db.Column(db.String(64),  nullable=True, default='')
 
+    # ── Referral System ─────────────────────────────────────────
+    referral_code    = db.Column(db.String(20), nullable=True, unique=True)
+    referred_by_id   = db.Column(db.Integer,    nullable=True)
+    referrals_count  = db.Column(db.Integer,    nullable=False, default=0)
+    referral_rewards = db.Column(db.Integer,    nullable=False, default=0)
+
+    # ── Gamification System ─────────────────────────────────────
+    pop_coin_balance  = db.Column(db.Integer,    nullable=False, default=0)
+    achievement_level = db.Column(db.String(50), nullable=False, default='Beginner')
+
+    # ── Profile Relationships (Partitioned Tables) ─────────────
+    patient_profile      = db.relationship('PatientProfile', backref='user', uselist=False, cascade='all, delete-orphan')
+    doctor_profile       = db.relationship('DoctorProfile', backref='user', uselist=False, cascade='all, delete-orphan')
+    organization_profile = db.relationship('OrganizationProfile', backref='user', uselist=False, cascade='all, delete-orphan')
+
     # ── Timestamps ─────────────────────────────────────────────
     created_at = db.Column(db.DateTime(timezone=True), nullable=False,
                            default=lambda: datetime.now(timezone.utc))
@@ -141,6 +156,11 @@ class User(db.Model):
             'is_active':            self.is_active,
             'is_email_verified':    self.is_email_verified,
             'two_fa_enabled':       self.two_fa_enabled,
+            'referral_code':        self.referral_code or '',
+            'referrals_count':      self.referrals_count,
+            'referral_rewards':     self.referral_rewards,
+            'pop_coin_balance':     self.pop_coin_balance,
+            'achievement_level':    self.achievement_level,
             'created_at':           self.created_at.isoformat() if self.created_at else None,
             'updated_at':           self.updated_at.isoformat() if self.updated_at else None,
             'last_login':           self.last_login.isoformat() if self.last_login else None,
@@ -165,6 +185,9 @@ class User(db.Model):
                 'bankAccountNumber':    self.bank_account_number or '',
                 'bankIfsc':             self.bank_ifsc or '',
                 'payoutVerified':       self.payout_verified,
+                'payout_verified':      self.payout_verified,
+                'upiVerifyRequested':   self.upi_verify_requested,
+                'upi_verify_requested': self.upi_verify_requested,
                 'verificationStatus':   self.verification_status or 'pending',
                 'hospitalId':           self.hospital_id,
                 'isVerified':           self.is_verified,

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../../utils/config';
 
 const QUICK_PROMPTS = [
@@ -118,6 +119,8 @@ export default function AIAssistant() {
     const scanVideoRef = useRef(null);
     const streamRef = useRef(null);
     const scanStreamRef = useRef(null);
+    const socketRef = useRef(null);
+    const frameIntervalRef = useRef(null);
 
     const token = () => localStorage.getItem('token') || sessionStorage.getItem('token');
 
@@ -214,6 +217,14 @@ export default function AIAssistant() {
         if (!msg) return;
 
         setInput('');
+
+        if (callActive && socketRef.current) {
+            addMessage('user', msg);
+            socketRef.current.emit("chat_message", msg);
+            setTyping(true);
+            return;
+        }
+
         addMessage('user', msg);
         setTyping(true);
 
@@ -314,6 +325,91 @@ export default function AIAssistant() {
             setMicOn(true);
             setCallStatus('AI doctor online');
             playLocalTTS('AI doctor video consultation started. Tell me your symptoms or upload a report scan.');
+
+            if (!socketRef.current) {
+                const s = io(API_BASE_URL, { auth: { token: token() } });
+                socketRef.current = s;
+
+                s.on("connect", () => {
+                    setCallStatus('Vaidya Voice AI Connected');
+                    s.emit("Vaidya_Connected", {
+                        token: token(),
+                        patientData: {
+                            status: "Active Video Consult",
+                            source: "VaidyaMed-X Frontend"
+                        }
+                    });
+
+                    if (frameIntervalRef.current) clearInterval(frameIntervalRef.current);
+                    frameIntervalRef.current = setInterval(() => {
+                        if (localVideoRef.current && socketRef.current) {
+                            const canvas = document.createElement("canvas");
+                            canvas.width = 640;
+                            canvas.height = 480;
+                            const ctx = canvas.getContext("2d");
+                            ctx.drawImage(localVideoRef.current, 0, 0, canvas.width, canvas.height);
+                            const base64Frame = canvas.toDataURL("image/jpeg", 0.5);
+                            socketRef.current.emit("camera_frame", base64Frame);
+                        }
+                    }, 2000);
+                });
+
+                s.on("system_status", (msg) => {
+                    if (msg.includes("Connected")) setCallStatus('Vaidya Voice AI Connected');
+                    else if (msg.includes("Disconnected")) setCallStatus('Voice AI Offline');
+                    else setCallStatus(msg);
+                });
+
+                s.on("transcript_chunk", (msg) => {
+                    if (msg.role === 'AGENT') {
+                        setIsSpeaking(true);
+                        setTyping(false);
+                    }
+
+                    setMessages(prev => {
+                        const lastMsg = prev[prev.length - 1];
+                        if (lastMsg && lastMsg.isLiveVoice && lastMsg.from === (msg.role === 'USER' ? 'user' : 'ai') && !lastMsg.finalized) {
+                            return prev.map((m, i) => i === prev.length - 1 ? { ...m, text: m.text + msg.text } : m);
+                        } else {
+                            const newMsg = {
+                                id: Date.now() + Math.random(),
+                                from: msg.role === 'USER' ? 'user' : 'ai',
+                                text: msg.text,
+                                time: nowTime(),
+                                isLiveVoice: true,
+                                finalized: false
+                            };
+                            return [...prev, newMsg];
+                        }
+                    });
+                });
+
+                s.on("ai_thinking", () => {
+                    setIsSpeaking(false);
+                    setTyping(true);
+                });
+
+                s.on("turn_complete", () => {
+                    setIsSpeaking(false);
+                    setTyping(false);
+                    setMessages(prev => {
+                        const lastMsg = prev[prev.length - 1];
+                        if (lastMsg && lastMsg.isLiveVoice) {
+                            return prev.map((m, i) => i === prev.length - 1 ? { ...m, finalized: true } : m);
+                        }
+                        return prev;
+                    });
+                });
+
+                s.on("disconnect", () => {
+                    setCallStatus('Voice AI Disconnected');
+                    setIsSpeaking(false);
+                    setTyping(false);
+                });
+            } else {
+                socketRef.current.connect();
+                socketRef.current.emit("Vaidya_Connected", { token: token() });
+            }
         } catch (err) {
             console.error('Camera error:', err);
             setCallStatus('Camera unavailable. Chat consult is still active.');
@@ -331,6 +427,18 @@ export default function AIAssistant() {
         setCallStatus('Ready for AI video consult');
         window.speechSynthesis?.cancel();
         setIsSpeaking(false);
+        setTyping(false);
+
+        if (frameIntervalRef.current) {
+            clearInterval(frameIntervalRef.current);
+            frameIntervalRef.current = null;
+        }
+
+        if (socketRef.current) {
+            socketRef.current.emit("Vaidya_Disconnected", "Disconnected");
+            socketRef.current.disconnect();
+            socketRef.current = null;
+        }
     };
 
     const processReportFile = async (file) => {
@@ -388,7 +496,14 @@ export default function AIAssistant() {
             setMessages(prev => prev.map(m => (
                 m.id === progressMsg.id ? { ...m, text: reply } : m
             )));
-            playLocalTTS(reply);
+
+            if (callActive && socketRef.current) {
+                const prompt = `System Notification: The patient just scanned/uploaded a medical report named '${file.name}'. Here is the analysis and OCR text:\n\n${reply}\n\nPlease read and summarize the critical findings out loud and guide the patient accordingly.`;
+                socketRef.current.emit("chat_message", prompt);
+                setTyping(true);
+            } else {
+                playLocalTTS(reply);
+            }
         } catch (err) {
             console.error('Report analysis error:', err);
             setMessages(prev => prev.map(m => (
@@ -490,12 +605,32 @@ export default function AIAssistant() {
                 <div className="ai-video-consult">
                     <div className="ai-video-main">
                         <div className="ai-doctor-screen">
-                            <div className={`ai-doctor-face ${isSpeaking ? 'talking' : ''}`}>
-                                <span className="ai-doctor-face-cross">+</span>
+                            <div className={`ai-doctor-orb-container ${callActive ? 'active' : ''}`}>
+                                <div className={`ai-doctor-orb ${isSpeaking ? 'speaking' : typing ? 'thinking' : 'listening'}`}>
+                                    {isSpeaking && (
+                                        <div className="ai-equalizer">
+                                            <span className="eq-bar bar1"></span>
+                                            <span className="eq-bar bar2"></span>
+                                            <span className="eq-bar bar3"></span>
+                                            <span className="eq-bar bar4"></span>
+                                            <span className="eq-bar bar5"></span>
+                                        </div>
+                                    )}
+                                    {typing && (
+                                        <div className="ai-thinking-waves">
+                                            <span className="wave wave1"></span>
+                                            <span className="wave wave2"></span>
+                                        </div>
+                                    )}
+                                    {!isSpeaking && !typing && (
+                                        <div className="ai-listening-pulse"></div>
+                                    )}
+                                </div>
+                                <div className="ai-orb-glow"></div>
                             </div>
                             <div>
-                                <strong>AI Doctor</strong>
-                                <span>{callStatus}</span>
+                                <strong className="ai-doctor-name">Dr. Vaidya AI</strong>
+                                <span className="ai-call-status-badge">{callStatus}</span>
                             </div>
                         </div>
                         <div className="ai-video-timer">{callTime}</div>
@@ -521,10 +656,25 @@ export default function AIAssistant() {
             <div className="pd-chat-messages ai-doctor-messages">
                 {messages.map(m => (
                     <div key={m.id} className={`pd-bubble-wrap ${m.from}`}>
-                        <div
-                            className={`pd-bubble ${m.from}`}
-                            dangerouslySetInnerHTML={{ __html: formatText(m.text) }}
-                        />
+                        <div className="pd-chat-avatar-row">
+                            {m.from === 'ai' && (
+                                <div className={`ai-chat-bubble-avatar ${isSpeaking && m.id === messages[messages.length - 1]?.id ? 'speaking' : ''}`}>
+                                    {isSpeaking && m.id === messages[messages.length - 1]?.id ? (
+                                        <div className="mini-eq">
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                        </div>
+                                    ) : (
+                                        <span className="mini-cross">+</span>
+                                    )}
+                                </div>
+                            )}
+                            <div
+                                className={`pd-bubble ${m.from}`}
+                                dangerouslySetInnerHTML={{ __html: formatText(m.text) }}
+                            />
+                        </div>
                         <div className="ai-message-time">{m.time}</div>
                     </div>
                 ))}
@@ -729,19 +879,117 @@ export default function AIAssistant() {
                     font-size: 0.82rem;
                     margin-top: 4px;
                 }
-                .ai-doctor-face {
-                    width: 74px;
-                    height: 74px;
-                    border-radius: 50%;
-                    background: #d8f3dc;
-                    color: #14532d;
+                /* Neural AI Orb & Equalizer Styles */
+                .ai-doctor-orb-container {
+                    position: relative;
+                    width: 90px;
+                    height: 90px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    box-shadow: 0 0 0 12px rgba(183, 228, 199, 0.12);
+                    margin-bottom: 4px;
                 }
-                .ai-doctor-face.talking {
-                    animation: aiTalk 900ms ease-in-out infinite;
+                .ai-doctor-orb {
+                    width: 74px;
+                    height: 74px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                    z-index: 2;
+                    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                    overflow: hidden;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                }
+                .ai-doctor-orb.listening {
+                    background: linear-gradient(135deg, #34d399, #059669);
+                    border: 2px solid rgba(255, 255, 255, 0.4);
+                    animation: orbBreathe 2.4s ease-in-out infinite;
+                }
+                .ai-doctor-orb.thinking {
+                    background: linear-gradient(135deg, #818cf8, #4f46e5, #c084fc);
+                    background-size: 200% 200%;
+                    border: 2px solid rgba(255, 255, 255, 0.5);
+                    animation: orbSpinGradient 3s linear infinite, orbBreathe 1.6s ease-in-out infinite;
+                }
+                .ai-doctor-orb.speaking {
+                    background: linear-gradient(135deg, #f472b6, #ec4899, #8b5cf6, #3b82f6);
+                    background-size: 300% 300%;
+                    border: 2px solid rgba(255, 255, 255, 0.6);
+                    box-shadow: 0 0 24px rgba(236, 72, 153, 0.5);
+                    animation: orbSpeakGradient 2s ease infinite alternate;
+                    transform: scale(1.08);
+                }
+                .ai-orb-glow {
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 50%;
+                    background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+                    z-index: 1;
+                    transition: all 0.5s ease;
+                }
+                .speaking + .ai-orb-glow {
+                    background: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, transparent 70%);
+                    animation: orbGlowPulse 1.2s ease-in-out infinite alternate;
+                }
+                .thinking + .ai-orb-glow {
+                    background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
+                }
+                .ai-listening-pulse {
+                    position: absolute;
+                    inset: 0;
+                    border-radius: 50%;
+                    border: 2px solid rgba(16, 185, 129, 0.6);
+                    animation: ripple 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+                }
+                .ai-thinking-waves .wave {
+                    position: absolute;
+                    border: 2px solid rgba(139, 92, 246, 0.6);
+                    border-radius: 50%;
+                    inset: 0;
+                    animation: ripple 1.6s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+                }
+                .ai-thinking-waves .wave2 {
+                    animation-delay: 0.6s;
+                }
+                .ai-equalizer {
+                    display: flex;
+                    align-items: flex-end;
+                    justify-content: center;
+                    gap: 3px;
+                    height: 24px;
+                }
+                .eq-bar {
+                    width: 3px;
+                    background: #fff;
+                    border-radius: 2px;
+                    height: 100%;
+                    transform-origin: bottom;
+                    animation: eqGrow 1.2s ease-in-out infinite alternate;
+                }
+                .bar1 { height: 40%; animation-delay: 0.1s; }
+                .bar2 { height: 80%; animation-delay: 0.3s; }
+                .bar3 { height: 100%; animation-delay: 0.5s; }
+                .bar4 { height: 60%; animation-delay: 0.2s; }
+                .bar5 { height: 30%; animation-delay: 0.4s; }
+
+                .ai-doctor-name {
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                    color: #fff;
+                    letter-spacing: 0.5px;
+                }
+                .ai-call-status-badge {
+                    display: inline-block !important;
+                    background: rgba(16, 185, 129, 0.15);
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    color: #34d399 !important;
+                    font-size: 0.78rem !important;
+                    font-weight: 600;
+                    padding: 3px 10px;
+                    border-radius: 12px;
+                    margin-top: 6px !important;
                 }
                 .ai-video-timer {
                     position: absolute;
@@ -813,6 +1061,85 @@ export default function AIAssistant() {
                     color: #fff;
                     background: #dc2626;
                     border-color: #dc2626;
+                }
+
+                /* Premium Chat Avatar Row & Elements */
+                .pd-chat-avatar-row {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
+                    width: 100%;
+                }
+                .ai-chat-bubble-avatar {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, #10b981, #059669);
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                    font-weight: bold;
+                    position: relative;
+                    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+                    border: 1.5px solid rgba(255, 255, 255, 0.8);
+                }
+                .ai-chat-bubble-avatar.speaking {
+                    background: linear-gradient(135deg, #ec4899, #8b5cf6);
+                    box-shadow: 0 2px 10px rgba(236, 72, 153, 0.4);
+                }
+                .mini-cross {
+                    font-size: 1.2rem;
+                    line-height: 1;
+                }
+                .mini-eq {
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 2.5px;
+                    height: 14px;
+                }
+                .mini-eq span {
+                    display: block;
+                    width: 2.5px;
+                    height: 100%;
+                    background: #fff;
+                    border-radius: 1px;
+                    animation: miniEqAnim 0.8s ease-in-out infinite alternate;
+                }
+                .mini-eq span:nth-child(1) { animation-delay: 0.15s; height: 50%; }
+                .mini-eq span:nth-child(2) { animation-delay: 0.35s; height: 100%; }
+                .mini-eq span:nth-child(3) { animation-delay: 0.55s; height: 35%; }
+
+                /* Keyframe Animations */
+                @keyframes orbBreathe {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                @keyframes orbSpinGradient {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+                @keyframes orbSpeakGradient {
+                    0% { background-position: 0% 50%; transform: scale(1.05); }
+                    100% { background-position: 100% 50%; transform: scale(1.12); }
+                }
+                @keyframes orbGlowPulse {
+                    0% { transform: scale(0.9); opacity: 0.4; }
+                    100% { transform: scale(1.15); opacity: 0.8; }
+                }
+                @keyframes ripple {
+                    0% { transform: scale(0.95); opacity: 0.8; }
+                    100% { transform: scale(1.4); opacity: 0; }
+                }
+                @keyframes eqGrow {
+                    0% { transform: scaleY(0.2); }
+                    100% { transform: scaleY(1); }
+                }
+                @keyframes miniEqAnim {
+                    0% { transform: scaleY(0.2); }
+                    100% { transform: scaleY(1); }
                 }
                 .ai-doctor-messages {
                     flex: 1;

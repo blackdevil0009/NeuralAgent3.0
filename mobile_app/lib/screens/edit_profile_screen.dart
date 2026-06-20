@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/vx_text_field.dart';
 import '../widgets/vx_widgets.dart';
@@ -32,20 +34,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: widget.user['name'] ?? '');
-    _phoneCtrl = TextEditingController(text: widget.user['mobile'] ?? '');
-    _dobCtrl = TextEditingController(text: widget.user['dob'] ?? '');
-    _addressCtrl = TextEditingController(text: widget.user['address'] ?? '');
-    _cityCtrl = TextEditingController(text: widget.user['city'] ?? '');
-    _stateCtrl = TextEditingController(text: widget.user['state'] ?? '');
-    _pinCtrl = TextEditingController(text: widget.user['pin'] ?? widget.user['pincode'] ?? '');
-    _allergiesCtrl = TextEditingController(text: widget.user['allergies'] ?? '');
-    _conditionsCtrl = TextEditingController(text: widget.user['conditions'] ?? '');
-    _medicationsCtrl = TextEditingController(text: widget.user['medications'] ?? '');
+    _nameCtrl = TextEditingController(text: widget.user['name']?.toString() ?? '');
+    _phoneCtrl = TextEditingController(text: widget.user['mobile']?.toString() ?? '');
+    _dobCtrl = TextEditingController(text: widget.user['dob']?.toString() ?? '');
+    _addressCtrl = TextEditingController(text: widget.user['address']?.toString() ?? '');
+    _cityCtrl = TextEditingController(text: widget.user['city']?.toString() ?? '');
+    _stateCtrl = TextEditingController(text: widget.user['state']?.toString() ?? '');
+    _pinCtrl = TextEditingController(text: (widget.user['pin'] ?? widget.user['pincode'])?.toString() ?? '');
+    _allergiesCtrl = TextEditingController(text: widget.user['allergies']?.toString() ?? '');
+    _conditionsCtrl = TextEditingController(text: widget.user['conditions']?.toString() ?? '');
+    _medicationsCtrl = TextEditingController(text: widget.user['medications']?.toString() ?? '');
 
-    _gender = widget.user['gender'] ?? 'Prefer not to say';
-    _bloodGroup = widget.user['bloodGroup'] ?? 'Unknown';
-    _dosha = widget.user['dosha'] ?? 'Not assessed';
+    _gender = _matchItem(['Prefer not to say', 'Male', 'Female', 'Other'], widget.user['gender']?.toString());
+    _bloodGroup = _matchItem(['Unknown', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'], widget.user['bloodGroup']?.toString());
+    _dosha = _matchItem(['Not assessed', 'Vata', 'Pitta', 'Kapha', 'Vata-Pitta', 'Pitta-Kapha', 'Vata-Kapha', 'Tridoshic'], widget.user['dosha']?.toString());
+  }
+
+  String _matchItem(List<String> items, String? val) {
+    if (val == null || val.isEmpty) return items.first;
+    final lowerVal = val.toLowerCase();
+    for (final item in items) {
+      if (item.toLowerCase() == lowerVal) return item;
+    }
+    return items.first;
   }
 
   @override
@@ -59,26 +70,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _saveProfile() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1)); // Mock save
-    if (!mounted) return;
     
-    // Return mock updated data
-    Navigator.of(context).pop({
-      ...widget.user,
+    String rawMobile = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+    if (rawMobile.length > 10 && rawMobile.startsWith('91')) {
+      rawMobile = rawMobile.substring(2);
+    }
+    
+    final payload = {
       'name': _nameCtrl.text,
-      'mobile': _phoneCtrl.text,
-      'dob': _dobCtrl.text,
+      'mobile': rawMobile,
       'address': _addressCtrl.text,
       'city': _cityCtrl.text,
       'state': _stateCtrl.text,
-      'pin': _pinCtrl.text,
+      'pin': _pinCtrl.text.replaceAll(RegExp(r'\D'), ''),
       'allergies': _allergiesCtrl.text,
       'conditions': _conditionsCtrl.text,
       'medications': _medicationsCtrl.text,
-      'gender': _gender,
       'bloodGroup': _bloodGroup,
       'dosha': _dosha,
-    });
+    };
+
+    try {
+      final res = await ApiClient.put(ApiConfig.profile, payload);
+      
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (res.ok && res.data != null) {
+        final updatedData = res.data!['data'] as Map<String, dynamic>?;
+        if (updatedData != null) {
+          // Keep local state merged with new backend state
+          final newUser = {...widget.user, ...updatedData};
+          await AuthService.saveUser(newUser);
+          
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully'), backgroundColor: AppColors.primaryGreen));
+          Navigator.of(context).pop(newUser);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.error ?? 'Failed to update profile'), backgroundColor: AppColors.errorRed));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connection error'), backgroundColor: AppColors.errorRed));
+    }
   }
 
   @override
@@ -100,7 +136,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _buildSection('👤 Personal Information', [
               VxTextField(label: 'Full Name', hint: 'Your full name', icon: Icons.person_outline, controller: _nameCtrl),
               const SizedBox(height: 12),
-              VxTextField(label: 'Email', hint: 'Email', icon: Icons.email_outlined, controller: TextEditingController(text: widget.user['email']), readOnly: true),
+              VxTextField(label: 'Email', hint: 'Email', icon: Icons.email_outlined, controller: TextEditingController(text: widget.user['email']?.toString() ?? ''), readOnly: true),
               const SizedBox(height: 12),
               VxTextField(label: 'Mobile', hint: '+91 XXXXX XXXXX', icon: Icons.phone_outlined, controller: _phoneCtrl),
               const SizedBox(height: 12),
@@ -164,13 +200,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _buildDropdown(String label, List<String> items, String? value, ValueChanged<String?> onChanged) {
+    String safeValue = items.first;
+    if (value != null && value.isNotEmpty) {
+      final lower = value.toLowerCase();
+      for (final item in items) {
+        if (item.toLowerCase() == lower) {
+          safeValue = item;
+          break;
+        }
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label.toUpperCase(), style: AppTextStyles.label),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: items.contains(value) ? value : items.first,
+          value: safeValue,
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontFamily: 'Poppins', fontSize: 13)))).toList(),
           onChanged: onChanged,
           decoration: InputDecoration(

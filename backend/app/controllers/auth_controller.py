@@ -7,6 +7,8 @@ All DB operations use SQLAlchemy ORM via Flask-SQLAlchemy.
 import os
 import logging
 import bcrypt
+import random
+import string
 from datetime import datetime, timezone, timedelta
 
 from flask import current_app, request
@@ -144,6 +146,19 @@ def register_patient(data: dict):
     if User.query.filter_by(email=data['email']).first():
         return error_response('An account with this email already exists.', 409)
 
+    # Resolve referrer if referralCode provided
+    referred_by_id = None
+    if data.get('referralCode'):
+        referrer = User.query.filter_by(referral_code=data['referralCode'].strip().upper()).first()
+        if referrer:
+            referred_by_id = referrer.id
+
+    # Generate unique referral code
+    new_referral_code = 'VMX-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    # Simple deduplication attempt
+    while User.query.filter_by(referral_code=new_referral_code).first():
+        new_referral_code = 'VMX-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
     user = User(
         email             = data['email'],
         password_hash     = _hash_password(data['password']),
@@ -158,6 +173,8 @@ def register_patient(data: dict):
         pincode           = data.get('pincode', '').strip(),
         terms_agreed      = bool(data.get('termsAgreed', False)),
         is_email_verified = False,
+        referral_code     = new_referral_code,
+        referred_by_id    = referred_by_id,
     )
     try:
         db.session.add(user)
@@ -367,6 +384,27 @@ def login():
         data = _login_schema.load(request.get_json(force=True, silent=True) or {})
     except ValidationError as err:
         return error_response('Validation failed', 422, err.messages)
+
+    # 1. Env-based Admin Login Override
+    admin_email = current_app.config.get('ADMIN_EMAIL', 'admin@vaidyamedx.in')
+    admin_key   = current_app.config.get('ADMIN_LOGIN_KEY')
+    
+    if admin_key and data.get('email') == admin_email and data.get('password') == admin_key:
+        admin_user = User.query.filter_by(email=admin_email, role='admin').first()
+        admin_id = admin_user.id if admin_user else 0
+        tokens = _make_jwt(admin_id, 'admin')
+        user_dict = admin_user.to_dict() if admin_user else {
+            'id': admin_id,
+            'email': admin_email,
+            'name': 'System Administrator',
+            'role': 'admin',
+            'is_active': True,
+            'is_email_verified': True
+        }
+        return success_response(
+            data={**tokens, 'role': 'admin', 'user': user_dict},
+            message='Admin login successful.'
+        )
 
     user = User.query.filter_by(email=data['email']).first()
     if not user or not _check_password(data['password'], user.password_hash):

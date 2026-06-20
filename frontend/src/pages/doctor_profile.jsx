@@ -230,6 +230,11 @@ export default function DoctorProfile() {
                 hospital: profile.hospital || '', clinicLocation: profile.clinicLocation || '',
                 regNumber: profile.regNumber || '', consultantFee: profile.consultantFee ?? 0,
                 workingHours: profile.workingHours || 'Mon-Fri, 10AM-6PM',
+                upiId: profile.upiId || '',
+                bankAccountDetails: profile.bankAccountDetails || '',
+                bankAccountName: profile.bankAccountName || '',
+                bankAccountNumber: profile.bankAccountNumber || '',
+                bankIfsc: profile.bankIfsc || '',
             });
         }
         setErrors({});
@@ -258,6 +263,7 @@ export default function DoctorProfile() {
             if (!res.ok) throw new Error(data.error || 'Failed to initiate verification.');
 
             handleSuccess('Verification payout initiated! Please check your UPI account for ₹1.');
+            fetchProfile();
         } catch (err) {
             handleError(err);
         }
@@ -356,8 +362,7 @@ export default function DoctorProfile() {
                             <span style={{ ...labelStyle, marginBottom: 0 }}>Verification Status</span>
                             {(() => {
                                 const hasValidUpi = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/.test(profile.upiId || '');
-                                const hasBankAcc = !!(profile.bankAccountNumber || '').trim();
-                                const isVerified = profile.payoutVerified || (hasValidUpi && hasBankAcc);
+                                const isVerified = profile.payoutVerified || hasValidUpi;
                                 return (
                                     <span style={{
                                         background: isVerified ? '#e8f8ee' : '#fff4e5',
@@ -520,8 +525,7 @@ export default function DoctorProfile() {
                         <h3 style={{ margin: 0, fontSize: '0.95rem' }}>💸 Payout & Financial Details</h3>
                         {(() => {
                             const hasValidUpi = /^[a-zA-Z0-9._-]+@[a-zA-Z]{3,}$/.test(form.upiId || '');
-                            const hasBankAcc = !!(form.bankAccountNumber || '').trim();
-                            const isVerified = profile.payoutVerified || (hasValidUpi && hasBankAcc);
+                            const isVerified = profile.payoutVerified || hasValidUpi;
                             return !isVerified ? (
                                 <button className="dd-btn dd-btn-outline" style={{ fontSize: '0.7rem', padding: '4px 12px' }} onClick={handleRequestPayoutVerification}>
                                     Verify Credentials

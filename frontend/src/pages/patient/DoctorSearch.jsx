@@ -540,8 +540,13 @@ export default function DoctorSearch() {
                                             </div>
                                         )}
                                         {confirmedAppointment.doctorMobile && (
-                                            <div style={{ fontSize: '0.82rem', color: '#1a2e1a' }}>
+                                            <div style={{ fontSize: '0.82rem', color: '#1a2e1a', marginBottom: 5 }}>
                                                 📞 <strong>Phone:</strong> {confirmedAppointment.doctorMobile}
+                                            </div>
+                                        )}
+                                        {confirmedAppointment.doctorUpiId && (
+                                            <div style={{ fontSize: '0.82rem', color: '#1a2e1a' }}>
+                                                💳 <strong>UPI ID:</strong> {confirmedAppointment.doctorUpiId}
                                             </div>
                                         )}
                                     </div>

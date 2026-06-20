@@ -62,6 +62,7 @@ function PatientForm({ onSubmit, loading }) {
         pincode: '',
         password: '',
         confirmPass: '',
+        referralCode: '',
         termsAgreed: false,
     });
 
@@ -304,6 +305,42 @@ function PatientForm({ onSubmit, loading }) {
                                 style={eyeStyle}>{showConfirm ? '🙈' : '👁️'}</button>
                         </div>
                         {errors.confirmPass && <span className="field-error">{errors.confirmPass}</span>}
+                    </div>
+                </div>
+
+                <hr className="reg-divider" />
+
+                {/* ── Referral System ── */}
+                <h3 className="reg-section-title"><span>🎁</span> Referral Program (Optional)</h3>
+                
+                <div style={{
+                    background: 'linear-gradient(135deg, rgba(45, 106, 79, 0.05), rgba(45, 106, 79, 0.15))',
+                    border: '1px solid rgba(45, 106, 79, 0.2)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px'
+                }}>
+                    <div style={{ fontSize: '2.5rem', lineHeight: 1 }}>🌟</div>
+                    <div>
+                        <h4 style={{ margin: '0 0 8px 0', color: '#1a2e1a', fontSize: '1.1rem' }}>Invite friends and earn rewards with Vaidyamed-X.</h4>
+                        <p style={{ margin: 0, color: '#3d5c3d', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                            <strong>Get 1 Month Premium Access FREE</strong> when 5 users successfully subscribe using your referral code.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="reg-grid" style={{ gridTemplateColumns: '1fr' }}>
+                    <div className="form-group">
+                        <label htmlFor="p-referralCode">Referral Code (Optional)</label>
+                        <input
+                            id="p-referralCode" type="text" name="referralCode"
+                            placeholder="Enter referral code (e.g. VMX-ABC123)"
+                            value={form.referralCode} onChange={handleChange}
+                            style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
+                        />
                     </div>
                 </div>
 

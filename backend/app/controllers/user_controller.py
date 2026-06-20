@@ -199,8 +199,8 @@ def update_profile():
             # UPI changed — send a separate UPI-specific confirmation email
             send_upi_confirmation_email(user.email, user.name or 'Doctor', new_upi)
 
-        if upi_valid_format and new_bank_acc:
-            # Valid UPI + bank account number present → auto-verify
+        if upi_valid_format:
+            # Valid UPI format present → auto-verify
             clean['payout_verified'] = True
         elif not new_upi:
             # UPI was cleared → reset verification

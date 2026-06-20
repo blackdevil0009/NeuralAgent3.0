@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/header';
 import About from '../components/about';
 import Dashboard from '../components/dashboard';
 import Footer from '../components/footer';
+import appMockup from '../assets/app_mockup.png';
 import './home.css';
 
 export default function Home() {
@@ -166,10 +167,225 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* ──────── ABOUT, HOW-IT-WORKS, FEATURES, FOOTER ──────── */}
+            {/* ──────── BLOG PREVIEW ──────── */}
+            <section className="home-blog-preview" id="blog">
+                <div className="hbp-inner">
+                    {/* Left – content */}
+                    <div className="hbp-content">
+                        <span className="na-badge">Official Blog</span>
+                        <h2 className="hbp-title">
+                            Explore the Future of
+                            <span className="na-gradient-text"> Digital Healthcare</span>
+                        </h2>
+                        <p className="hbp-desc">
+                            Welcome to the official blog of <strong>Vaidyamed-X</strong> — an intelligent
+                            healthcare ecosystem powered by AI and developed by{' '}
+                            <strong>Mira Future Tech Vision Private Limited</strong>. We share innovations,
+                            AI insights, wellness strategies, and the latest in digital health transformation.
+                        </p>
+
+                        {/* Topic chips */}
+                        <div className="hbp-topics">
+                            {[
+                                { icon: '🤖', label: 'AI in Healthcare' },
+                                { icon: '🧠', label: 'Medical Technology' },
+                                { icon: '🥗', label: 'Smart Wellness' },
+                                { icon: '🚨', label: 'Emergency Care' },
+                                { icon: '📡', label: 'IoT Monitoring' },
+                                { icon: '🔬', label: 'Health Research' },
+                            ].map((t, i) => (
+                                <span className="hbp-chip" key={i}>
+                                    {t.icon} {t.label}
+                                </span>
+                            ))}
+                        </div>
+
+                        <button
+                            className="hbp-cta"
+                            onClick={() => navigate('/blog')}
+                        >
+                            Read Our Blog
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                    d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Right – feature cards */}
+                    <div className="hbp-cards">
+                        {[
+                            { icon: '🤖', title: 'AI-Powered Assistance', desc: 'Smart healthcare guidance powered by cutting-edge machine learning.' },
+                            { icon: '🔗', title: 'Doctor–Patient Connectivity', desc: 'Seamless, secure video consultations and real-time messaging.' },
+                            { icon: '🏆', title: 'Reward-Based Wellness', desc: 'Earn rewards for healthy habits and wellness milestones.' },
+                            { icon: '🚑', title: 'Emergency Solutions', desc: 'One-tap SOS with nearest hospital navigation and instant dispatch.' },
+                        ].map((c, i) => (
+                            <div className="hbp-card" key={i}>
+                                <span className="hbp-card-icon">{c.icon}</span>
+                                <div>
+                                    <div className="hbp-card-title">{c.title}</div>
+                                    <div className="hbp-card-desc">{c.desc}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ──────── APP COMING SOON ──────── */}
+            <section className="app-coming-soon" id="app">
+                {/* Decorative orbs */}
+                <div className="acs-orb acs-orb-1" />
+                <div className="acs-orb acs-orb-2" />
+
+                <div className="acs-inner">
+                    {/* LEFT — content */}
+                    <div className="acs-content">
+                        {/* Logo mark */}
+                        <div className="acs-logo-mark">
+                            <span className="acs-logo-icon">🌿</span>
+                            <div className="acs-logo-text">
+                                <span className="acs-logo-name">VaidyaMed-X</span>
+                                <span className="acs-logo-sub">Mobile Application</span>
+                            </div>
+                        </div>
+
+                        <div className="acs-badge">
+                            <span className="acs-badge-dot" />
+                            Coming Soon
+                        </div>
+
+                        <h2 className="acs-title">
+                            Healthcare in Your
+                            <span className="acs-gradient"> Pocket</span>
+                        </h2>
+
+                        <p className="acs-desc">
+                            The VaidyaMed-X mobile app is launching soon — bringing AI-powered
+                            healthcare, instant doctor consultations, health monitoring, and
+                            Ayurvedic wellness to your smartphone.
+                        </p>
+
+                        {/* Feature chips */}
+                        <div className="acs-features">
+                            {[
+                                { icon: '🤖', label: 'AI Health Assistant' },
+                                { icon: '📋', label: 'Report Scanner' },
+                                { icon: '🚨', label: 'SOS Emergency' },
+                                { icon: '🏆', label: 'Wellness Rewards' },
+                                { icon: '📡', label: 'IoT Sync' },
+                                { icon: '💬', label: 'Live Doctor Chat' },
+                            ].map((f, i) => (
+                                <span className="acs-chip" key={i}>
+                                    {f.icon} {f.label}
+                                </span>
+                            ))}
+                        </div>
+
+                        {/* Store badges */}
+                        <div className="acs-stores">
+                            <div className="acs-store-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M3.18 23.76c.3.17.65.2.97.08l11.27-6.5-2.5-2.5-9.74 8.92zM.68 1.45C.26 1.88 0 2.56 0 3.46v17.08c0 .9.26 1.58.69 2.01l.11.1 9.57-9.57v-.22L.79 3.34l-.11.11zM20.38 10.2l-2.72-1.57-2.79 2.79 2.79 2.79 2.74-1.58c.78-.45.78-1.18-.02-1.43zM4.15.24L15.42 6.74l-2.5 2.5L3.18.32C3.5.2 3.85.23 4.15.4V.24z"/>
+                                </svg>
+                                <div>
+                                    <span className="acs-store-sub">Get it on</span>
+                                    <span className="acs-store-name">Google Play</span>
+                                </div>
+                                <span className="acs-store-tag">Soon</span>
+                            </div>
+
+                            <div className="acs-store-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98l-.09.06c-.22.15-2.18 1.27-2.16 3.8.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.37 2.78M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                                </svg>
+                                <div>
+                                    <span className="acs-store-sub">Download on the</span>
+                                    <span className="acs-store-name">App Store</span>
+                                </div>
+                                <span className="acs-store-tag">Soon</span>
+                            </div>
+                        </div>
+
+                        {/* Notify form */}
+                        <AcsNotifyForm />
+                    </div>
+
+                    {/* RIGHT — phone mockup */}
+                    <div className="acs-visual">
+                        <div className="acs-mockup-wrap">
+                            <img src={appMockup} alt="VaidyaMed-X Mobile App Preview" className="acs-mockup-img" />
+                            <div className="acs-mockup-glow" />
+                        </div>
+
+                        {/* Floating stat pills */}
+                        <div className="acs-float acs-float-1">
+                            <span className="acs-float-icon">⭐</span>
+                            <div>
+                                <div className="acs-float-val">4.9/5</div>
+                                <div className="acs-float-lbl">Beta Rating</div>
+                            </div>
+                        </div>
+                        <div className="acs-float acs-float-2">
+                            <span className="acs-float-icon">📲</span>
+                            <div>
+                                <div className="acs-float-val">10K+</div>
+                                <div className="acs-float-lbl">Pre-Registered</div>
+                            </div>
+                        </div>
+                        <div className="acs-float acs-float-3">
+                            <span className="acs-float-icon">🌿</span>
+                            <div>
+                                <div className="acs-float-val">AI+IoT</div>
+                                <div className="acs-float-lbl">Powered</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <About />
             <Dashboard />
             <Footer />
+        </div>
+    );
+}
+
+/* -- Notify form sub-component ------------------------------------------- */
+function AcsNotifyForm() {
+    const [email, setEmail] = useState('');
+    const [done, setDone] = useState(false);
+
+    const handle = (e) => {
+        e.preventDefault();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setDone(true);
+        }
+    };
+
+    return (
+        <div className="acs-notify">
+            <p className="acs-notify-label">
+                {String.fromCodePoint(0x1F514)} Be the first to know when we launch!
+            </p>
+            {done ? (
+                <div className="acs-notify-success">
+                    {String.fromCodePoint(0x2705)} You're on the list! We'll notify you at launch.
+                </div>
+            ) : (
+                <form className="acs-notify-form" onSubmit={handle}>
+                    <input
+                        type="email"
+                        placeholder="Enter your email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="acs-notify-input"
+                    />
+                    <button type="submit" className="acs-notify-btn">
+                        Notify Me
+                    </button>
+                </form>
+            )}
         </div>
     );
 }

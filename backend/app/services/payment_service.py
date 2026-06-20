@@ -167,6 +167,9 @@ def verify_payment_signature(razorpay_order_id: str,
         return True
     except Exception as exc:
         logger.warning(f"❌ Signature verification error: {exc}")
+        if allow_sim:
+            logger.warning("⚠️ [SIM] allow_sim is Enabled — Bypassing signature verification error for local developer testing!")
+            return True
         return False
 
 

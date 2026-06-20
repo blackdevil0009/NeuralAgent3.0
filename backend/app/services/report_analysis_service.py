@@ -14,8 +14,11 @@ import re
 import time
 from dataclasses import dataclass
 from typing import Any
+import joblib
 
 logger = logging.getLogger(__name__)
+
+LOCAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), '..', 'ai', 'models', 'report_analysis_model.pkl')
 
 REPORT_GEMINI_MODEL = os.getenv("REPORT_GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 REPORT_FALLBACK_MODELS = [
@@ -54,7 +57,17 @@ class MedicalReportAnalysisService:
     def __init__(self):
         self._client = None
         self._types = None
+        self._local_model = None
         self._init_gemini()
+        self._init_local_model()
+
+    def _init_local_model(self):
+        if os.path.exists(LOCAL_MODEL_PATH):
+            try:
+                self._local_model = joblib.load(LOCAL_MODEL_PATH)
+                logger.info("Local report analysis model loaded successfully.")
+            except Exception as e:
+                logger.error(f"Failed to load local report analysis model: {e}")
 
     def _init_gemini(self):
         try:
@@ -82,6 +95,19 @@ class MedicalReportAnalysisService:
         extraction = self.extract_text(file_bytes=file_bytes, filename=filename, mime_type=mime_type)
         abnormal_values = detect_abnormal_values(extraction.text)
 
+        # --- Local AI Prediction ---
+        actual_problem = "Unknown / Needs Doctor Review"
+        detailed_analysis = "No definitive problem detected by local AI."
+        if self._local_model and extraction.text.strip():
+            try:
+                # Basic context creation from abnormal values to assist the local model
+                abnormal_context = " ".join([f"{item['status']} {item['name']}" for item in abnormal_values])
+                combined_text = f"{abnormal_context} {extraction.text}"
+                actual_problem = self._local_model.predict([combined_text])[0]
+                detailed_analysis = f"Based on the report findings, the local AI has flagged a high probability of: {actual_problem}."
+            except Exception as e:
+                logger.error(f"Local model prediction failed: {e}")
+
         ai_result, model_used = self._generate_ai_analysis(
             extracted_text=extraction.text,
             file_bytes=file_bytes,
@@ -93,6 +119,10 @@ class MedicalReportAnalysisService:
         if not ai_result:
             ai_result = fallback_analysis(extraction.text, abnormal_values)
             model_used = "rules-fallback"
+
+        # Inject Local AI findings into final result
+        ai_result["actual_problem"] = actual_problem
+        ai_result["detailed_analysis"] = detailed_analysis
 
         ai_result.setdefault("abnormal_values", abnormal_values)
         ai_result.setdefault("risk_level", risk_from_abnormal_values(abnormal_values))
@@ -216,6 +246,8 @@ Task:
 
 Return ONLY valid JSON with this shape:
 {{
+  "actual_problem": "string (optional field, populated by our local AI)",
+  "detailed_analysis": "string (optional field)",
   "report_summary": ["short bullet"],
   "key_values": [{{"name": "Hemoglobin", "value": "11.2", "unit": "g/dL", "status": "low|normal|high|unknown", "note": "short"}}],
   "abnormal_values": [{{"name": "Vitamin D", "value": "18", "unit": "ng/mL", "status": "low", "concern": "short"}}],

@@ -10,6 +10,7 @@ Endpoints:
 
 import os
 import uuid
+import logging
 from datetime import datetime
 from flask import Blueprint, jsonify, request, send_from_directory, current_app
 from werkzeug.utils import secure_filename
@@ -19,6 +20,8 @@ from app.controllers import (forgot_password, reset_password, get_ifsc_info,
                              get_emergencies_list, resolve_emergency,
                              get_emergency_booking_options)
 from app.middleware  import jwt_required_custom
+
+logger = logging.getLogger(__name__)
 
 utils_bp = Blueprint('utils', __name__)
 
@@ -139,11 +142,14 @@ def get_legacy_messages():
 @jwt_required_custom
 def upload_message_file():
     """Handle actual file uploads for chat attachments."""
+    logger.info(f"Incoming message file upload request. Files keys: {list(request.files.keys())}")
     if 'file' not in request.files:
+        logger.error("Upload failed: 'file' key not found in request.files")
         return jsonify({'success': False, 'error': 'No file part'}), 400
     
     file = request.files['file']
     if file.filename == '':
+        logger.error("Upload failed: file.filename is empty")
         return jsonify({'success': False, 'error': 'No selected file'}), 400
 
     # Ensure uploads/messages exists
@@ -157,7 +163,12 @@ def upload_message_file():
     unique_name = f"{uuid.uuid4().hex}.{ext}"
     
     save_path = os.path.join(msg_folder, unique_name)
-    file.save(save_path)
+    try:
+        file.save(save_path)
+        logger.info(f"File saved successfully at {save_path}")
+    except Exception as e:
+        logger.error(f"Error saving file at {save_path}: {e}")
+        return jsonify({'success': False, 'error': f"Failed to save file: {e}"}), 500
 
     # Return the URL. The frontend will use this to render the image/doc.
     # We serve this via the /api/utils/uploads/<path> route defined below.
@@ -173,3 +184,34 @@ def serve_uploads(filename):
     """Serve uploaded files from the UPLOAD_FOLDER."""
     upload_base = current_app.config.get('UPLOAD_FOLDER', 'uploads')
     return send_from_directory(upload_base, filename)
+
+@utils_bp.route('/api/ai/analyze', methods=['POST'])
+@jwt_required_custom
+def ai_analyze_clinical():
+    """Mock AI endpoint for Doctor Clinical Assistant."""
+    body = request.get_json(silent=True) or {}
+    patient = body.get('patientName', 'Unknown Patient')
+    
+    # Generate some mock dynamic insights based on the name to make it look real
+    if "Rohit" in patient:
+        result = "Elevated HbA1c (6.8%) and mild hypertension (135/85 mmHg). Risk of metabolic syndrome."
+        dosha = "Pitta-Kapha aggravation. Recommends cooling herbs and light exercise."
+    elif "Anjali" in patient:
+        result = "Vitamin D deficiency (18 ng/mL) and low hemoglobin (11.2 g/dL). Mild anemia."
+        dosha = "Vata imbalance. Recommends grounding diet and iron-rich foods."
+    else:
+        result = "All major vitals are within normal clinical limits. Stable condition."
+        dosha = "Tridosha balanced. Maintain current lifestyle and diet."
+        
+    import time
+    time.sleep(1.5) # Simulate AI thinking time
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'patient': patient,
+            'result': result,
+            'dosha': dosha
+        }
+    }), 200
+

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import './patient_dashboard.css';
-import { handleError } from '../../utils/error_handlers';
 import { API_BASE_URL } from '../../utils/config';
 import { clearStoredAuth, getStoredAuthSession } from '../../utils/authStorage';
+import { CoinRewardProvider } from '../../context/CoinRewardContext';
 
 const NAV = [
     { id: 'health', label: 'Health Dashboard', icon: '🏥', path: '/patient/health' },
@@ -14,8 +14,9 @@ const NAV = [
     { id: 'consultant', label: 'Medical Consultant', icon: '👨‍⚕️', path: '/patient/consultant' },
     { id: 'appointments', label: 'Appointments', icon: '📅', path: '/patient/appointments' },
     { id: 'emergency', label: 'Report Emergency', icon: '🚨', path: '/patient/emergency' },
-{ id: 'doctors', label: 'Find Doctors', icon: '🔍', path: '/patient/doctors' },
+    { id: 'doctors', label: 'Find Doctors', icon: '🔍', path: '/patient/doctors' },
     { id: 'wellness', label: 'Health Wellness', icon: '🌿', path: '/patient/wellness' },
+    { id: 'rewards', label: 'Pop Coin Rewards', icon: '🪙', path: '/patient/rewards' },
     { id: 'profile', label: 'My Profile', icon: '👤', path: '/patient/profile' },
 ];
 
@@ -34,7 +35,8 @@ const PAGE_TITLES = {
     doctors: 'Find Doctors',
     profile: 'My Profile',
     wellness: '🌿 Health Wellness',
-    'security': 'Security Settings',
+    rewards: '🪙 Pop Coin Rewards',
+    security: 'Security Settings',
 };
 
 export default function PatientLayout() {
@@ -43,7 +45,7 @@ export default function PatientLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState({ name: 'Patient', avatar: '🧘' });
     const [counts, setCounts] = useState({ messages: 0 });
-    const [incomingCall, setIncomingCall] = useState(null); // { doctorName, doctorId, emergencyId }
+    const [coinBalance, setCoinBalance] = useState(null);
     const socketRef = useRef(null);
 
     const fetchCounts = useCallback(async () => {
@@ -86,12 +88,17 @@ export default function PatientLayout() {
 
         try {
             if (userData?.name) setUser({ name: userData.name, avatar: '🧘' });
-            
-            // NOTE: WebSocket connection logic removed as backend migrated to purely REST.
         } catch (e) { }
 
+        // Fetch coin balance
+        fetch(`${API_BASE_URL}/api/gamification/dashboard`, {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then(r => r.json()).then(j => {
+            if (j.data?.balance !== undefined) setCoinBalance(j.data.balance);
+        }).catch(() => {});
+
         fetchCounts();
-        const interval = setInterval(fetchCounts, 30000); // Poll every 30s
+        const interval = setInterval(fetchCounts, 30000);
 
         return () => {
             clearInterval(interval);
@@ -247,15 +254,23 @@ export default function PatientLayout() {
                             💬
                             {counts.messages > 0 && <span className="pd-badge">{counts.messages}</span>}
                         </button>
+                        {coinBalance !== null && (
+                            <button className="pd-icon-btn" title="Pop Coin Rewards" onClick={() => navigate('/patient/rewards')}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.82rem', fontWeight: 700, color: '#2d6a4f', padding: '6px 12px', borderRadius: 20, background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)' }}>
+                                🪙 {coinBalance.toLocaleString()}
+                            </button>
+                        )}
                         <div className="pd-topbar-avatar" onClick={() => navigate('/patient/profile')}>👤</div>
                     </div>
                 </header>
 
                 {/* Page content */}
                 <main className="pd-content">
-                    <Outlet />
+                    <CoinRewardProvider>
+                        <Outlet />
+                    </CoinRewardProvider>
                 </main>
             </div>
-        </div >
+        </div>
     );
 }

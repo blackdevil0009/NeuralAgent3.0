@@ -4,31 +4,86 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Central API configuration for VaidyaMed-X Flutter app.
-/// Android emulator uses 10.0.2.2 to reach the host machine's localhost.
-/// Physical device: replace with your PC's local IP (e.g. 192.168.1.10).
+///
+/// ── Production SSL Backend ───────────────────────────────────────────────
+/// The app is configured to connect to the live SSL backend:
+///   https://api.vaidyamedx.in
+///
+/// ── Localhost connectivity on a PHYSICAL ANDROID DEVICE (For Dev) ────────
+/// The backend runs on your PC at port 5002. On a physical device connected
+/// via USB or ADB-over-WiFi, `127.0.0.1` resolves to the **device itself**,
+/// not the PC. We fix this with ADB reverse port forwarding, which tunnels
+/// the device's loopback → PC's loopback:
+///
+///   adb reverse tcp:5002 tcp:5002
+///
+/// Run this once after connecting the device. Flutter hot-restart is enough
+/// after that. The HTTP URL `http://127.0.0.1:5002` then works on both the
+/// emulator and physical device transparently.
+///
+/// For the Android emulator only (no ADB reverse needed):
+///   use http://10.0.2.2:5002 instead.
 class ApiConfig {
-  // ─── Direct networking is blocked by emulator, using ADB reverse ───
-  static const String _localHost =
-      kIsWeb ? 'localhost' : 'http://127.0.0.1:5002';
+  // ─── Base URL ───────────────────────────────────────────────────────────
+  // Production SSL Backend → https://api.vaidyamedx.in
+  // Physical device + ADB reverse → http://127.0.0.1:5002
+  // Android emulator (no ADB reverse) → http://10.0.2.2:5002
+  // Web → http://localhost:5002
+  static const String _host = 'https://api.vaidyamedx.in';
 
-  static const String baseUrl = _localHost;
+  static const String baseUrl = _host;
 
-  // Auth
-  static const String login = '$baseUrl/api/auth/login';
-  static const String register = '$baseUrl/api/auth/register';
-  static const String profile = '$baseUrl/api/user/profile';
+  // ── Auth ────────────────────────────────────────────────────────────────
+  static const String register              = '$baseUrl/api/auth/register';
+  static const String login                 = '$baseUrl/api/auth/login';
+  static const String verifyRegistrationOtp = '$baseUrl/api/auth/verify-registration-otp';
+  static const String verify2faOtp          = '$baseUrl/api/auth/verify-2fa-otp';
+  static const String resendVerification    = '$baseUrl/api/auth/resend-verification';
+  static const String resend2faOtp          = '$baseUrl/api/auth/resend-2fa-otp';
+  static const String forgotPassword        = '$baseUrl/api/auth/forgot-password';
+  static const String resetPassword         = '$baseUrl/api/auth/reset-password';
+  static const String toggle2fa             = '$baseUrl/api/auth/2fa/toggle';
+  static const String verifyDocument        = '$baseUrl/api/auth/verify-document';
 
-  // Messages
-  static const String conversations = '$baseUrl/api/messages';
+  // ── User / Profile / Doctors ─────────────────────────────────────────────
+  static const String profile               = '$baseUrl/api/user/profile';
+  static const String doctors               = '$baseUrl/api/doctors';
+  static const String notifications         = '$baseUrl/api/notifications';
+  static const String verifyUpi             = '$baseUrl/api/doctor/verify-upi';
+  static String lookupIfsc(String code)     => '$baseUrl/api/utils/ifsc/$code';
+
+  // ── Appointments ────────────────────────────────────────────────────────
+  static const String appointments          = '$baseUrl/api/appointments';
+  static const String createOrder           = '$baseUrl/api/appointments/create-order';
+  static const String verifyPayment         = '$baseUrl/api/appointments/verify-payment';
+  static String appointmentById(String id)  => '$baseUrl/api/appointments/$id';
+
+  // ── Reports ─────────────────────────────────────────────────────────────
+  static const String reports               = '$baseUrl/api/reports';
+  static String analyzeReport(String id)    => '$baseUrl/api/reports/$id/analyze';
+  static String deleteReport(String id)     => '$baseUrl/api/reports/$id';
+
+  // ── Emergencies ─────────────────────────────────────────────────────────
+  static const String emergencyOptions      = '$baseUrl/api/emergencies/options';
+  static const String emergencies           = '$baseUrl/api/emergencies';
+  static const String myEmergencies         = '$baseUrl/api/emergencies/my';
+  static String resolveEmergency(String id) => '$baseUrl/api/emergencies/$id/handle';
+
+  // ── AI ──────────────────────────────────────────────────────────────────
+  static const String aiQuery               = '$baseUrl/api/v2/ai/query';
+
+  // ── Messages ────────────────────────────────────────────────────────────
+  static const String conversations         = '$baseUrl/api/messages';
+  static const String uploadMessage         = '$baseUrl/api/messages/upload';
+  static const String sendMessage           = '$baseUrl/api/v2/messages/send';
   static String messageHistory(String peerId) =>
       '$baseUrl/api/v2/messages/history/$peerId';
-  static const String sendMessage = '$baseUrl/api/v2/messages/send';
 
-  // Appointments
-  static const String appointments = '$baseUrl/api/appointments';
-  static String appointmentById(String id) =>
-      '$baseUrl/api/appointments/$id';
+  // ── WebSocket ────────────────────────────────────────────────────────────
+  /// Socket.IO server URL (same host, no path prefix)
+  static const String socketUrl             = _host;
 }
+
 
 /// Helper to get the stored JWT token.
 class AuthService {
@@ -116,6 +171,33 @@ class ApiClient {
       final headers = await AuthService.authHeaders();
       final res = await http
           .post(Uri.parse(url), headers: headers, body: jsonEncode(payload))
+          .timeout(const Duration(seconds: 12));
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return ApiResponse(data: body, statusCode: res.statusCode);
+    } catch (e) {
+      return ApiResponse(error: e.toString(), statusCode: 0);
+    }
+  }
+
+  static Future<ApiResponse<Map<String, dynamic>>> delete(String url) async {
+    try {
+      final headers = await AuthService.authHeaders();
+      final res = await http
+          .delete(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 12));
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return ApiResponse(data: body, statusCode: res.statusCode);
+    } catch (e) {
+      return ApiResponse(error: e.toString(), statusCode: 0);
+    }
+  }
+
+  static Future<ApiResponse<Map<String, dynamic>>> put(
+      String url, Map<String, dynamic> payload) async {
+    try {
+      final headers = await AuthService.authHeaders();
+      final res = await http
+          .put(Uri.parse(url), headers: headers, body: jsonEncode(payload))
           .timeout(const Duration(seconds: 12));
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       return ApiResponse(data: body, statusCode: res.statusCode);

@@ -15,9 +15,11 @@ import DoctorProfile from './pages/doctor_profile';
 import VaidyaMedDashboard from './pages/vaidyamed_dashboard';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsCondition from './pages/TermsCondition';
+import Blog from './pages/Blog';
 import OrganizationLogin from './pages/OrganizationLogin';
 import OrganizationRegistration from './pages/OrganizationRegistration';
 import HospitalVerify from './pages/Hospital/HospitalVerify';
+import Pricing from './pages/Pricing';
 
 // Hospital Dashboard
 import HospitalLayout from './pages/Hospital/HospitalLayout';
@@ -56,6 +58,7 @@ import Wellness from './pages/patient/wellness/Wellness';
 import Quiz from './pages/patient/wellness/Quiz';
 import DietPlan from './pages/patient/wellness/DietPlan';
 import Reminder from './pages/patient/wellness/Reminder';
+import PopCoinDashboard from './pages/patient/PopCoinDashboard';
 
 // Helper to initialize error handler with toast function
 const AppInitializer = () => {
@@ -72,66 +75,69 @@ function App() {
       <SocketProvider>
         <AppInitializer />
         <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Registration />} />
-          <Route path="/hospital/login" element={<OrganizationLogin />} />
-          <Route path="/hospital/register" element={<OrganizationRegistration />} />
-          <Route path="/hospital/verify" element={<HospitalVerify />} />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Registration />} />
+            <Route path="/hospital/login" element={<OrganizationLogin />} />
+            <Route path="/hospital/register" element={<OrganizationRegistration />} />
+            <Route path="/hospital/verify" element={<HospitalVerify />} />
 
-          {/* Hospital Management Layout */}
-          <Route path="/hospital" element={<HospitalLayout />}>
+            {/* Hospital Management Layout */}
+            <Route path="/hospital" element={<HospitalLayout />}>
               <Route path="dashboard" element={<HospitalDashboard />} />
               <Route path="profile" element={<HospitalProfile />} />
               <Route path="appointments" element={<HospitalAppointments />} />
               <Route path="doctors" element={<HospitalDoctors />} />
               <Route path="emergencies" element={<HospitalEmergencies />} />
-          </Route>
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsCondition />} />
+            </Route>
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsCondition />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/pricing" element={<Pricing />} />
 
-          {/* Patient Dashboard (nested) */}
-          <Route path="/patient" element={<PatientLayout />}>
-            <Route index element={<Navigate to="health" replace />} />
-            <Route path="health" element={<HealthDashboard />} />
-            <Route path="ai" element={<AIAssistant />} />
-            <Route path="inbox" element={<Inbox />} />
-            <Route path="vcall" element={<VideoCall />} />
-            <Route path="reports" element={<ReportUpload />} />
-            <Route path="consultant" element={<MedicalConsultant />} />
-            <Route path="appointments" element={<Appointments />} />
-            <Route path="doctors" element={<DoctorSearch />} />
-            <Route path="profile" element={<PatientProfile />} />
-            <Route path="settings/security" element={<SecuritySettings />} />
-            <Route path="emergency" element={<EmergencyCase />} />
-            <Route path="wellness" element={<Wellness />} />
-            <Route path="wellness/quiz" element={<Quiz />} />
-            <Route path="wellness/diet-plan" element={<DietPlan />} />
-            <Route path="wellness/reminder" element={<Reminder />} />
-          </Route>
+            {/* Patient Dashboard (nested) */}
+            <Route path="/patient" element={<PatientLayout />}>
+              <Route index element={<Navigate to="health" replace />} />
+              <Route path="health" element={<HealthDashboard />} />
+              <Route path="ai" element={<AIAssistant />} />
+              <Route path="inbox" element={<Inbox />} />
+              <Route path="vcall" element={<VideoCall />} />
+              <Route path="reports" element={<ReportUpload />} />
+              <Route path="consultant" element={<MedicalConsultant />} />
+              <Route path="appointments" element={<Appointments />} />
+              <Route path="doctors" element={<DoctorSearch />} />
+              <Route path="profile" element={<PatientProfile />} />
+              <Route path="settings/security" element={<SecuritySettings />} />
+              <Route path="emergency" element={<EmergencyCase />} />
+              <Route path="wellness" element={<Wellness />} />
+              <Route path="wellness/quiz" element={<Quiz />} />
+              <Route path="wellness/diet-plan" element={<DietPlan />} />
+              <Route path="wellness/reminder" element={<Reminder />} />
+              <Route path="rewards" element={<PopCoinDashboard />} />
+            </Route>
 
-          {/* Doctor Portal (nested) */}
-          <Route path="/doctor" element={<DoctorLayout />}>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<PatientManagement />} />
-            <Route path="schedule" element={<DoctorSchedule />} />
-            <Route path="inbox" element={<DoctorInbox />} />
-            <Route path="profile" element={<DoctorProfile />} />
-            <Route path="vcall" element={<DoctorVideoCall />} />
-            <Route path="settings/security" element={<DoctorSecuritySettings />} />
-            <Route path="emergency" element={<EmergencyDashboard />} />
-          </Route>
-          <Route path="/doctor/invite" element={<DoctorInvite />} />
-          <Route path="/dashboard" element={<VaidyaMedDashboard />} />
+            {/* Doctor Portal (nested) */}
+            <Route path="/doctor" element={<DoctorLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<PatientManagement />} />
+              <Route path="schedule" element={<DoctorSchedule />} />
+              <Route path="inbox" element={<DoctorInbox />} />
+              <Route path="profile" element={<DoctorProfile />} />
+              <Route path="vcall" element={<DoctorVideoCall />} />
+              <Route path="settings/security" element={<DoctorSecuritySettings />} />
+              <Route path="emergency" element={<EmergencyDashboard />} />
+            </Route>
+            <Route path="/doctor/invite" element={<DoctorInvite />} />
+            <Route path="/dashboard" element={<VaidyaMedDashboard />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
       </SocketProvider>
     </ToastProvider>
   );

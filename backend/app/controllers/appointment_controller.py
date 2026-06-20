@@ -22,6 +22,7 @@ from app.middleware import get_jwt_user_id, get_jwt_claims
 from app.utils import success_response, error_response, not_found_response, created_response
 from app.services import payment_service
 from app.services import pdf_service
+from app.services import reward_service
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,11 @@ def create_payment_order():
             "This time slot is already booked. Please choose another time.", 400
         )
 
+    # ── Verify doctor fee ────────────────────────────────────
+    amount_inr = doctor.consultant_fee if doctor.consultant_fee is not None else 0
+    if amount_inr < 1:
+        return error_response("Doctor has not set a valid consultation fee.", 400)
+
     # ── Duplicate pending check (same patient + doctor + date) ─
     dup = Appointment.query.filter_by(
         user_id=user_id,
@@ -103,16 +109,16 @@ def create_payment_order():
         try:
             # Return existing pending order so frontend can retry payment
             order = payment_service.create_razorpay_order(
-                amount_inr=doctor.consultant_fee if doctor.consultant_fee is not None else 0,
+                amount_inr=amount_inr,
                 appointment_id=dup.id,
-                notes={'patient_id': user_id, 'doctor_id': doctor_id}
+                notes={'patient_id': str(user_id), 'doctor_id': str(doctor_id)}
             )
             return success_response(
                 data={
                     'appointmentId':   dup.id,
                     'orderId':         dup.razorpay_order_id or order['id'],
-                    'amount':          (doctor.consultant_fee if doctor.consultant_fee is not None else 0) * 100,   # paise
-                    'amountINR':       doctor.consultant_fee if doctor.consultant_fee is not None else 0,
+                    'amount':          amount_inr * 100,   # paise
+                    'amountINR':       amount_inr,
                     'currency':        'INR',
                     'doctorName':      doctor.name,
                     'keyId':           current_app.config.get('RAZORPAY_KEY_ID', ''),
@@ -128,12 +134,11 @@ def create_payment_order():
             return error_response("Failed to initialize payment. Please try again later.", 500)
 
     # ── Create Razorpay order ────────────────────────────────
-    amount_inr = doctor.consultant_fee if doctor.consultant_fee is not None else 0
     try:
         order = payment_service.create_razorpay_order(
             amount_inr=amount_inr,
             appointment_id=0,   # will update after DB save
-            notes={'patient_id': user_id, 'doctor_id': doctor_id}
+            notes={'patient_id': str(user_id), 'doctor_id': str(doctor_id)}
         )
     except ValueError as e:
         logger.error(f"Payment Order Creation Failed: {e}")
@@ -263,6 +268,14 @@ def verify_and_confirm():
     appointment.platform_share      = platform_paise
     db.session.commit()
     _emit_appointment_event('appointment_updated', appointment)
+
+    # ── Gamification: Award Coins ─────────────────────────────
+    reward_service.award_coins(
+        user_id=user_id, 
+        amount=15, 
+        activity="appointment_booked", 
+        description=f"Booked appointment with Dr. {doctor.name if 'doctor' in locals() else 'Doctor'}"
+    )
 
     # ── Log successful transaction ────────────────────────────
     txn = _log_transaction(

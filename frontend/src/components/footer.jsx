@@ -13,7 +13,8 @@ const LINKS = {
         { label: 'About Us', href: '#about' },
         { label: 'Our Team', href: '#about' },
         { label: 'Careers', href: '#' },
-        { label: 'Blog', href: '#' },
+        { label: 'Blog', to: '/blog' },
+        { label: 'Pricing', to: '/pricing' },
     ],
     Support: [
         { label: 'Help Center', href: 'mailto:vaidyamedx@gmail.com' },

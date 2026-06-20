@@ -127,6 +127,8 @@ class Appointment(db.Model):
             # ── GATED: sensitive details only after payment ──────
             'clinicLocation': (getattr(doctor, 'clinic_location', '') or '') if (doctor and (paid or include_sensitive)) else None,
             'doctorMobile':   (getattr(doctor, 'mobile',          '') or '') if (doctor and (paid or include_sensitive)) else None,
+            'doctorUpiId':    (getattr(doctor, 'upi_id',          '') or '') if (doctor and (paid or include_sensitive)) else None,
+            'doctor_upi_id':  (getattr(doctor, 'upi_id',          '') or '') if (doctor and (paid or include_sensitive)) else None,
         }
         return data
 

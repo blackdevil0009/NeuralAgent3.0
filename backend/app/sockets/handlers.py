@@ -96,7 +96,8 @@ def handle_message(data):
         appointment_id=appointment_id,
         sender_id=sender_id,
         receiver_id=receiver_id,
-        content=content
+        content=content,
+        message_type=data.get('message_type') or data.get('messageType') or 'text'
     )
     db.session.add(msg)
     db.session.commit()
@@ -134,3 +135,66 @@ def handle_end_call(data):
     appointment_id = data.get('appointment_id')
     room = f"appointment_{appointment_id}"
     emit('call_ended', room=room)
+
+# ── Vaidya Voice/Video AI Integration ─────────────────────────────
+from app.services.wellness_ai_service import get_wellness_service
+
+# In-memory store for the latest camera frame per socket session
+_active_camera_frames = {}
+
+@socketio.on('Vaidya_Connected')
+def handle_vaidya_connected(data):
+    sid = request.sid
+    user_id = 0
+    if isinstance(data, dict) and 'token' in data:
+        try:
+            from flask_jwt_extended import decode_token
+            decoded = decode_token(data['token'])
+            user_id = decoded['sub']
+        except Exception:
+            pass
+    _active_camera_frames[sid] = {'frame': None, 'user_id': user_id}
+    logger.info(f"Vaidya AI Connected for session {sid}, user_id={user_id}")
+    emit('system_status', 'Vaidya AI Connected')
+
+@socketio.on('camera_frame')
+def handle_camera_frame(base64_frame):
+    sid = request.sid
+    if sid in _active_camera_frames:
+        _active_camera_frames[sid]['frame'] = base64_frame
+
+@socketio.on('chat_message')
+def handle_ai_chat_message(message_text):
+    sid = request.sid
+    emit('ai_thinking')
+    session_data = _active_camera_frames.get(sid, {'frame': None, 'user_id': 0})
+    latest_frame = session_data['frame']
+    user_id = session_data['user_id']
+    
+    try:
+        service = get_wellness_service()
+        result = service.chat(
+            user_id=user_id,
+            message=message_text,
+            session_id=f"socket_{sid}",
+            image_b64=latest_frame
+        )
+        
+        response_text = result.get('response', '')
+        
+        # Simulate streaming by sending the whole text as one chunk
+        emit('transcript_chunk', {'role': 'AGENT', 'text': response_text})
+        emit('turn_complete')
+        
+    except Exception as e:
+        logger.error(f"Vaidya Chat Error: {e}")
+        emit('transcript_chunk', {'role': 'AGENT', 'text': 'I am currently experiencing connection issues. Please try again in a moment.'})
+        emit('turn_complete')
+
+@socketio.on('Vaidya_Disconnected')
+def handle_vaidya_disconnected(data):
+    sid = request.sid
+    _active_camera_frames.pop(sid, None)
+    logger.info(f"Vaidya AI Disconnected for session {sid}")
+    emit('system_status', 'Vaidya AI Disconnected')
+

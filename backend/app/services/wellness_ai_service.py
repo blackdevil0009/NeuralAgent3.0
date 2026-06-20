@@ -72,7 +72,7 @@ class WellnessAIService:
             logger.error("google-genai is not installed.")
 
     def chat(self, user_id: int, message: str, session_id: str | None = None,
-             org_id: int | None = None) -> dict:
+             org_id: int | None = None, image_b64: str | None = None) -> dict:
         session_id = session_id or str(uuid.uuid4())
         started_at = time.perf_counter()
 
@@ -124,9 +124,20 @@ class WellnessAIService:
             }
 
         prompt = self._build_compact_prompt(message)
-        ai_text, model_used = self._generate(prompt)
+        
+        contents = [prompt]
+        if image_b64:
+            import base64
+            # handle 'data:image/jpeg;base64,...' format
+            b64_str = image_b64.split(",")[-1] if "," in image_b64 else image_b64
+            img_bytes = base64.b64decode(b64_str)
+            contents.append(
+                self._types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+            )
+            
+        ai_text, model_used = self._generate(contents)
 
-        if self._is_cacheable(ai_text):
+        if self._is_cacheable(ai_text) and not image_b64:
             set_cache(message, ai_text)
 
         usage_id = self._persist_sync(
@@ -155,7 +166,7 @@ class WellnessAIService:
         yield f"data: {json.dumps({'chunk': result['response']})}\n\n"
         yield f"data: {json.dumps({'done': True, 'session_id': result['session_id'], 'route': result['route']})}\n\n"
 
-    def _generate(self, prompt: str) -> tuple[str, str]:
+    def _generate(self, contents: list | str) -> tuple[str, str]:
         if not self._client or not self._types:
             return ("AI service is temporarily unavailable. Please try again later.", "none")
 
@@ -170,7 +181,7 @@ class WellnessAIService:
             try:
                 response = self._client.models.generate_content(
                     model=model_name,
-                    contents=prompt,
+                    contents=contents,
                     config=config,
                 )
                 text = getattr(response, "text", "") if response else ""
@@ -193,11 +204,14 @@ class WellnessAIService:
     def _build_compact_prompt(self, message: str) -> str:
         cleaned = " ".join(message.strip().split())[:1200]
         return (
-            "You are VaidyaMedX Wellness AI. Give concise, safe wellness guidance. "
-            "Do not diagnose, prescribe drugs, or claim emergency care is unnecessary. "
-            "For danger signs, advise urgent medical help. Use 4 short bullets max. "
-            "End with: This is general wellness information, not a medical diagnosis.\n\n"
-            f"User: {cleaned}\nAnswer:"
+            "You are Vaidya, the highly intelligent and empathetic clinical AI assistant for VaidyaMed-X. "
+            "You converse naturally like a knowledgeable, warm, and friendly human doctor. "
+            "If the user is asking about wellness, give practical advice in a conversational tone. "
+            "If the user provides an image or medical report, analyze it carefully and explain it simply. "
+            "Always be concise enough for a chat interface, but retain a supportive and extremely human-like bedside manner. "
+            "Do not use stiff robotic formatting like '1. 2. 3. 4.' unless specifically asked for a list. "
+            "End with a polite, caring sign-off, but no generic legal disclaimers unless explicitly discussing life-threatening danger.\n\n"
+            f"User: {cleaned}\nVaidya:"
         )
 
     def _is_cacheable(self, response: str) -> bool:

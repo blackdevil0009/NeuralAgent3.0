@@ -30,3 +30,8 @@ redis==5.0.8
 pypdf==6.4.0
 pillow==12.0.0
 pytesseract==0.3.13
+
+# ── Local ML Training (Ayurveda Self-Learning) ─────────────
+scikit-learn
+pandas
+joblib

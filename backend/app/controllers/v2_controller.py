@@ -47,7 +47,8 @@ def send_v2_message():
         appointment_id=appointment.id,
         sender_id=sender_id,
         receiver_id=receiver_id,
-        content=content
+        content=content,
+        message_type=body.get('messageType') or body.get('message_type') or 'text'
     )
     
     db.session.add(new_msg)

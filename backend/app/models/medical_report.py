@@ -89,7 +89,7 @@ class ReportAnalysis(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False,
                            default=lambda: datetime.now(timezone.utc), index=True)
 
-    report = db.relationship('MedicalReport', backref=db.backref('analysis_runs', lazy='dynamic'))
+    report = db.relationship('MedicalReport', backref=db.backref('analysis_runs', lazy='dynamic', cascade='all, delete-orphan', passive_deletes=True))
 
     def to_dict(self):
         return {

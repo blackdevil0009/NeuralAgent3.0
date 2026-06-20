@@ -34,6 +34,8 @@ export default function Header() {
                     <button className="na-nav-link" onClick={() => scrollTo('about')}>About</button>
                     <button className="na-nav-link" onClick={() => scrollTo('how-it-works')}>How It Works</button>
                     <button className="na-nav-link" onClick={() => scrollTo('contact')}>Contact</button>
+                    <button className="na-nav-link" onClick={() => navigate('/blog')}>Blog</button>
+                    <button className="na-nav-link" onClick={() => navigate('/pricing')}>Pricing</button>
                 </nav>
 
                 {/* CTA Buttons */}
@@ -60,6 +62,8 @@ export default function Header() {
                     <button className="na-nav-link" onClick={() => scrollTo('about')}>About</button>
                     <button className="na-nav-link" onClick={() => scrollTo('how-it-works')}>How It Works</button>
                     <button className="na-nav-link" onClick={() => scrollTo('contact')}>Contact</button>
+                    <button className="na-nav-link" onClick={() => navigate('/blog')}>Blog</button>
+                    <button className="na-nav-link" onClick={() => navigate('/pricing')}>Pricing</button>
                     <div className="na-mobile-actions">
                         <Link to="/login" className="na-btn-outline" onClick={() => setMenuOpen(false)}>Login</Link>
                         <Link to="/register" className="na-btn-solid" onClick={() => setMenuOpen(false)}>Get Started</Link>

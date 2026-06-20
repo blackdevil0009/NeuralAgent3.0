@@ -73,7 +73,7 @@ class BaseConfig:
         os.path.dirname(__file__), '..', '..',
         os.getenv('UPLOAD_FOLDER', 'uploads')
     )
-    MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH_MB', 5)) * 1024 * 1024
+    MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH_MB', 50)) * 1024 * 1024
     ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 
     # ── CORS ───────────────────────────────────────────────────
@@ -85,6 +85,10 @@ class BaseConfig:
     OTP_EXPIRY_MINUTES  = int(os.getenv('OTP_EXPIRY_MINUTES', 10))
     OTP_RESEND_COOLDOWN = int(os.getenv('OTP_RESEND_COOLDOWN_SECONDS', 60))
     BCRYPT_LOG_ROUNDS   = int(os.getenv('BCRYPT_LOG_ROUNDS', 12))
+
+    # ── Admin ──────────────────────────────────────────────────
+    ADMIN_EMAIL         = os.getenv('ADMIN_EMAIL', 'admin@vaidyamedx.in')
+    ADMIN_LOGIN_KEY     = os.getenv('ADMIN_LOGIN_KEY', None)
 
     # ── Razorpay Payment Gateway ───────────────────────────────
     RAZORPAY_KEY_ID      = os.getenv('RAZORPAY_KEY_ID',      'rzp_test_placeholder')
