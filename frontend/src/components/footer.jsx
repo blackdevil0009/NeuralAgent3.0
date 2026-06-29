@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/config';
 
 const LINKS = {
@@ -40,13 +40,20 @@ export default function Footer() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const scrollTo = (id) => {
         if (id === '#') return;
-        try {
-            const el = document.querySelector(id);
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-        } catch (err) {
-            console.warn("Invalid selector:", id);
+        if (location.pathname !== '/') {
+            navigate(`/${id}`);
+        } else {
+            try {
+                const el = document.querySelector(id);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+            } catch (err) {
+                console.warn("Invalid selector:", id);
+            }
         }
     };
 

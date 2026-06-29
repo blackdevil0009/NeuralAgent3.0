@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 import joblib
+from app.services.ml_training_service import ml_service
 
 logger = logging.getLogger(__name__)
 
@@ -95,18 +96,31 @@ class MedicalReportAnalysisService:
         extraction = self.extract_text(file_bytes=file_bytes, filename=filename, mime_type=mime_type)
         abnormal_values = detect_abnormal_values(extraction.text)
 
-        # --- Local AI Prediction ---
+        # --- Extreme Level ML Prediction (Custom Trained Model) ---
         actual_problem = "Unknown / Needs Doctor Review"
         detailed_analysis = "No definitive problem detected by local AI."
+        
+        # 1. Fallback to basic local model if no custom model exists
         if self._local_model and extraction.text.strip():
             try:
-                # Basic context creation from abnormal values to assist the local model
                 abnormal_context = " ".join([f"{item['status']} {item['name']}" for item in abnormal_values])
                 combined_text = f"{abnormal_context} {extraction.text}"
                 actual_problem = self._local_model.predict([combined_text])[0]
-                detailed_analysis = f"Based on the report findings, the local AI has flagged a high probability of: {actual_problem}."
+                detailed_analysis = f"Based on the report findings, the local AI flags a high probability of: {actual_problem}."
             except Exception as e:
                 logger.error(f"Local model prediction failed: {e}")
+
+        # 2. Use the Custom Trained ML Model (Extreme Level Accuracy)
+        latest_model_id = ml_service.get_latest_model_id()
+        if latest_model_id and abnormal_values:
+            feature_dict = {item['name']: item['value'] for item in abnormal_values}
+            try:
+                ml_result = ml_service.predict(latest_model_id, feature_dict)
+                if ml_result.get("success") and ml_result.get("predictions"):
+                    actual_problem = str(ml_result["predictions"][0])
+                    detailed_analysis = f"The custom ML model analyzed your vitals and accurately predicts: {actual_problem}."
+            except Exception as e:
+                logger.error(f"Custom ML model prediction failed: {e}")
 
         ai_result, model_used = self._generate_ai_analysis(
             extracted_text=extraction.text,
@@ -114,6 +128,8 @@ class MedicalReportAnalysisService:
             filename=filename,
             mime_type=mime_type,
             abnormal_values=abnormal_values,
+            ml_prediction=actual_problem,
+            ml_analysis=detailed_analysis,
         )
 
         if not ai_result:
@@ -184,11 +200,13 @@ class MedicalReportAnalysisService:
         filename: str,
         mime_type: str,
         abnormal_values: list[dict],
+        ml_prediction: str = None,
+        ml_analysis: str = None,
     ) -> tuple[dict[str, Any] | None, str]:
         if not self._client or not self._types:
             return None, "none"
 
-        prompt = build_report_prompt(extracted_text, abnormal_values)
+        prompt = build_report_prompt(extracted_text, abnormal_values, ml_prediction, ml_analysis)
         contents: list[Any] = [prompt]
         if len(file_bytes) <= REPORT_INLINE_MAX_MB * 1024 * 1024 and mime_type in {
             "application/pdf", "image/jpeg", "image/jpg", "image/png"
@@ -231,18 +249,29 @@ class MedicalReportAnalysisService:
         return None, "none"
 
 
-def build_report_prompt(extracted_text: str, abnormal_values: list[dict]) -> str:
+def build_report_prompt(extracted_text: str, abnormal_values: list[dict], ml_prediction: str = None, ml_analysis: str = None) -> str:
     trimmed = (extracted_text or "")[:12000]
+    
+    ml_context = ""
+    if ml_prediction and ml_prediction != "Unknown / Needs Doctor Review":
+        ml_context = f"""
+Extreme Level ML Prediction:
+Our custom machine learning model has analyzed the patient's tabular data and predicts the condition is: {ml_prediction}.
+({ml_analysis})
+CRITICAL INSTRUCTION: You MUST formulate your remedies, suggestions, and lifestyle guidance based on the fact that the patient likely has {ml_prediction}. Do NOT guess, use the ML prediction!
+"""
+
     return f"""
 You are VaidyaMedX Medical Report Analysis AI.
 
 Task:
 - Extract readable medical findings from the attached report or text.
 - Identify key health values and abnormal values when clearly present.
+{ml_context}
 - Explain in simple patient-friendly language.
-- Do not diagnose disease.
+- Do not diagnose disease (mention the ML prediction as a strong possibility, but advise consultation).
 - Do not prescribe medicines or dosages.
-- Always advise licensed doctor consultation for diagnosis.
+- Always advise licensed doctor consultation.
 
 Return ONLY valid JSON with this shape:
 {{

@@ -4,7 +4,7 @@ app/sockets/handlers.py — Socket.IO Event Handlers
 
 import logging
 from flask import request
-from flask_socketio import emit, join_room, leave_room, disconnect
+from flask_socketio import emit, join_room, leave_room, disconnect, ConnectionRefusedError
 from flask_jwt_extended import decode_token
 
 from app.extensions import db, socketio
@@ -19,7 +19,10 @@ def _get_user_from_auth(auth):
     if not auth or 'token' not in auth:
         return None
     try:
-        decoded = decode_token(auth['token'])
+        token = auth['token']
+        if token.startswith('Bearer '):
+            token = token[7:]
+        decoded = decode_token(token)
         user_id = decoded['sub']
         return User.query.get(int(user_id))
     except Exception as e:
@@ -36,7 +39,15 @@ def handle_connect(auth):
     user = _get_user_from_auth(auth)
     if not user:
         logger.warning("Unauthorized socket connection attempt.")
-        return False # Refuse connection
+        
+        # Accept the connection temporarily so we can reliably emit the error
+        def _disconnect_unauth(sid):
+            socketio.emit('auth_error', {'message': 'Unauthorized'}, to=sid)
+            socketio.sleep(0.1) # Brief delay to ensure delivery
+            socketio.server.disconnect(sid)
+            
+        socketio.start_background_task(_disconnect_unauth, request.sid)
+        return True
 
     # 2FA Enforcement (Temporarily disabled for dev testing)
     # if not user.two_fa_enabled:

@@ -436,6 +436,21 @@ export default function ReportUpload() {
                             </div>
                         ) : (
                             <>
+                                {(selected.actualProblem && selected.actualProblem !== 'Unknown / Needs Doctor Review') && (
+                                    <div style={{ background: '#f0fdfa', borderRadius: 12, padding: 18, marginTop: 16, borderLeft: '4px solid #0d9488' }}>
+                                        <strong style={{ color: '#0f766e', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            🤖 Custom ML Prediction: 
+                                            <span style={{ background: '#ccfbf1', color: '#0f766e', padding: '2px 10px', borderRadius: 8, border: '1px solid #99f6e4' }}>
+                                                {selected.actualProblem}
+                                            </span>
+                                        </strong>
+                                        {selected.detailedAnalysis && (
+                                            <p style={{ fontSize: '0.88rem', color: '#115e59', marginTop: 8, lineHeight: 1.6 }}>
+                                                {selected.detailedAnalysis}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                                 <div style={{ background: '#f4faf6', borderRadius: 12, padding: 18, marginTop: 16 }}>
                                     <strong style={{ color: '#2d6a4f', fontSize: '0.88rem' }}>📊 Medical Summary</strong>
                                     <p style={{ fontSize: '0.88rem', color: '#3d5c3d', marginTop: 8, lineHeight: 1.8 }}>

@@ -10,22 +10,12 @@ const LEVELS = [
     { name: 'Elite Care Member', min: 2500, icon: '👑', color: '#e76f51' },
 ];
 
-const QUIZZES = [
-    { id: 'nutrition', title: 'Nutrition Basics', icon: '🥗', difficulty: 'Easy', coins: 10, questions: [
-        { q: 'Which vitamin is produced by the body using sunlight?', options: ['Vitamin A', 'Vitamin B12', 'Vitamin D', 'Vitamin K'], answer: 2 },
-        { q: 'How many glasses of water should you drink daily?', options: ['4-5', '6-7', '8-10', '12+'], answer: 2 },
-        { q: 'Which food is highest in iron?', options: ['Bananas', 'Spinach', 'Carrots', 'Apples'], answer: 1 },
-    ]},
-    { id: 'mental', title: 'Mental Wellness', icon: '🧠', difficulty: 'Medium', coins: 15, questions: [
-        { q: 'How many hours of sleep do adults generally need?', options: ['4-5', '6-7', '7-9', '10-12'], answer: 2 },
-        { q: 'Which activity is best for reducing stress?', options: ['Scrolling social media', 'Deep breathing', 'Eating junk food', 'Working more hours'], answer: 1 },
-        { q: 'What is mindfulness?', options: ['Being forgetful', 'Focusing on present moment', 'Multitasking efficiently', 'Avoiding problems'], answer: 1 },
-    ]},
-    { id: 'emergency', title: 'Emergency Awareness', icon: '🚨', difficulty: 'Hard', coins: 20, questions: [
-        { q: 'What is the first step in CPR?', options: ['Give breaths', 'Check for response', 'Start compressions', 'Call a doctor'], answer: 1 },
-        { q: 'Normal human body temperature is:', options: ['36°C / 96.8°F', '37°C / 98.6°F', '38°C / 100.4°F', '35°C / 95°F'], answer: 1 },
-        { q: 'Signs of a stroke include:', options: ['Runny nose', 'Sudden numbness on one side', 'Mild headache', 'Hunger'], answer: 1 },
-    ]},
+const QUIZ_CATEGORIES = [
+    { id: 'dosha', title: 'Dosha Science (Vata, Pitta, Kapha)', icon: '🌿' },
+    { id: 'herbs', title: 'Ayurvedic Herbs & Roots', icon: '🌱' },
+    { id: 'dinacharya', title: 'Dinacharya (Daily Routine)', icon: '🌅' },
+    { id: 'shloka', title: 'Sanskrit Shlokas & Meanings', icon: '📜' },
+    { id: 'panchakarma', title: 'Panchakarma Basics', icon: '🧘' },
 ];
 
 const ACTIVITY_ICONS = {
@@ -47,6 +37,7 @@ export default function PopCoinDashboard() {
     const [quizDone, setQuizDone] = useState(false);
     const [quizResult, setQuizResult] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [generating, setGenerating] = useState(false);
 
     const { token } = getStoredAuthSession();
 
@@ -69,12 +60,29 @@ export default function PopCoinDashboard() {
         ? Math.min(100, (((data?.balance || 0) - currentLevel.min) / (nextLevel.min - currentLevel.min)) * 100)
         : 100;
 
-    const startQuiz = (quiz) => {
-        setActiveQuiz(quiz);
-        setQuizStep(0);
-        setQuizAnswers([]);
+    const startQuiz = async (category) => {
+        setGenerating(true);
+        setActiveQuiz(null);
         setQuizDone(false);
         setQuizResult(null);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/gamification/quiz/generate?category=${category.title}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (res.ok && json.data) {
+                setActiveQuiz(json.data);
+                setQuizStep(0);
+                setQuizAnswers([]);
+            } else {
+                alert(json.message || "Failed to generate AI quiz");
+            }
+        } catch (e) {
+            console.error("AI Quiz error", e);
+            alert("Failed to connect to AI Quiz service.");
+        } finally {
+            setGenerating(false);
+        }
     };
 
     const answerQuestion = (idx) => {
@@ -226,21 +234,25 @@ export default function PopCoinDashboard() {
                                 </div>
                             ) : null}
                         </div>
+                    ) : generating ? (
+                        <div className="pc-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: 16, animation: 'floatCoin 2s infinite' }}>🤖</div>
+                            <div style={{ fontWeight: 700, color: '#2d6a4f', fontSize: '1.1rem' }}>AI is building your quiz...</div>
+                            <div style={{ fontSize: '0.85rem', color: '#6b8f71', marginTop: 8 }}>Reading knowledge dataset to generate custom questions.</div>
+                        </div>
                     ) : (
-                        QUIZZES.map(quiz => (
-                            <div key={quiz.id} className="pc-card pc-quiz-card" onClick={() => startQuiz(quiz)} style={{ marginBottom: 12 }}>
+                        QUIZ_CATEGORIES.map(cat => (
+                            <div key={cat.id} className="pc-card pc-quiz-card" onClick={() => startQuiz(cat)} style={{ marginBottom: 12 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                        <span style={{ fontSize: '1.8rem' }}>{quiz.icon}</span>
+                                        <span style={{ fontSize: '1.8rem' }}>{cat.icon}</span>
                                         <div>
-                                            <div style={{ fontWeight: 700, color: '#1a2e1a', fontSize: '0.9rem' }}>{quiz.title}</div>
-                                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 2 }}>{quiz.questions.length} questions</div>
+                                            <div style={{ fontWeight: 700, color: '#1a2e1a', fontSize: '0.9rem' }}>{cat.title}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 2 }}>Generate AI Quiz</div>
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 20, marginBottom: 4 }}
-                                            className={`diff-${quiz.difficulty.toLowerCase()}`}>{quiz.difficulty}</div>
-                                        <div style={{ fontWeight: 800, color: '#f4a261', fontSize: '0.9rem' }}>+{quiz.coins} 🪙</div>
+                                        <div style={{ fontWeight: 800, color: '#2d6a4f', fontSize: '0.9rem' }}>Play & Earn 🪙</div>
                                     </div>
                                 </div>
                             </div>

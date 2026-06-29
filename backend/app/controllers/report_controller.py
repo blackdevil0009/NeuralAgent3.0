@@ -260,6 +260,8 @@ def analyze_report(report_id):
         'lifestyleGuidance': result.get('lifestyle_guidance', []),
         'recommendation': result.get('recommendation', ''),
         'disclaimer': result.get('disclaimer', ''),
+        'actualProblem': result.get('actual_problem', 'Unknown'),
+        'detailedAnalysis': result.get('detailed_analysis', ''),
     }
 
     symptoms = json.dumps([
@@ -317,6 +319,8 @@ def analyze_report(report_id):
             'ayurvedic': ayurvedic,
             'analysis': insights,
             'abnormalValues': abnormal,
+            'actualProblem': result.get('actual_problem', 'Unknown'),
+            'detailedAnalysis': result.get('detailed_analysis', ''),
         },
         message="AI analysis complete."
     )

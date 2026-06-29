@@ -24,3 +24,6 @@ from .organization_profile import OrganizationProfile
 
 # AI Self-Learning
 from .ai_self_learning import AISelfLearningLog
+
+# Gamified Quiz
+from .quiz import QuizLevel, QuizCategory, QuizQuestion, UserQuizProgress, UserQuizHistory

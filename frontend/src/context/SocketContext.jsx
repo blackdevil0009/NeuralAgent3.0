@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../utils/config';
-import { AUTH_SESSION_EVENT, getStoredAuthSession } from '../utils/authStorage';
+import { AUTH_SESSION_EVENT, getStoredAuthSession, clearStoredAuth } from '../utils/authStorage';
 
 const SocketContext = createContext();
 
@@ -53,6 +53,12 @@ export const SocketProvider = ({ children }) => {
 
         newSocket.on('connect_error', (err) => {
             console.warn("⚠️ Shared WebSocket connection error:", err.message);
+        });
+
+        newSocket.on('auth_error', (data) => {
+            console.error("Unauthorized socket connection:", data?.message);
+            newSocket.disconnect();
+            clearStoredAuth();
         });
 
         setSocket(newSocket);

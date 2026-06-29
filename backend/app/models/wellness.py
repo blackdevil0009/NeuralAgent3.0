@@ -17,10 +17,10 @@ from app.extensions import db
 
 
 PLAN_LIMITS = {
-    "free": {"daily": 5, "monthly": 150, "price_paise": 0},
-    "pro": {"daily": 50, "monthly": 1500, "price_paise": 9900},
-    "premium": {"daily": 150, "monthly": 5000, "price_paise": 49900},
-    "enterprise": {"daily": 1000, "monthly": 50000, "price_paise": 0},
+    "free": {"daily": 50, "monthly": 1500, "price_paise": 0},
+    "pro": {"daily": 100, "monthly": 3000, "price_paise": 9900},
+    "premium": {"daily": 300, "monthly": 9000, "price_paise": 49900},
+    "enterprise": {"daily": 2000, "monthly": 60000, "price_paise": 0},
 }
 
 
@@ -77,8 +77,8 @@ class UserAILimit(db.Model):
     usage_date = db.Column(db.Date, nullable=False, default=date.today, index=True)
     month_key = db.Column(db.String(7), nullable=False, index=True)
     plan = db.Column(db.String(30), nullable=False, default="free")
-    daily_limit = db.Column(db.Integer, nullable=False, default=5)
-    monthly_limit = db.Column(db.Integer, nullable=False, default=150)
+    daily_limit = db.Column(db.Integer, nullable=False, default=50)
+    monthly_limit = db.Column(db.Integer, nullable=False, default=1500)
     daily_used = db.Column(db.Integer, nullable=False, default=0)
     monthly_used = db.Column(db.Integer, nullable=False, default=0)
     estimated_cost_usd = db.Column(db.Numeric(10, 6), nullable=False, default=0)

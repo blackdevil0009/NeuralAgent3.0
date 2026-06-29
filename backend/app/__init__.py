@@ -52,6 +52,8 @@ def create_app(config_class=None) -> Flask:
     from app.routes.patient_subscription_routes import patient_subscription_bp
     from app.routes.gamification_routes import gamification_bp
     from app.routes.ayurveda_ai_routes import ayurveda_ai_bp
+    from app.routes.quiz_routes import quiz_bp
+    from app.routes.ml_routes import ml_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
@@ -73,6 +75,8 @@ def create_app(config_class=None) -> Flask:
     app.register_blueprint(subscription_bp, url_prefix='/api')
     app.register_blueprint(patient_subscription_bp)
     app.register_blueprint(ayurveda_ai_bp, url_prefix='/api/ai/ayurveda')
+    app.register_blueprint(quiz_bp, url_prefix='/api/quiz')
+    app.register_blueprint(ml_bp, url_prefix='/api/ml')
 
     # ── JWT error callbacks ───────────────────────────────────────
     _register_jwt_callbacks(jwt)
@@ -153,6 +157,11 @@ def _init_db(app: Flask):
             TenantSubscription, AIAnalytics, Subscription,
             UserAILimit, AIUsageLog, TokenTracking,
             CachedResponse, EnterpriseClient, Invoice
+        )
+        # Gamified Quiz
+        from app.models.quiz import (
+            QuizLevel, QuizCategory, QuizQuestion, 
+            UserQuizProgress, UserQuizHistory
         )
 
         db.create_all()

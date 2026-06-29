@@ -22,3 +22,13 @@ def submit_quiz():
 @jwt_required_custom
 def claim_login():
     return gamification_controller.claim_daily_login()
+
+@gamification_bp.route('/knowledge-upload', methods=['POST'])
+@jwt_required_custom
+def upload_knowledge():
+    return gamification_controller.upload_knowledge_dataset()
+
+@gamification_bp.route('/quiz/generate', methods=['GET'])
+@jwt_required_custom
+def generate_quiz():
+    return gamification_controller.generate_ai_quiz()

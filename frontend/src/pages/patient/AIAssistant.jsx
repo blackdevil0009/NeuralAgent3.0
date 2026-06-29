@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../../utils/config';
+import './ai-chat.css';
 
 const QUICK_PROMPTS = [
     'I have common cold symptoms',
@@ -111,6 +112,7 @@ export default function AIAssistant() {
     const [callSeconds, setCallSeconds] = useState(0);
     const [scanCameraOpen, setScanCameraOpen] = useState(false);
     const [scanCameraError, setScanCameraError] = useState('');
+    const [voiceGender, setVoiceGender] = useState('female');
 
     const recognition = useRef(null);
     const endRef = useRef(null);
@@ -153,17 +155,34 @@ export default function AIAssistant() {
                 if (event.results[i].isFinal) {
                     setInterimTranscript('');
                     sendMessage(transcript);
-                    recognition.current.stop();
                 } else {
                     interim += transcript;
                     setInterimTranscript(interim);
                 }
             }
         };
-        recognition.current.onend = () => setIsRecording(false);
+        recognition.current.onend = () => {
+            setIsRecording(false);
+            // In live mode, keep listening continuously unless the AI is speaking
+            if (window.__isCallActive && !window.__isSpeaking) {
+                try { recognition.current.start(); } catch (e) {}
+            }
+        };
         recognition.current.onerror = () => setIsRecording(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Keep track of call state for the speech recognition onend callback
+    useEffect(() => {
+        window.__isCallActive = callActive;
+        window.__isSpeaking = isSpeaking;
+        
+        if (callActive && !isSpeaking && recognition.current && !isRecording) {
+            try { recognition.current.start(); } catch (e) {}
+        } else if ((!callActive || isSpeaking) && recognition.current && isRecording) {
+            try { recognition.current.stop(); } catch (e) {}
+        }
+    }, [callActive, isSpeaking, isRecording]);
 
     useEffect(() => {
         endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -198,10 +217,20 @@ export default function AIAssistant() {
         utterance.rate = 0.95;
 
         const voices = window.speechSynthesis.getVoices();
-        const preferred =
-            voices.find(v => v.lang.includes('IN') && /Google|Premium/i.test(v.name)) ||
-            voices.find(v => v.lang.includes('IN')) ||
-            voices.find(v => v.lang.includes('US'));
+        
+        let preferred;
+        if (voiceGender === 'male') {
+            preferred = voices.find(v => v.lang.includes('IN') && /Male/i.test(v.name)) ||
+                        voices.find(v => v.lang.includes('UK') && /Male/i.test(v.name)) ||
+                        voices.find(v => /Male/i.test(v.name)) ||
+                        voices.find(v => v.lang.includes('IN'));
+        } else {
+            preferred = voices.find(v => v.lang.includes('IN') && /Female/i.test(v.name)) ||
+                        voices.find(v => v.lang.includes('IN') && /Google|Premium/i.test(v.name)) ||
+                        voices.find(v => /Female/i.test(v.name)) ||
+                        voices.find(v => v.lang.includes('IN')) ||
+                        voices.find(v => v.lang.includes('US'));
+        }
 
         if (preferred) utterance.voice = preferred;
         utterance.onstart = () => setIsSpeaking(true);
@@ -364,6 +393,7 @@ export default function AIAssistant() {
                     if (msg.role === 'AGENT') {
                         setIsSpeaking(true);
                         setTyping(false);
+                        playLocalTTS(msg.text); // Play voice immediately
                     }
 
                     setMessages(prev => {
@@ -390,7 +420,8 @@ export default function AIAssistant() {
                 });
 
                 s.on("turn_complete", () => {
-                    setIsSpeaking(false);
+                    // Do NOT call setIsSpeaking(false) here! The TTS engine's onend event will handle it.
+                    // If we set it false here, the mic turns on immediately and mutes/cancels the TTS audio.
                     setTyping(false);
                     setMessages(prev => {
                         const lastMsg = prev[prev.length - 1];
@@ -584,21 +615,32 @@ export default function AIAssistant() {
             <div className="pd-page-header ai-doctor-header">
                 <div className="ai-doctor-title">
                     <div className={`ai-doctor-avatar ${isSpeaking ? 'speaking' : ''}`}>
-                        <span className="ai-doctor-cross">+</span>
+                        <span className="ai-doctor-cross">🌿</span>
                     </div>
                     <div>
                         <h1>VaidyaMedX AI Doctor</h1>
                         <p>Chat, AI video consult, OCR report scan, and safe remedy guidance.</p>
                     </div>
                 </div>
-                <button
-                    type="button"
-                    className={`pd-btn ${callActive ? 'pd-btn-danger' : 'pd-btn-primary'}`}
-                    onClick={callActive ? stopVideoConsult : startVideoConsult}
-                >
-                    <span className="icon-video" aria-hidden="true"></span>
-                    {callActive ? 'End AI Call' : 'Start AI Call'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <select 
+                        className="pd-btn pd-btn-outline" 
+                        value={voiceGender} 
+                        onChange={(e) => setVoiceGender(e.target.value)}
+                        style={{ padding: '6px 12px' }}
+                    >
+                        <option value="female">Female Voice</option>
+                        <option value="male">Male Voice</option>
+                    </select>
+                    <button
+                        type="button"
+                        className={`pd-btn ${callActive ? 'pd-btn-danger' : 'pd-btn-primary'}`}
+                        onClick={callActive ? stopVideoConsult : startVideoConsult}
+                    >
+                        <span className="icon-video" aria-hidden="true"></span>
+                        {callActive ? 'End AI Call' : 'Start AI Call'}
+                    </button>
+                </div>
             </div>
 
             {callActive && (
@@ -666,7 +708,7 @@ export default function AIAssistant() {
                                             <span></span>
                                         </div>
                                     ) : (
-                                        <span className="mini-cross">+</span>
+                                        <span className="mini-cross">🌿</span>
                                     )}
                                 </div>
                             )}
